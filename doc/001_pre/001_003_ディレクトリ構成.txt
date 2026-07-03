@@ -1,0 +1,169 @@
+
+ディレクトリ構成
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+
+
+================================================================================
+方針
+================================================================================
+
+  - 外側: Feature-based（feature を最上位の仕切りにする）
+  - 内側: Layer-based（各 feature の中で renderer / main / shared に分ける）
+  - Electron の renderer / preload / main は「実行場所」の壁。
+    feature 外側に electron/ を置かない。各 feature の中に renderer / main がある。
+  - MVP で未実装の feature も、最初からフォルダ（箱）を用意する。
+  - 横断 concern（安全・シェル・共通 UI 等）は features/ ではなく shared/ へ。
+
+
+================================================================================
+トップ構成
+================================================================================
+
+  src/
+    features/              … 機能単位（垂直分割）
+    shared/                … 複数 feature から使う横断モジュール
+    preload/               … IPC 窓口（アプリ共通・薄く保つ）
+    renderer/
+      app/                 … エントリ・ルーティング・シェル組み立て
+    main/
+      index.ts             … エントリ・IPC 登録
+
+
+================================================================================
+features/ 一覧
+================================================================================
+
+  001_002 の章立てをベースに、ユーザーが意識する塊で分割する。
+  フォルダ名は snake_case（001_004 参照）。
+
+  #   feature 名           001_002 対応                    MVP
+  ─   ──────────────────   ─────────────────────────────   ───
+  1   connection             接続                            ✓
+  2   workspace              プロジェクト管理                △ 箱のみ（単一接続）
+  3   explorer               データ閲覧・編集                ✓
+  4   query                  クエリ（Simple 系）             ✓
+  5   bulk_operations        一括操作（diff プレビュー等）   ✓  ★差別化の核
+  6   data_transfer          インポート / エクスポート / 転送 △  export のみ
+  7   script_runner          JS エディタ・Background Tasks   —  v1
+  8   auth                   Firebase Authentication         —  v1
+  9   onboarding             初回オンボーディングガイド      —  v1
+
+  後回し（001_002）の機能は、必要になるまで feature を増やさない。
+    例: storage, audit, licensing, dashboard
+
+
+================================================================================
+各 feature の内部構成
+================================================================================
+
+  features/<feature_name>/
+    renderer/              … React（ui, hooks 等）
+    main/                  … Node.js / firebase-admin（ipc, service 等）
+    shared/                … その feature 専用の型・定数（両プロセス共有）
+
+  例:
+
+    features/bulk_operations/
+      renderer/
+      main/
+      shared/
+
+
+================================================================================
+features/ ツリー（全体）
+================================================================================
+
+  src/
+    features/
+      connection/
+        renderer/  main/  shared/
+      workspace/
+        renderer/  main/  shared/
+      explorer/
+        renderer/  main/  shared/
+      query/
+        renderer/  main/  shared/
+      bulk_operations/
+        renderer/  main/  shared/
+      data_transfer/
+        renderer/  main/  shared/
+      script_runner/
+        renderer/  main/  shared/
+      auth/
+        renderer/  main/  shared/
+      onboarding/
+        renderer/  main/  shared/
+
+
+================================================================================
+shared/ 一覧（feature にしない横断モジュール）
+================================================================================
+
+  src/
+    shared/
+      shell/                 … メインウィンドウ、タブ枠、Split View 枠、Command Palette
+      safety/                … 本番警告、破壊的操作確認、コスト表示
+      settings/              … ダークテーマ、ショートカット
+      ui/                    … 共通 UI コンポーネント
+      firestore/             … firebase-admin 接続の共通基盤
+      i18n/                  … 日本語 UI
+
+
+================================================================================
+feature 間の責務メモ
+================================================================================
+
+  connection       … どう繋ぐか（サービスアカウント JSON、v1: Google / Emulator）
+  workspace        … 繋いだ先の管理（複数、ラベル、read-only）
+  explorer         … コレクションを開いて見る・1件編集（Table / JSON、CRUD）
+  query            … 条件を組んで検索（where / orderBy / limit、Collection Group）
+  bulk_operations  … まとめて変える（一括削除・更新、diff プレビュー、バッチ 500）
+  data_transfer    … ファイル経由でデータを動かす（export / import / 転送 / バックアップ）
+  script_runner    … JS エディタ実行、Background Tasks（v1）
+  auth             … Firebase Auth ユーザー管理（v1）
+
+  協調の例:
+    テーブル複数選択 → 一括削除
+      UI トリガー: explorer / shell
+      処理本体:    bulk_operations
+
+    クエリ結果 → 一括更新
+      検索:        query
+      更新:        bulk_operations
+
+    タブ・Split View
+      枠:          shared/shell
+      中身:        explorer
+
+
+================================================================================
+MVP 実装順（箱は全 feature 先に用意）
+================================================================================
+
+  1. connection
+  2. explorer
+  3. query
+  4. bulk_operations
+  5. data_transfer（export のみ）
+
+  shared/safety は 1 と 4 と並行で入れる。
+
+
+================================================================================
+001_002 章 → feature 対応
+================================================================================
+
+  接続                         → connection
+  プロジェクト管理             → workspace
+  データ閲覧・編集             → explorer（+ shared/shell のタブ枠）
+  クエリ                       → query
+  一括操作（GUI・diff）        → bulk_operations
+  一括操作（JS・Tasks）        → script_runner
+  インポート / エクスポート    → data_transfer
+  Firebase Authentication      → auth
+  オンボーディング             → onboarding
+  安全・UX（警告・確認）       → shared/safety, shared/settings
+  アプリ基盤（タブ・Split）    → shared/shell
+

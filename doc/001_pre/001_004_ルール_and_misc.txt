@@ -1,0 +1,42 @@
+
+ルール
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+
+＊　ハイフン禁止。アンスコで統一。
+
+
+
+
+
+
+misc
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+
+
+
+ディレクトリに先立ち、大きく分けると下記の通り
+垂直分割 / Feature-based / Package by feature / Vertical slice
+水平分割 / Layer-based / Package by layer / Horizontal slice
+
+このプロジェクトは、
+垂直分割 / Feature-based / Package by feature / Vertical slice
+で進める
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
