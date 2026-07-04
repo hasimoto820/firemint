@@ -9,6 +9,10 @@
     "src/features/**/shared/**/*",
     "src/shared/**/*"
   ],
+  "exclude": [
+    "src/shared/shell/**/*",
+    "src/shared/ui/**/*"
+  ],
   "compilerOptions": {
     "composite": true,
     "types": ["electron-vite/node"],

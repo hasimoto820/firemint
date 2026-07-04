@@ -2,7 +2,11 @@ import { useEffect, useState } from 'react'
 import type { ConnectResult, ConnectionStatus } from '@features/connection/shared/types'
 import EnvironmentBadge from './EnvironmentBadge'
 
-function ConnectionPanel(): React.JSX.Element {
+type ConnectionPanelProps = {
+  onConnected?: () => void
+}
+
+function ConnectionPanel({ onConnected }: ConnectionPanelProps): React.JSX.Element {
   const [selectedFile, setSelectedFile] = useState<string | null>(null)
   const [status, setStatus] = useState<ConnectionStatus | null>(null)
   const [rootCollections, setRootCollections] = useState<string[]>([])
@@ -34,6 +38,7 @@ function ConnectionPanel(): React.JSX.Element {
       environment: result.environment
     })
     setRootCollections(result.rootCollections)
+    onConnected?.()
   }
 
   const handleConnect = async (): Promise<void> => {
