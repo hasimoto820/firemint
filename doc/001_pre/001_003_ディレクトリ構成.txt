@@ -103,12 +103,18 @@ shared/ 一覧（feature にしない横断モジュール）
 
   src/
     shared/
+      ipc/                   … IPC チャンネル名・IpcApi 型（preload / main / renderer 共有）
+      logging/               … 横断ログ（main / feature service から利用）
       shell/                 … メインウィンドウ、タブ枠、Split View 枠、Command Palette
       safety/                … 本番警告、破壊的操作確認、コスト表示
       settings/              … ダークテーマ、ショートカット
       ui/                    … 共通 UI コンポーネント
       firestore/             … firebase-admin 接続の共通基盤
       i18n/                  … 日本語 UI
+
+  補足:
+    - preload/ は IPC の窓口（contextBridge）のみ。チャンネル定義・型は shared/ipc/。
+    - feature が増えると shared/ipc/types.ts がハブとして太りやすい。typed IPC のトレードオフ。
 
 
 ================================================================================

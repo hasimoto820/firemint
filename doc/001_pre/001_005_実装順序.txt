@@ -171,20 +171,23 @@ shared の実装タイミング
 Phase 6〜：v1（MVP 後）
 ================================================================================
 
-  依存の少ない・体験インパクトの大きい順。順番は v1 着手前に再確認可。
+  v1 の最初は shared/ui 整理（001_006 反映）。機能追加の前に横断 UI を共通化する。
+  以降は依存の少ない・体験インパクトの大きい順。順番は v1 着手前に再確認可。
+
 
   Phase   内容
   ──────  ─────────────────────────────────────────────────────
-  6       workspace              … 複数プロジェクト、ラベル、read-only
-  7       explorer 拡張          … Tree、フィルタ、複製、Geopoint 等
-  8       shared/shell 拡張      … タブ、Split View 枠、Command Palette
-  9       query 拡張             … Saved Queries、starts-with、オートコンプリート
-  10      data_transfer 拡張     … import、全 DB バックアップ、プロジェクト間転送
-  11      connection 拡張        … Google サインイン、Emulator 対応
-  12      script_runner          … JS エディタ、Background Tasks
-  13      auth                   … Firebase Auth ユーザー管理
-  14      onboarding             … 初回オンボーディングガイド（日本語）
-  15      shared/i18n, settings  … 日本語 UI 整備、ダークテーマ、ショートカット
+  6       shared/ui              … 部品共通化
+  7       workspace              … 複数プロジェクト、ラベル、read-only
+  8       explorer 拡張          … Tree、フィルタ、複製、Geopoint 等
+  9       shared/shell 拡張      … タブ、Split View 枠、Command Palette
+  10      query 拡張             … Saved Queries、starts-with、オートコンプリート
+  11      data_transfer 拡張     … import、全 DB バックアップ、プロジェクト間転送
+  12      connection 拡張        … Google サインイン、Emulator 対応
+  13      script_runner          … JS エディタ、Background Tasks
+  14      auth                   … Firebase Auth ユーザー管理
+  15      onboarding             … 初回オンボーディングガイド（日本語）
+  16      shared/i18n, settings  … 日本語 UI 整備、ダークテーマ、ショートカット
 
 
 ================================================================================
@@ -211,4 +214,30 @@ MVP 完了の定義（001_002 D 節と同一）
   □ クエリ結果のフィールドを一括更新でき、プレビュー    … Phase 4
   □ JSON / CSV エクスポートができる                     … Phase 5
   □ 破壊的操作に確認が入る                              … Phase 4（safety）
+
+
+
+
+
+--------------------------------------------------------------------------------
+Phase 6 — shared/ui 整理
+--------------------------------------------------------------------------------
+
+  作るもの:
+    shared/ui/                … 横断 UI 部品の移動・集約
+    （001_006 参照）
+      EnvironmentBadge        … connection/renderer から移動
+      DocumentTable           … explorer/renderer から移動
+      DocumentJsonPanel       … explorer/renderer から移動
+    features/*/renderer       … import 先を shared/ui に更新（機能変更なし）
+
+  方針:
+    - 部品（見た目）→ shared/ui/
+    - Firestore の取得・更新・ページ構成 → feature/ のまま
+    - DocumentSummary 等の型は当面 feature/shared または shared 側で整理（移動時に決める）
+
+  Done:
+    □ EnvironmentBadge / DocumentTable / DocumentJsonPanel が shared/ui/ にある
+    □ explorer / query の import が shared/ui 経由
+    □ 既存 MVP 機能（表示・選択・一括操作）に退行がない
 

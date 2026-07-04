@@ -1,0 +1,23 @@
+
+リファクタ
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+
+
+1. explorer の UI を query が直接 import
+query → explorer/DocumentTable, DocumentJsonPanel
+query → connection/EnvironmentBadge
+doc 上は テーブル再利用は OK。EnvironmentBadge だけ connection 依存がやや散らばっています。v1 で shared/ui/ に移す候補程度です。
+
+2. shared/ipc/types.ts が全 feature の型を import
+typed IPC のハブとしては自然ですが、feature が増えるとここだけ太る パターンです。現状 5 feature なら問題なし。
+
+3. DocumentTable が shared にない
+doc も「explorer 所有・再利用」としているので 今のままで正しい。複数 feature から使うようになったら v1 で shared/ui/ 移動を検討、程度です。
+
+
+
+
+
+
