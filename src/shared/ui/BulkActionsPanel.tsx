@@ -10,7 +10,7 @@ import {
   formatCostUsd
 } from '@shared/safety/operations'
 import Button from '@shared/ui/Button'
-import DiffPreviewPanel from './DiffPreviewPanel'
+import DiffPreviewPanel from '@shared/ui/DiffPreviewPanel'
 
 type BulkActionsPanelProps = {
   environment: EnvironmentKind

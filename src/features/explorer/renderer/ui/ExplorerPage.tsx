@@ -8,8 +8,8 @@ import Button from '@shared/ui/Button'
 import DocumentJsonPanel from '@shared/ui/DocumentJsonPanel'
 import DocumentTable from '@shared/ui/DocumentTable'
 import EnvironmentBadge from '@shared/ui/EnvironmentBadge'
-import BulkActionsPanel from '@features/bulk_operations/renderer/ui/BulkActionsPanel'
-import ExportPanel from '@features/data_transfer/renderer/ui/ExportPanel'
+import BulkActionsPanel from '@shared/ui/BulkActionsPanel'
+import ExportPanel from '@shared/ui/ExportPanel'
 import CollectionSidebar from './CollectionSidebar'
 
 type ExplorerPageProps = {

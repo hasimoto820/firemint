@@ -17,6 +17,20 @@
       - gRPC　→　REST
 
 
+＊　UI部品化
+Page → 必ず features/*/ui/
+部品（名前付き React コンポーネントで再利用）→ shared/ui/
+生 HTML → 包まない。必要なら Button 程度
+迷ったら → 2 feature から使う？ Yes → shared / No → feature
+
+
+
+
+
+
+
+
+
 
 
 misc
