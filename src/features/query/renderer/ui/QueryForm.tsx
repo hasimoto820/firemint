@@ -27,11 +27,12 @@ const EMPTY_WHERE: QueryWhereClause = {
 }
 
 type QueryFormProps = {
+  projectId: string
   loading: boolean
   onRun: (input: SimpleQueryInput) => void
 }
 
-function QueryForm({ loading, onRun }: QueryFormProps): React.JSX.Element {
+function QueryForm({ projectId, loading, onRun }: QueryFormProps): React.JSX.Element {
   const [collectionPath, setCollectionPath] = useState('company')
   const [collectionGroup, setCollectionGroup] = useState(false)
   const [wheres, setWheres] = useState<QueryWhereClause[]>([])
@@ -59,6 +60,7 @@ function QueryForm({ loading, onRun }: QueryFormProps): React.JSX.Element {
     const activeWheres = wheres.filter((where) => where.field.trim())
 
     onRun({
+      projectId,
       collectionPath: collectionPath.trim(),
       collectionGroup,
       wheres: activeWheres,

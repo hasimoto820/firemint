@@ -11,18 +11,33 @@ const api: IpcApi = {
     disconnect: () => ipcRenderer.invoke(IPC_CHANNELS.CONNECTION_DISCONNECT),
     getStatus: () => ipcRenderer.invoke(IPC_CHANNELS.CONNECTION_GET_STATUS)
   },
+  workspace: {
+    getState: () => ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_GET_STATE),
+    addEntry: (input) => ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_ADD_ENTRY, input),
+    removeEntry: (projectId: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_REMOVE_ENTRY, projectId),
+    updateEntry: (projectId: string, input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_UPDATE_ENTRY, projectId, input),
+    loadProject: (projectId: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_LOAD_PROJECT, projectId),
+    unloadProject: (projectId: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_UNLOAD_PROJECT, projectId),
+    setFocused: (projectId: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_SET_FOCUSED, projectId)
+  },
   explorer: {
-    listRootCollections: () => ipcRenderer.invoke(IPC_CHANNELS.EXPLORER_LIST_ROOT_COLLECTIONS),
-    listDocuments: (collectionPath: string) =>
-      ipcRenderer.invoke(IPC_CHANNELS.EXPLORER_LIST_DOCUMENTS, collectionPath),
-    getDocument: (documentPath: string) =>
-      ipcRenderer.invoke(IPC_CHANNELS.EXPLORER_GET_DOCUMENT, documentPath),
+    listRootCollections: (projectId: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.EXPLORER_LIST_ROOT_COLLECTIONS, projectId),
+    listDocuments: (projectId: string, collectionPath: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.EXPLORER_LIST_DOCUMENTS, projectId, collectionPath),
+    getDocument: (projectId: string, documentPath: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.EXPLORER_GET_DOCUMENT, projectId, documentPath),
     createDocument: (input) => ipcRenderer.invoke(IPC_CHANNELS.EXPLORER_CREATE_DOCUMENT, input),
     updateDocument: (input) => ipcRenderer.invoke(IPC_CHANNELS.EXPLORER_UPDATE_DOCUMENT, input),
-    deleteDocument: (documentPath: string) =>
-      ipcRenderer.invoke(IPC_CHANNELS.EXPLORER_DELETE_DOCUMENT, documentPath),
-    listSubcollections: (documentPath: string) =>
-      ipcRenderer.invoke(IPC_CHANNELS.EXPLORER_LIST_SUBCOLLECTIONS, documentPath)
+    deleteDocument: (projectId: string, documentPath: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.EXPLORER_DELETE_DOCUMENT, projectId, documentPath),
+    listSubcollections: (projectId: string, documentPath: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.EXPLORER_LIST_SUBCOLLECTIONS, projectId, documentPath)
   },
   query: {
     execute: (input) => ipcRenderer.invoke(IPC_CHANNELS.QUERY_EXECUTE, input)

@@ -4,6 +4,7 @@ import Button from '@shared/ui/Button'
 
 type ExportPanelCollectionProps = {
   mode: 'collection'
+  projectId: string
   collectionPath: string | null
   disabled?: boolean
   onSuccess: (message: string) => void
@@ -54,6 +55,7 @@ function ExportPanel(props: ExportPanelProps): React.JSX.Element {
 
     try {
       const result = await window.api.dataTransfer.exportCollectionJson({
+        projectId: props.projectId,
         collectionPath: props.collectionPath
       })
       handleResult(result)

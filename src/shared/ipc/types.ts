@@ -29,6 +29,14 @@ import type {
   ExportResult
 } from '@features/data_transfer/shared/types'
 
+import type {
+  AddWorkspaceEntryInput,
+  UpdateWorkspaceEntryInput,
+  WorkspaceEntry,
+  WorkspaceResult,
+  WorkspaceState
+} from '@features/workspace/shared/types'
+
 export type PingResult = {
   message: string
 }
@@ -41,13 +49,16 @@ export type ConnectionIpcApi = {
 }
 
 export type ExplorerIpcApi = {
-  listRootCollections: () => Promise<ExplorerResult<string[]>>
-  listDocuments: (collectionPath: string) => Promise<ExplorerResult<DocumentSummary[]>>
-  getDocument: (documentPath: string) => Promise<ExplorerResult<DocumentDetail>>
+  listRootCollections: (projectId: string) => Promise<ExplorerResult<string[]>>
+  listDocuments: (
+    projectId: string,
+    collectionPath: string
+  ) => Promise<ExplorerResult<DocumentSummary[]>>
+  getDocument: (projectId: string, documentPath: string) => Promise<ExplorerResult<DocumentDetail>>
   createDocument: (input: CreateDocumentInput) => Promise<ExplorerResult<string>>
   updateDocument: (input: UpdateDocumentInput) => Promise<ExplorerResult<null>>
-  deleteDocument: (documentPath: string) => Promise<ExplorerResult<null>>
-  listSubcollections: (documentPath: string) => Promise<ExplorerResult<string[]>>
+  deleteDocument: (projectId: string, documentPath: string) => Promise<ExplorerResult<null>>
+  listSubcollections: (projectId: string, documentPath: string) => Promise<ExplorerResult<string[]>>
 }
 
 export type QueryIpcApi = {
@@ -66,9 +77,23 @@ export type DataTransferIpcApi = {
   exportDocumentsCsv: (input: ExportDocumentsInput) => Promise<ExportResult>
 }
 
+export type WorkspaceIpcApi = {
+  getState: () => Promise<WorkspaceState>
+  addEntry: (input: AddWorkspaceEntryInput) => Promise<WorkspaceResult<WorkspaceEntry>>
+  removeEntry: (projectId: string) => Promise<WorkspaceResult<null>>
+  updateEntry: (
+    projectId: string,
+    input: UpdateWorkspaceEntryInput
+  ) => Promise<WorkspaceResult<WorkspaceEntry>>
+  loadProject: (projectId: string) => Promise<WorkspaceResult<WorkspaceEntry>>
+  unloadProject: (projectId: string) => Promise<WorkspaceResult<null>>
+  setFocused: (projectId: string) => Promise<WorkspaceResult<WorkspaceEntry>>
+}
+
 export interface IpcApi {
   ping: () => Promise<PingResult>
   connection: ConnectionIpcApi
+  workspace: WorkspaceIpcApi
   explorer: ExplorerIpcApi
   query: QueryIpcApi
   bulk: BulkOperationsIpcApi

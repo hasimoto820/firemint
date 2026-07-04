@@ -7,12 +7,14 @@ export type DocumentSummary = {
 export type DocumentDetail = DocumentSummary
 
 export type CreateDocumentInput = {
+  projectId: string
   collectionPath: string
   data: Record<string, unknown>
   documentId?: string
 }
 
 export type UpdateDocumentInput = {
+  projectId: string
   documentPath: string
   data: Record<string, unknown>
 }

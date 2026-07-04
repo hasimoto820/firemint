@@ -5,6 +5,7 @@ import { deserializeFirestoreValue } from '@shared/firestore/serialize'
 import { parseQueryLiteral } from '@shared/firestore/value_parse'
 import { calculateBatchCount, FIRESTORE_BATCH_LIMIT } from '@shared/safety/operations'
 import { logError, logInfo } from '@shared/logging/logger'
+import { ensureWritable } from '@features/workspace/main/guard'
 import type {
   BulkDeleteInput,
   BulkOperationSummary,
@@ -13,9 +14,9 @@ import type {
   DiffPreviewItem
 } from '@features/bulk_operations/shared/types'
 
-function ensureConnected(): void {
-  if (!isFirestoreConnected()) {
-    throw new Error('Firestore is not connected')
+function ensureConnected(projectId: string): void {
+  if (!isFirestoreConnected(projectId)) {
+    throw new Error(`Firestore is not connected: ${projectId}`)
   }
 }
 
@@ -60,6 +61,7 @@ function formatPreviewValue(value: unknown): unknown {
 }
 
 async function commitInBatches(
+  projectId: string,
   documentPaths: string[],
   applyToBatch: (batch: WriteBatch, documentPath: string) => void
 ): Promise<BulkOperationSummary> {
@@ -70,7 +72,7 @@ async function commitInBatches(
   }
 
   for (const chunk of batches) {
-    const batch = getFirestore().batch()
+    const batch = getFirestore(projectId).batch()
 
     for (const documentPath of chunk) {
       applyToBatch(batch, documentPath)
@@ -89,17 +91,20 @@ export async function previewBulkUpdateField(
   input: BulkUpdateFieldInput
 ): Promise<BulkResult<DiffPreviewItem[]>> {
   try {
-    ensureConnected()
+    ensureConnected(input.projectId)
 
     const documentPaths = validateDocumentPaths(input.documentPaths)
     const field = validateField(input.field)
     const parsedValue = parseQueryLiteral(input.value)
     const previewItems: DiffPreviewItem[] = []
 
-    logInfo('bulk_operations', `previewBulkUpdateField count=${documentPaths.length} field=${field}`)
+    logInfo(
+      'bulk_operations',
+      `previewBulkUpdateField projectId=${input.projectId} count=${documentPaths.length} field=${field}`
+    )
 
     for (const documentPath of documentPaths) {
-      const snapshot = await getDocumentRef(documentPath).get()
+      const snapshot = await getDocumentRef(documentPath, input.projectId).get()
 
       if (!snapshot.exists) {
         continue
@@ -129,16 +134,24 @@ export async function bulkUpdateField(
   input: BulkUpdateFieldInput
 ): Promise<BulkResult<BulkOperationSummary>> {
   try {
-    ensureConnected()
+    ensureConnected(input.projectId)
+    ensureWritable(input.projectId)
 
     const documentPaths = validateDocumentPaths(input.documentPaths)
     const field = validateField(input.field)
     const parsedValue = parseFieldValue(input.value)
 
-    logInfo('bulk_operations', `bulkUpdateField count=${documentPaths.length} field=${field}`)
+    logInfo(
+      'bulk_operations',
+      `bulkUpdateField projectId=${input.projectId} count=${documentPaths.length} field=${field}`
+    )
 
-    const summary = await commitInBatches(documentPaths, (batch, documentPath) => {
-      batch.set(getDocumentRef(documentPath), { [field]: parsedValue }, { merge: true })
+    const summary = await commitInBatches(input.projectId, documentPaths, (batch, documentPath) => {
+      batch.set(
+        getDocumentRef(documentPath, input.projectId),
+        { [field]: parsedValue },
+        { merge: true }
+      )
     })
 
     return { ok: true, data: summary }
@@ -151,14 +164,15 @@ export async function bulkDelete(
   input: BulkDeleteInput
 ): Promise<BulkResult<BulkOperationSummary>> {
   try {
-    ensureConnected()
+    ensureConnected(input.projectId)
+    ensureWritable(input.projectId)
 
     const documentPaths = validateDocumentPaths(input.documentPaths)
 
-    logInfo('bulk_operations', `bulkDelete count=${documentPaths.length}`)
+    logInfo('bulk_operations', `bulkDelete projectId=${input.projectId} count=${documentPaths.length}`)
 
-    const summary = await commitInBatches(documentPaths, (batch, documentPath) => {
-      batch.delete(getDocumentRef(documentPath))
+    const summary = await commitInBatches(input.projectId, documentPaths, (batch, documentPath) => {
+      batch.delete(getDocumentRef(documentPath, input.projectId))
     })
 
     logInfo(

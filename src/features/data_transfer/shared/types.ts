@@ -5,6 +5,7 @@ export type ExportDocument = {
 }
 
 export type ExportCollectionJsonInput = {
+  projectId: string
   collectionPath: string
 }
 

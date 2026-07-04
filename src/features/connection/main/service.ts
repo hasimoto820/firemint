@@ -1,14 +1,12 @@
-import { readFile } from 'fs/promises'
-import {
-  connectFirestore,
-  disconnectFirestore,
-  getConnectionInfo,
-  getFirestore,
-  isFirestoreConnected,
-  logFirestoreState
-} from '@shared/firestore/client'
+import { getConnectionInfo, getFirestore, logFirestoreState } from '@shared/firestore/client'
 import { logError, logInfo, logWarn } from '@shared/logging/logger'
 import { detectEnvironment } from '@shared/safety/environment'
+import {
+  addEntryAndLoad,
+  getFocusedConnectionInfo,
+  unloadProject
+} from '@features/workspace/main/service'
+import { getFocusedProjectId } from '@shared/firestore/focused'
 import type { ConnectResult, ConnectionStatus } from '@features/connection/shared/types'
 
 const CONNECT_TIMEOUT_MS = 30_000
@@ -43,11 +41,11 @@ function formatConnectionError(error: unknown): string {
   return message
 }
 
-async function listRootCollectionsWithTimeout(): Promise<string[]> {
-  logInfo('connection', `listCollections start (timeout=${CONNECT_TIMEOUT_MS}ms)`)
+async function listRootCollectionsWithTimeout(projectId: string): Promise<string[]> {
+  logInfo('connection', `listCollections start projectId=${projectId} timeout=${CONNECT_TIMEOUT_MS}ms`)
   const startedAt = Date.now()
 
-  const collectionsPromise = getFirestore()
+  const collectionsPromise = getFirestore(projectId)
     .listCollections()
     .then((collections) => {
       const names = collections.map((collection) => collection.id)
@@ -81,25 +79,32 @@ export async function connectWithServiceAccountFile(filePath: string): Promise<C
   logInfo('connection', `connect start file=${filePath}`)
 
   try {
-    logInfo('connection', 'read service account file')
-    const json = await readFile(filePath, 'utf-8')
-    logInfo('connection', `read service account file ok bytes=${json.length}`)
+    const addResult = await addEntryAndLoad({
+      serviceAccountPath: filePath,
+      setFocused: true
+    })
 
-    const info = await connectFirestore(json)
+    if (!addResult.ok) {
+      return { ok: false, error: addResult.error }
+    }
+
+    const entry = addResult.data
     logFirestoreState('after initializeApp')
 
-    const rootCollections = await listRootCollectionsWithTimeout()
-    const environment = detectEnvironment(info.projectId)
+    const rootCollections = await listRootCollectionsWithTimeout(entry.id)
+    const environment = detectEnvironment(entry.id)
 
     logInfo(
       'connection',
-      `connect success in ${Date.now() - startedAt}ms project_id=${info.projectId} collections=${rootCollections.length}`
+      `connect success in ${Date.now() - startedAt}ms project_id=${entry.id} collections=${rootCollections.length}`
     )
+
+    const info = getConnectionInfo(entry.id)
 
     return {
       ok: true,
-      projectId: info.projectId,
-      clientEmail: info.clientEmail,
+      projectId: entry.id,
+      clientEmail: info?.clientEmail ?? '',
       environment,
       rootCollections
     }
@@ -113,21 +118,28 @@ export async function connectWithServiceAccountFile(filePath: string): Promise<C
 }
 
 export async function disconnectFromFirestore(): Promise<void> {
-  logInfo('connection', 'disconnect start')
-  await disconnectFirestore()
+  const projectId = getFocusedProjectId()
+  logInfo('connection', `disconnect start projectId=${projectId ?? 'none'}`)
+
+  if (!projectId) {
+    return
+  }
+
+  await unloadProject(projectId)
   logInfo('connection', 'disconnect done')
 }
 
 export function getConnectionStatus(): ConnectionStatus | null {
-  const info = getConnectionInfo()
+  const focused = getFocusedConnectionInfo()
 
-  if (!info || !isFirestoreConnected()) {
+  if (!focused?.info) {
     return null
   }
 
   return {
-    projectId: info.projectId,
-    clientEmail: info.clientEmail,
-    environment: detectEnvironment(info.projectId)
+    projectId: focused.projectId,
+    clientEmail: focused.info.clientEmail,
+    environment: detectEnvironment(focused.projectId),
+    readOnly: focused.entry?.readOnly ?? false
   }
 }

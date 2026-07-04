@@ -16,9 +16,9 @@ import { documentsToCsv, documentsToJson, sanitizeFileName } from './format'
 
 const PAGE_SIZE = 500
 
-function ensureConnected(): void {
-  if (!isFirestoreConnected()) {
-    throw new Error('Firestore is not connected')
+function ensureConnected(projectId: string): void {
+  if (!isFirestoreConnected(projectId)) {
+    throw new Error(`Firestore is not connected: ${projectId}`)
   }
 }
 
@@ -47,8 +47,11 @@ function toExportDocument(
   }
 }
 
-async function fetchAllDocuments(collectionPath: string): Promise<ExportDocument[]> {
-  const collectionRef = getCollectionRef(collectionPath)
+async function fetchAllDocuments(
+  projectId: string,
+  collectionPath: string
+): Promise<ExportDocument[]> {
+  const collectionRef = getCollectionRef(collectionPath, projectId)
   const documents: ExportDocument[] = []
   let lastDocument: QueryDocumentSnapshot | undefined
 
@@ -115,16 +118,16 @@ export async function exportCollectionJson(
   window: BrowserWindow | null
 ): Promise<ExportResult> {
   try {
-    ensureConnected()
+    ensureConnected(input.projectId)
 
     const collectionPath = input.collectionPath.trim()
     if (!collectionPath) {
       throw new Error('コレクション path を指定してください')
     }
 
-    logInfo('data_transfer', `exportCollectionJson path=${collectionPath}`)
+    logInfo('data_transfer', `exportCollectionJson projectId=${input.projectId} path=${collectionPath}`)
 
-    const documents = await fetchAllDocuments(collectionPath)
+    const documents = await fetchAllDocuments(input.projectId, collectionPath)
 
     if (documents.length === 0) {
       throw new Error('エクスポート対象のドキュメントがありません')

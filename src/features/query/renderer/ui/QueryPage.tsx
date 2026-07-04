@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { ConnectionStatus } from '@features/connection/shared/types'
 import type { DocumentSummary } from '@features/explorer/shared/types'
 import type { SimpleQueryInput } from '@features/query/shared/types'
+import WorkspacePanel from '@features/workspace/renderer/ui/WorkspacePanel'
 import AppNav from '@shared/shell/AppNav'
 import type { AppView } from '@shared/shell/AppNav'
 import AppShell from '@shared/shell/AppShell'
@@ -16,11 +17,19 @@ import QueryForm from './QueryForm'
 type QueryPageProps = {
   initialStatus: ConnectionStatus
   onDisconnected: () => void
+  onWorkspaceChanged: () => void
   onNavigate: (view: AppView) => void
 }
 
-function QueryPage({ initialStatus, onDisconnected, onNavigate }: QueryPageProps): React.JSX.Element {
+function QueryPage({
+  initialStatus,
+  onDisconnected,
+  onWorkspaceChanged,
+  onNavigate
+}: QueryPageProps): React.JSX.Element {
   const [status] = useState(initialStatus)
+  const projectId = status.projectId
+  const readOnly = status.readOnly
   const [documents, setDocuments] = useState<DocumentSummary[]>([])
   const [selectedDocumentPath, setSelectedDocumentPath] = useState<string | null>(null)
   const [jsonText, setJsonText] = useState('{\n  \n}')
@@ -73,7 +82,7 @@ function QueryPage({ initialStatus, onDisconnected, onNavigate }: QueryPageProps
     setError(null)
 
     try {
-      const result = await window.api.explorer.getDocument(documentPath)
+      const result = await window.api.explorer.getDocument(projectId, documentPath)
 
       if (!result.ok) {
         setError(result.error)
@@ -126,6 +135,7 @@ function QueryPage({ initialStatus, onDisconnected, onNavigate }: QueryPageProps
             <h1 className="explorer-header__title">FireMint</h1>
             <p className="explorer-header__meta">
               {status.projectId} <EnvironmentBadge environment={status.environment} />
+              {readOnly && <span className="explorer-header__readonly">read-only</span>}
             </p>
             <AppNav active="query" onChange={onNavigate} />
           </div>
@@ -136,6 +146,7 @@ function QueryPage({ initialStatus, onDisconnected, onNavigate }: QueryPageProps
       }
       sidebar={
         <div className="query-sidebar">
+          <WorkspacePanel onChanged={onWorkspaceChanged} disabled={loading} />
           <h2 className="query-sidebar__title">Query</h2>
           <p className="query-sidebar__hint">
             Simple クエリと Collection Group を実行します。結果の行をクリックすると JSON を表示できます。
@@ -148,7 +159,11 @@ function QueryPage({ initialStatus, onDisconnected, onNavigate }: QueryPageProps
       }
       main={
         <div className="query-main">
-          <QueryForm loading={loading} onRun={(input) => void handleRun(input)} />
+          <QueryForm
+            projectId={projectId}
+            loading={loading}
+            onRun={(input) => void handleRun(input)}
+          />
           {error && <p className="query-main__error">{error}</p>}
           {successMessage && <p className="query-main__success">{successMessage}</p>}
           {loading && <p className="query-main__loading">実行中...</p>}
@@ -165,20 +180,23 @@ function QueryPage({ initialStatus, onDisconnected, onNavigate }: QueryPageProps
             onSuccess={setSuccessMessage}
             onError={setError}
           />
-          <BulkActionsPanel
-            environment={status.environment}
-            selectedPaths={Array.from(bulkSelectedPaths)}
-            loading={loading}
-            onLoadingChange={setLoading}
-            onClearSelection={() => setBulkSelectedPaths(new Set())}
-            onOperationComplete={() => void handleBulkOperationComplete()}
-            onError={setError}
-          />
+          {!readOnly && (
+            <BulkActionsPanel
+              projectId={projectId}
+              environment={status.environment}
+              selectedPaths={Array.from(bulkSelectedPaths)}
+              loading={loading}
+              onLoadingChange={setLoading}
+              onClearSelection={() => setBulkSelectedPaths(new Set())}
+              onOperationComplete={() => void handleBulkOperationComplete()}
+              onError={setError}
+            />
+          )}
           <DocumentTable
             documents={documents}
             selectedDocumentPath={selectedDocumentPath}
             showPath={collectionGroup}
-            selectable
+            selectable={!readOnly}
             bulkSelectedPaths={bulkSelectedPaths}
             onBulkToggle={handleBulkToggle}
             onBulkToggleAll={handleBulkToggleAll}

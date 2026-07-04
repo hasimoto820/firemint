@@ -1,0 +1,194 @@
+
+workspace 設計（Phase 7）
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+関連:
+  001_005 Phase 7
+  001_003 features/workspace, shared/firestore
+  001_004 Firestore 接続ルール（client.ts 経由は維持）
+
+
+================================================================================
+目的
+================================================================================
+
+  - 複数 Firebase プロジェクトを登録・保持する
+  - プロジェクトごとにラベル色・read-only を設定する
+  - 接続は projectId 単位のプール（1本限定にしない）
+  - Phase 9 タブは { projectId, collectionPath } を持つ（Phase 7 では未実装）
+
+
+================================================================================
+責務分担
+================================================================================
+
+  features/workspace/
+    - 登録済みプロジェクトの名簿（WorkspaceEntry[]）
+    - 永続化（ローカル JSON）
+    - 追加・削除・ラベル・readOnly 編集
+    - ロード / アンロードの orchestration（firestore に connect 依頼）
+    - UI: プロジェクト一覧・選択中（フォーカス）表示
+
+  shared/firestore/
+    - Map<projectId, ConnectionEntry> で接続プールを保持
+    - connect(projectId, serviceAccountJson) / disconnect(projectId)
+    - getFirestore(projectId) … 読み書きの入口
+    - preferRest: true はここだけ（001_004）
+
+  features/connection/
+    - サービスアカウント JSON ファイル選択（ダイアログ）
+    - 初回接続フロー（MVP 互換）。Phase 7 以降は workspace 追加フローと統合
+    - getStatus(projectId) … projectId + readOnly + environment 等を UI に返す
+
+  features/explorer / query / bulk_operations / data_transfer
+    - 全 IPC・service に projectId を渡す（Phase 7-b 以降で順次）
+    - 書込操作の先頭で read-only チェック（ensureWritable(projectId)）
+
+  shared/shell/（Phase 9）
+    - タブ状態: { projectId, collectionPath, view? }
+    - タブの数だけ別 projectId を指せる（接続プールと対応）
+
+
+================================================================================
+WorkspaceEntry（名簿1件）
+================================================================================
+
+  id              … projectId（Firebase project_id。一意キー）
+  label           … 表示名（ユーザー編集可）
+  color           … ラベル色（#RRGGBB）
+  serviceAccountPath … キー JSON のファイルパス（中身は保存しない）
+  readOnly        … true なら書込禁止
+  loaded          … 現在 Firestore 接続プールに載っているか（UI 用）
+
+
+================================================================================
+永続化
+================================================================================
+
+  場所:
+    config/workspaces.json（process.cwd() 基準。Git 対象外）
+
+  形式（例）:
+
+    {
+      "version": 1,
+      "entries": [
+        {
+          "id": "mintfarm-b62db",
+          "label": "MintFarm",
+          "color": "#4CAF50",
+          "serviceAccountPath": "F:/FireMint/key/mintfarm-....json",
+          "readOnly": false
+        }
+      ],
+      "focusedProjectId": "mintfarm-b62db"
+    }
+
+  注意:
+    - サービスアカウントの private_key は JSON に直書きしない
+    - パスが無効ならロード時にエラー表示
+
+
+================================================================================
+接続プール（shared/firestore）
+================================================================================
+
+  今（MVP）:
+    let app / firestore … 1本
+
+  Phase 7 以降:
+    Map<projectId, { app, firestore, info }>
+
+  firebase-admin は名前付き app:
+    admin.initializeApp(credential, projectId)
+
+  ルール:
+    - ロード = プールに追加（未接続なら connect）
+    - アンロード = disconnect(projectId) でプールから削除
+    - 複数 projectId が同時に接続されていてよい
+    - getFirestore(projectId) … 未接続なら Error
+
+  「active」という語:
+    - Firestore 接続を1本に絞る意味では使わない
+    - UI の focusedProjectId（今フォーカスしているプロジェクト）のみ
+
+
+================================================================================
+read-only の enforce
+================================================================================
+
+  意味:
+    本番など「見るだけ」のプロジェクトで誤操作を防ぐ（001_002 v1）
+
+  2段構え:
+
+    1. UI（renderer）
+       readOnly なら保存・削除・一括操作・import ボタンを disabled
+
+    2. main/service（必須）
+       書込 API の入口で ensureWritable(projectId):
+         workspace 名簿の readOnly を見て、true なら throw
+
+  チェック対象（書込）:
+    explorer: create / update / delete
+    bulk_operations: delete / updateField
+    data_transfer: import（Phase 11）
+
+  対象外（読取）:
+    list / get / query / export
+
+
+================================================================================
+IPC の変更方針
+================================================================================
+
+  原則: 既存 handler に projectId を追加（破壊的変更は Phase 7-b で一括）
+
+  例:
+    explorer.listDocuments(projectId, collectionPath)
+    bulk.delete({ projectId, documentPaths })
+
+  workspace 専用 IPC（新規）:
+    listEntries / addEntry / removeEntry / updateEntry
+    loadProject(projectId) / unloadProject(projectId)
+    getFocusedProject / setFocusedProject
+
+  shared/ipc/types.ts … workspace ブロック追加
+
+
+================================================================================
+UI（Phase 7-c）
+================================================================================
+
+  - サイドバーまたは専用パネルにプロジェクト一覧
+  - 色ラベル + 表示名
+  - 追加（JSON 選択 → 名簿登録 → ロード）
+  - 削除（名簿から。接続も unload）
+  - read-only トグル
+  - クリックで focusedProjectId 切替
+  - Explorer / Query は focusedProjectId の projectId で IPC
+
+  Phase 9 以降:
+    タブごとに projectId を持ち、focused と独立して複数表示
+
+
+================================================================================
+実装ステップ
+================================================================================
+
+  7-a  本ドキュメント（設計合意）                    … 完了目安: 本文
+  7-b  shared/firestore プール化 + workspace main   … projectId 渡し開始
+  7-c  workspace UI + 永続化 + read-only enforce     … 001_005 Done
+
+
+================================================================================
+Phase 7 Done（001_005 と同一）
+================================================================================
+
+  □ 複数のサービスアカウント JSON を登録・同時にロードできる
+  □ プロジェクト一覧から focused を切り替えられる
+  □ プロジェクトに色ラベルを付けられる
+  □ read-only プロジェクトでは書込・削除・一括操作が無効（UI + main）
+  □ 接続情報はローカルに保存され、再起動後も復元できる
+

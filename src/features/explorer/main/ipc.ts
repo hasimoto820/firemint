@@ -13,38 +13,50 @@ import {
 } from './service'
 
 export function registerExplorerHandlers(): void {
-  ipcMain.handle(IPC_CHANNELS.EXPLORER_LIST_ROOT_COLLECTIONS, async () => {
-    logInfo('ipc:explorer', 'listRootCollections invoked')
-    return listRootCollections()
+  ipcMain.handle(IPC_CHANNELS.EXPLORER_LIST_ROOT_COLLECTIONS, async (_event, projectId: string) => {
+    logInfo('ipc:explorer', `listRootCollections invoked projectId=${projectId}`)
+    return listRootCollections(projectId)
   })
 
-  ipcMain.handle(IPC_CHANNELS.EXPLORER_LIST_DOCUMENTS, async (_event, collectionPath: string) => {
-    logInfo('ipc:explorer', `listDocuments invoked path=${collectionPath}`)
-    return listDocuments(collectionPath)
-  })
+  ipcMain.handle(
+    IPC_CHANNELS.EXPLORER_LIST_DOCUMENTS,
+    async (_event, projectId: string, collectionPath: string) => {
+      logInfo('ipc:explorer', `listDocuments invoked projectId=${projectId} path=${collectionPath}`)
+      return listDocuments(projectId, collectionPath)
+    }
+  )
 
-  ipcMain.handle(IPC_CHANNELS.EXPLORER_GET_DOCUMENT, async (_event, documentPath: string) => {
-    logInfo('ipc:explorer', `getDocument invoked path=${documentPath}`)
-    return getDocument(documentPath)
-  })
+  ipcMain.handle(
+    IPC_CHANNELS.EXPLORER_GET_DOCUMENT,
+    async (_event, projectId: string, documentPath: string) => {
+      logInfo('ipc:explorer', `getDocument invoked projectId=${projectId} path=${documentPath}`)
+      return getDocument(projectId, documentPath)
+    }
+  )
 
   ipcMain.handle(IPC_CHANNELS.EXPLORER_CREATE_DOCUMENT, async (_event, input: CreateDocumentInput) => {
-    logInfo('ipc:explorer', `createDocument invoked path=${input.collectionPath}`)
+    logInfo('ipc:explorer', `createDocument invoked projectId=${input.projectId}`)
     return createDocument(input)
   })
 
   ipcMain.handle(IPC_CHANNELS.EXPLORER_UPDATE_DOCUMENT, async (_event, input: UpdateDocumentInput) => {
-    logInfo('ipc:explorer', `updateDocument invoked path=${input.documentPath}`)
+    logInfo('ipc:explorer', `updateDocument invoked projectId=${input.projectId}`)
     return updateDocument(input)
   })
 
-  ipcMain.handle(IPC_CHANNELS.EXPLORER_DELETE_DOCUMENT, async (_event, documentPath: string) => {
-    logInfo('ipc:explorer', `deleteDocument invoked path=${documentPath}`)
-    return deleteDocument(documentPath)
-  })
+  ipcMain.handle(
+    IPC_CHANNELS.EXPLORER_DELETE_DOCUMENT,
+    async (_event, projectId: string, documentPath: string) => {
+      logInfo('ipc:explorer', `deleteDocument invoked projectId=${projectId}`)
+      return deleteDocument(projectId, documentPath)
+    }
+  )
 
-  ipcMain.handle(IPC_CHANNELS.EXPLORER_LIST_SUBCOLLECTIONS, async (_event, documentPath: string) => {
-    logInfo('ipc:explorer', `listSubcollections invoked path=${documentPath}`)
-    return listSubcollections(documentPath)
-  })
+  ipcMain.handle(
+    IPC_CHANNELS.EXPLORER_LIST_SUBCOLLECTIONS,
+    async (_event, projectId: string, documentPath: string) => {
+      logInfo('ipc:explorer', `listSubcollections invoked projectId=${projectId}`)
+      return listSubcollections(projectId, documentPath)
+    }
+  )
 }

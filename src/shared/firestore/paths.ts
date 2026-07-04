@@ -17,11 +17,14 @@ export function assertDocumentPath(documentPath: string): void {
   }
 }
 
-export function getCollectionRef(collectionPath: string): CollectionReference {
+export function getCollectionRef(
+  collectionPath: string,
+  projectId?: string
+): CollectionReference {
   assertCollectionPath(collectionPath)
 
   const segments = collectionPath.split('/').filter(Boolean)
-  let ref = getFirestore().collection(segments[0])
+  let ref = getFirestore(projectId).collection(segments[0])
 
   for (let index = 1; index < segments.length; index += 2) {
     ref = ref.doc(segments[index]).collection(segments[index + 1])
@@ -30,13 +33,13 @@ export function getCollectionRef(collectionPath: string): CollectionReference {
   return ref
 }
 
-export function getDocumentRef(documentPath: string): DocumentReference {
+export function getDocumentRef(documentPath: string, projectId?: string): DocumentReference {
   assertDocumentPath(documentPath)
 
   const segments = documentPath.split('/').filter(Boolean)
   const collectionPath = segments.slice(0, -1).join('/')
 
-  return getCollectionRef(collectionPath).doc(segments[segments.length - 1])
+  return getCollectionRef(collectionPath, projectId).doc(segments[segments.length - 1])
 }
 
 export function joinDocumentPath(collectionPath: string, documentId: string): string {

@@ -14,10 +14,12 @@ export type BulkResult<T> =
     }
 
 export type BulkDeleteInput = {
+  projectId: string
   documentPaths: string[]
 }
 
 export type BulkUpdateFieldInput = {
+  projectId: string
   documentPaths: string[]
   field: string
   value: string

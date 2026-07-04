@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { ConnectionStatus } from '@features/connection/shared/types'
 import type { DocumentSummary } from '@features/explorer/shared/types'
+import WorkspacePanel from '@features/workspace/renderer/ui/WorkspacePanel'
 import AppNav from '@shared/shell/AppNav'
 import type { AppView } from '@shared/shell/AppNav'
 import AppShell from '@shared/shell/AppShell'
@@ -15,11 +16,19 @@ import CollectionSidebar from './CollectionSidebar'
 type ExplorerPageProps = {
   initialStatus: ConnectionStatus
   onDisconnected: () => void
+  onWorkspaceChanged: () => void
   onNavigate: (view: AppView) => void
 }
 
-function ExplorerPage({ initialStatus, onDisconnected, onNavigate }: ExplorerPageProps): React.JSX.Element {
+function ExplorerPage({
+  initialStatus,
+  onDisconnected,
+  onWorkspaceChanged,
+  onNavigate
+}: ExplorerPageProps): React.JSX.Element {
   const [status] = useState(initialStatus)
+  const projectId = status.projectId
+  const readOnly = status.readOnly
   const [rootCollections, setRootCollections] = useState<string[]>([])
   const [activeCollectionPath, setActiveCollectionPath] = useState<string | null>(null)
   const [documents, setDocuments] = useState<DocumentSummary[]>([])
@@ -32,65 +41,71 @@ function ExplorerPage({ initialStatus, onDisconnected, onNavigate }: ExplorerPag
   const [bulkSelectedPaths, setBulkSelectedPaths] = useState<Set<string>>(new Set())
 
   const loadRootCollections = useCallback(async (): Promise<void> => {
-    const result = await window.api.explorer.listRootCollections()
+    const result = await window.api.explorer.listRootCollections(projectId)
     if (!result.ok) {
       setError(result.error)
       return
     }
     setRootCollections(result.data)
-  }, [])
+  }, [projectId])
 
-  const loadDocuments = useCallback(async (collectionPath: string): Promise<void> => {
-    setLoading(true)
-    setError(null)
+  const loadDocuments = useCallback(
+    async (collectionPath: string): Promise<void> => {
+      setLoading(true)
+      setError(null)
 
-    try {
-      const result = await window.api.explorer.listDocuments(collectionPath)
-      if (!result.ok) {
-        setError(result.error)
-        setDocuments([])
-        return
-      }
+      try {
+        const result = await window.api.explorer.listDocuments(projectId, collectionPath)
+        if (!result.ok) {
+          setError(result.error)
+          setDocuments([])
+          return
+        }
 
-      setDocuments(result.data)
-      setActiveCollectionPath(collectionPath)
-      setSelectedDocumentPath(null)
-      setSubcollections([])
-      setJsonText('{\n  \n}')
-      setBulkSelectedPaths(new Set())
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  const loadDocument = useCallback(async (documentPath: string): Promise<void> => {
-    setLoading(true)
-    setError(null)
-
-    try {
-      const [documentResult, subcollectionResult] = await Promise.all([
-        window.api.explorer.getDocument(documentPath),
-        window.api.explorer.listSubcollections(documentPath)
-      ])
-
-      if (!documentResult.ok) {
-        setError(documentResult.error)
-        return
-      }
-
-      setSelectedDocumentPath(documentPath)
-      setJsonText(JSON.stringify(documentResult.data.data, null, 2))
-
-      if (subcollectionResult.ok) {
-        setSubcollections(subcollectionResult.data)
-      } else {
+        setDocuments(result.data)
+        setActiveCollectionPath(collectionPath)
+        setSelectedDocumentPath(null)
         setSubcollections([])
-        setError(subcollectionResult.error)
+        setJsonText('{\n  \n}')
+        setBulkSelectedPaths(new Set())
+      } finally {
+        setLoading(false)
       }
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+    },
+    [projectId]
+  )
+
+  const loadDocument = useCallback(
+    async (documentPath: string): Promise<void> => {
+      setLoading(true)
+      setError(null)
+
+      try {
+        const [documentResult, subcollectionResult] = await Promise.all([
+          window.api.explorer.getDocument(projectId, documentPath),
+          window.api.explorer.listSubcollections(projectId, documentPath)
+        ])
+
+        if (!documentResult.ok) {
+          setError(documentResult.error)
+          return
+        }
+
+        setSelectedDocumentPath(documentPath)
+        setJsonText(JSON.stringify(documentResult.data.data, null, 2))
+
+        if (subcollectionResult.ok) {
+          setSubcollections(subcollectionResult.data)
+        } else {
+          setSubcollections([])
+          setError(subcollectionResult.error)
+        }
+      } finally {
+        setLoading(false)
+      }
+    },
+    [projectId]
+  )
 
   useEffect(() => {
     void loadRootCollections()
@@ -112,6 +127,7 @@ function ExplorerPage({ initialStatus, onDisconnected, onNavigate }: ExplorerPag
     try {
       const parsed = JSON.parse(jsonText) as Record<string, unknown>
       const result = await window.api.explorer.updateDocument({
+        projectId,
         documentPath: selectedDocumentPath,
         data: parsed
       })
@@ -145,7 +161,7 @@ function ExplorerPage({ initialStatus, onDisconnected, onNavigate }: ExplorerPag
     setError(null)
 
     try {
-      const result = await window.api.explorer.deleteDocument(selectedDocumentPath)
+      const result = await window.api.explorer.deleteDocument(projectId, selectedDocumentPath)
       if (!result.ok) {
         setError(result.error)
         return
@@ -169,6 +185,7 @@ function ExplorerPage({ initialStatus, onDisconnected, onNavigate }: ExplorerPag
     try {
       const parsed = JSON.parse(jsonText) as Record<string, unknown>
       const result = await window.api.explorer.createDocument({
+        projectId,
         collectionPath: activeCollectionPath,
         data: parsed
       })
@@ -227,6 +244,7 @@ function ExplorerPage({ initialStatus, onDisconnected, onNavigate }: ExplorerPag
             <h1 className="explorer-header__title">FireMint</h1>
             <p className="explorer-header__meta">
               {status.projectId} <EnvironmentBadge environment={status.environment} />
+              {readOnly && <span className="explorer-header__readonly">read-only</span>}
             </p>
             <AppNav active="explorer" onChange={onNavigate} />
           </div>
@@ -236,14 +254,17 @@ function ExplorerPage({ initialStatus, onDisconnected, onNavigate }: ExplorerPag
         </div>
       }
       sidebar={
-        <CollectionSidebar
-          rootCollections={rootCollections}
-          activeCollectionPath={activeCollectionPath}
-          subcollections={subcollections}
-          selectedDocumentPath={selectedDocumentPath}
-          onSelectCollection={(path) => void loadDocuments(path)}
-          onSelectSubcollection={(path) => void loadDocuments(path)}
-        />
+        <div className="explorer-sidebar">
+          <WorkspacePanel onChanged={onWorkspaceChanged} disabled={loading} />
+          <CollectionSidebar
+            rootCollections={rootCollections}
+            activeCollectionPath={activeCollectionPath}
+            subcollections={subcollections}
+            selectedDocumentPath={selectedDocumentPath}
+            onSelectCollection={(path) => void loadDocuments(path)}
+            onSelectSubcollection={(path) => void loadDocuments(path)}
+          />
+        </div>
       }
       main={
         <div className="explorer-main">
@@ -255,24 +276,28 @@ function ExplorerPage({ initialStatus, onDisconnected, onNavigate }: ExplorerPag
           </div>
           <ExportPanel
             mode="collection"
+            projectId={projectId}
             collectionPath={activeCollectionPath}
             disabled={loading}
             onSuccess={setSuccessMessage}
             onError={setError}
           />
-          <BulkActionsPanel
-            environment={status.environment}
-            selectedPaths={Array.from(bulkSelectedPaths)}
-            loading={loading}
-            onLoadingChange={setLoading}
-            onClearSelection={() => setBulkSelectedPaths(new Set())}
-            onOperationComplete={() => void handleBulkOperationComplete()}
-            onError={setError}
-          />
+          {!readOnly && (
+            <BulkActionsPanel
+              projectId={projectId}
+              environment={status.environment}
+              selectedPaths={Array.from(bulkSelectedPaths)}
+              loading={loading}
+              onLoadingChange={setLoading}
+              onClearSelection={() => setBulkSelectedPaths(new Set())}
+              onOperationComplete={() => void handleBulkOperationComplete()}
+              onError={setError}
+            />
+          )}
           <DocumentTable
             documents={documents}
             selectedDocumentPath={selectedDocumentPath}
-            selectable
+            selectable={!readOnly}
             bulkSelectedPaths={bulkSelectedPaths}
             onBulkToggle={handleBulkToggle}
             onBulkToggleAll={handleBulkToggleAll}
@@ -286,6 +311,7 @@ function ExplorerPage({ initialStatus, onDisconnected, onNavigate }: ExplorerPag
             onSave={() => void handleSave()}
             onDelete={() => void handleDelete()}
             onCreate={() => void handleCreate()}
+            readOnly={readOnly}
           />
         </div>
       }

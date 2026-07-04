@@ -17,4 +17,5 @@ export type ConnectionStatus = {
   projectId: string
   clientEmail: string
   environment: EnvironmentKind
+  readOnly: boolean
 }

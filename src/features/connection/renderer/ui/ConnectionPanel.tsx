@@ -23,7 +23,7 @@ function ConnectionPanel({ onConnected }: ConnectionPanelProps): React.JSX.Eleme
     setSelectedFile(filePath)
   }
 
-  const applyConnectResult = (result: ConnectResult): void => {
+  const applyConnectResult = async (result: ConnectResult): Promise<void> => {
     if (!result.ok) {
       setError(result.error)
       setStatus(null)
@@ -32,12 +32,8 @@ function ConnectionPanel({ onConnected }: ConnectionPanelProps): React.JSX.Eleme
     }
 
     setError(null)
-    setStatus({
-      projectId: result.projectId,
-      clientEmail: result.clientEmail,
-      environment: result.environment
-    })
     setRootCollections(result.rootCollections)
+    setStatus(await window.api.connection.getStatus())
     onConnected?.()
   }
 
@@ -52,7 +48,7 @@ function ConnectionPanel({ onConnected }: ConnectionPanelProps): React.JSX.Eleme
 
     try {
       const result = await window.api.connection.connect(selectedFile)
-      applyConnectResult(result)
+      await applyConnectResult(result)
     } catch (error) {
       setError(error instanceof Error ? error.message : '接続に失敗しました')
       setStatus(null)

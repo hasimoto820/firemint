@@ -4,6 +4,7 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { registerIpcHandlers } from './ipc/register_handlers'
+import { initializeWorkspace } from '@features/workspace/main/service'
 
 function createWindow(): void {
   // Create the browser window.
@@ -53,9 +54,10 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window)
   })
 
-  registerIpcHandlers()
-
-  createWindow()
+  void initializeWorkspace().then(() => {
+    registerIpcHandlers()
+    createWindow()
+  })
 
   app.on('activate', function () {
     // On macOS it's common to re-create a window in the app when the

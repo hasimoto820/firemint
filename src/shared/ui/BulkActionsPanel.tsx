@@ -13,6 +13,7 @@ import Button from '@shared/ui/Button'
 import DiffPreviewPanel from '@shared/ui/DiffPreviewPanel'
 
 type BulkActionsPanelProps = {
+  projectId: string
   environment: EnvironmentKind
   selectedPaths: string[]
   loading: boolean
@@ -23,6 +24,7 @@ type BulkActionsPanelProps = {
 }
 
 function BulkActionsPanel({
+  projectId,
   environment,
   selectedPaths,
   loading,
@@ -49,6 +51,7 @@ function BulkActionsPanel({
 
     try {
       const result = await window.api.bulk.previewUpdate({
+        projectId,
         documentPaths: selectedPaths,
         field,
         value
@@ -82,6 +85,7 @@ function BulkActionsPanel({
 
     try {
       const result = await window.api.bulk.updateField({
+        projectId,
         documentPaths: selectedPaths,
         field,
         value
@@ -113,6 +117,7 @@ function BulkActionsPanel({
 
     try {
       const result = await window.api.bulk.delete({
+        projectId,
         documentPaths: selectedPaths
       })
 

@@ -24,6 +24,7 @@ export type QueryOrderByClause = {
 }
 
 export type SimpleQueryInput = {
+  projectId: string
   collectionPath: string
   collectionGroup: boolean
   wheres: QueryWhereClause[]

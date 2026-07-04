@@ -15,9 +15,9 @@ const MAX_WHERE_CLAUSES = 3
 const DEFAULT_LIMIT = 200
 const MAX_LIMIT = 1000
 
-function ensureConnected(): void {
-  if (!isFirestoreConnected()) {
-    throw new Error('Firestore is not connected')
+function ensureConnected(projectId: string): void {
+  if (!isFirestoreConnected(projectId)) {
+    throw new Error(`Firestore is not connected: ${projectId}`)
   }
 }
 
@@ -56,9 +56,9 @@ function buildQuery(input: SimpleQueryInput): Query {
       throw new Error('Collection Group ではコレクション ID のみ指定してください（例: user）')
     }
 
-    query = getFirestore().collectionGroup(collectionPath)
+    query = getFirestore(input.projectId).collectionGroup(collectionPath)
   } else {
-    query = getCollectionRef(collectionPath)
+    query = getCollectionRef(collectionPath, input.projectId)
   }
 
   for (const where of input.wheres) {
@@ -89,10 +89,10 @@ function toDocumentSummary(snapshot: QueryDocumentSnapshot): DocumentSummary {
 
 export async function executeQuery(input: SimpleQueryInput): Promise<QueryExecuteResult> {
   try {
-    ensureConnected()
+    ensureConnected(input.projectId)
     logInfo(
       'query',
-      `executeQuery path=${input.collectionPath} group=${input.collectionGroup} wheres=${input.wheres.length}`
+      `executeQuery projectId=${input.projectId} path=${input.collectionPath} group=${input.collectionGroup} wheres=${input.wheres.length}`
     )
 
     const snapshot = await buildQuery(input).get()
