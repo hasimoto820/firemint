@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { ConnectResult, ConnectionStatus } from '@features/connection/shared/types'
-import EnvironmentBadge from './EnvironmentBadge'
+import EnvironmentBadge from '@shared/ui/EnvironmentBadge'
 
 type ConnectionPanelProps = {
   onConnected?: () => void
