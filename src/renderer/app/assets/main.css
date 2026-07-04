@@ -2,9 +2,11 @@
 
 body {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  min-height: 100vh;
   background-image: url('./wavy-lines.svg');
   background-size: cover;
   user-select: none;
@@ -26,12 +28,92 @@ code {
   font-size: 85%;
 }
 
+.app-shell {
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.connection-panel {
+  text-align: left;
+}
+
+.connection-panel h1 {
+  margin: 0 0 8px;
+  font-size: 28px;
+}
+
+.connection-panel__lead {
+  margin: 0 0 16px;
+  color: var(--ev-c-text-2);
+}
+
+.connection-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.connection-panel__actions button {
+  border: 1px solid var(--ev-button-alt-border);
+  background: var(--ev-button-alt-bg);
+  color: inherit;
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.connection-panel__actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.connection-panel__file,
+.connection-panel__status p,
+.connection-panel__status li {
+  word-break: break-all;
+}
+
+.connection-panel__error {
+  color: #ff6b6b;
+}
+
+.connection-panel__warning {
+  color: #ffb020;
+  font-weight: 600;
+}
+
+.environment-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.environment-badge--production {
+  background: rgba(255, 80, 80, 0.2);
+  color: #ff8080;
+}
+
+.environment-badge--development {
+  background: rgba(80, 180, 255, 0.2);
+  color: #8fd3ff;
+}
+
+.environment-badge--unknown {
+  background: rgba(180, 180, 180, 0.2);
+  color: #d0d0d0;
+}
+
 #root {
   display: flex;
-  align-items: center;
-  justify-content: center;
   flex-direction: column;
-  margin-bottom: 80px;
+  width: 100%;
+  min-height: 100vh;
+  padding: 24px 0 48px;
 }
 
 .logo {
