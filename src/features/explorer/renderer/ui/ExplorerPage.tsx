@@ -7,6 +7,7 @@ import type { AppView } from '@shared/shell/AppNav'
 import AppShell from '@shared/shell/AppShell'
 import Button from '@shared/ui/Button'
 import BulkActionsPanel from '@features/bulk_operations/renderer/ui/BulkActionsPanel'
+import ExportPanel from '@features/data_transfer/renderer/ui/ExportPanel'
 import CollectionSidebar from './CollectionSidebar'
 import DocumentJsonPanel from './DocumentJsonPanel'
 import DocumentTable from './DocumentTable'
@@ -26,6 +27,7 @@ function ExplorerPage({ initialStatus, onDisconnected, onNavigate }: ExplorerPag
   const [subcollections, setSubcollections] = useState<string[]>([])
   const [jsonText, setJsonText] = useState('{\n  \n}')
   const [error, setError] = useState<string | null>(null)
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [bulkSelectedPaths, setBulkSelectedPaths] = useState<Set<string>>(new Set())
 
@@ -246,10 +248,18 @@ function ExplorerPage({ initialStatus, onDisconnected, onNavigate }: ExplorerPag
       main={
         <div className="explorer-main">
           {error && <p className="explorer-main__error">{error}</p>}
+          {successMessage && <p className="explorer-main__success">{successMessage}</p>}
           {loading && <p className="explorer-main__loading">読み込み中...</p>}
           <div className="explorer-main__path">
             {activeCollectionPath ? `コレクション: ${activeCollectionPath}` : 'コレクションを選択してください'}
           </div>
+          <ExportPanel
+            mode="collection"
+            collectionPath={activeCollectionPath}
+            disabled={loading}
+            onSuccess={setSuccessMessage}
+            onError={setError}
+          />
           <BulkActionsPanel
             environment={status.environment}
             selectedPaths={Array.from(bulkSelectedPaths)}

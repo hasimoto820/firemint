@@ -31,6 +31,14 @@ const api: IpcApi = {
     previewUpdate: (input) => ipcRenderer.invoke(IPC_CHANNELS.BULK_PREVIEW_UPDATE, input),
     updateField: (input) => ipcRenderer.invoke(IPC_CHANNELS.BULK_UPDATE_FIELD, input),
     delete: (input) => ipcRenderer.invoke(IPC_CHANNELS.BULK_DELETE, input)
+  },
+  dataTransfer: {
+    exportCollectionJson: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.DATA_TRANSFER_EXPORT_COLLECTION_JSON, input),
+    exportDocumentsJson: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.DATA_TRANSFER_EXPORT_DOCUMENTS_JSON, input),
+    exportDocumentsCsv: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.DATA_TRANSFER_EXPORT_DOCUMENTS_CSV, input)
   }
 }
 

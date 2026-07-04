@@ -23,6 +23,12 @@ import type {
   DiffPreviewItem
 } from '@features/bulk_operations/shared/types'
 
+import type {
+  ExportCollectionJsonInput,
+  ExportDocumentsInput,
+  ExportResult
+} from '@features/data_transfer/shared/types'
+
 export type PingResult = {
   message: string
 }
@@ -54,10 +60,17 @@ export type BulkOperationsIpcApi = {
   delete: (input: BulkDeleteInput) => Promise<BulkResult<BulkOperationSummary>>
 }
 
+export type DataTransferIpcApi = {
+  exportCollectionJson: (input: ExportCollectionJsonInput) => Promise<ExportResult>
+  exportDocumentsJson: (input: ExportDocumentsInput) => Promise<ExportResult>
+  exportDocumentsCsv: (input: ExportDocumentsInput) => Promise<ExportResult>
+}
+
 export interface IpcApi {
   ping: () => Promise<PingResult>
   connection: ConnectionIpcApi
   explorer: ExplorerIpcApi
   query: QueryIpcApi
   bulk: BulkOperationsIpcApi
+  dataTransfer: DataTransferIpcApi
 }

@@ -152,6 +152,11 @@ code {
   color: #ff6b6b;
 }
 
+.explorer-main__success,
+.query-main__success {
+  color: #9fef9f;
+}
+
 .explorer-main__loading {
   color: var(--ev-c-text-2);
 }
@@ -467,6 +472,36 @@ code {
 .document-table__checkbox-col {
   width: 36px;
   text-align: center;
+}
+
+.export-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid var(--ev-c-gray-1);
+  border-radius: 8px;
+}
+
+.export-panel__title {
+  margin: 0;
+  font-size: 14px;
+}
+
+.export-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.export-panel__actions .fm-button {
+  width: auto;
+}
+
+.export-panel__hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ev-c-text-2);
 }
 
 .connection-panel {

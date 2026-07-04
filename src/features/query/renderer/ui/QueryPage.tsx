@@ -10,6 +10,7 @@ import type { AppView } from '@shared/shell/AppNav'
 import AppShell from '@shared/shell/AppShell'
 import Button from '@shared/ui/Button'
 import BulkActionsPanel from '@features/bulk_operations/renderer/ui/BulkActionsPanel'
+import ExportPanel from '@features/data_transfer/renderer/ui/ExportPanel'
 import QueryForm from './QueryForm'
 
 type QueryPageProps = {
@@ -27,6 +28,7 @@ function QueryPage({ initialStatus, onDisconnected, onNavigate }: QueryPageProps
   const [lastQueryLabel, setLastQueryLabel] = useState<string | null>(null)
   const [lastQueryInput, setLastQueryInput] = useState<SimpleQueryInput | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [bulkSelectedPaths, setBulkSelectedPaths] = useState<Set<string>>(new Set())
 
@@ -148,12 +150,21 @@ function QueryPage({ initialStatus, onDisconnected, onNavigate }: QueryPageProps
         <div className="query-main">
           <QueryForm loading={loading} onRun={(input) => void handleRun(input)} />
           {error && <p className="query-main__error">{error}</p>}
+          {successMessage && <p className="query-main__success">{successMessage}</p>}
           {loading && <p className="query-main__loading">実行中...</p>}
           {lastQueryLabel && (
             <div className="query-main__result-label">
               {lastQueryLabel} — {documents.length} 件
             </div>
           )}
+          <ExportPanel
+            mode="documents"
+            documents={documents}
+            defaultFileName={lastQueryLabel ?? 'query-result'}
+            disabled={loading}
+            onSuccess={setSuccessMessage}
+            onError={setError}
+          />
           <BulkActionsPanel
             environment={status.environment}
             selectedPaths={Array.from(bulkSelectedPaths)}

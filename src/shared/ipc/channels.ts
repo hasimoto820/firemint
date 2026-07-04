@@ -14,7 +14,10 @@ export const IPC_CHANNELS = {
   QUERY_EXECUTE: 'query:execute',
   BULK_PREVIEW_UPDATE: 'bulk:preview_update',
   BULK_UPDATE_FIELD: 'bulk:update_field',
-  BULK_DELETE: 'bulk:delete'
+  BULK_DELETE: 'bulk:delete',
+  DATA_TRANSFER_EXPORT_COLLECTION_JSON: 'data_transfer:export_collection_json',
+  DATA_TRANSFER_EXPORT_DOCUMENTS_JSON: 'data_transfer:export_documents_json',
+  DATA_TRANSFER_EXPORT_DOCUMENTS_CSV: 'data_transfer:export_documents_csv'
 } as const
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS]
