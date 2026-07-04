@@ -23,6 +23,14 @@ const api: IpcApi = {
       ipcRenderer.invoke(IPC_CHANNELS.EXPLORER_DELETE_DOCUMENT, documentPath),
     listSubcollections: (documentPath: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.EXPLORER_LIST_SUBCOLLECTIONS, documentPath)
+  },
+  query: {
+    execute: (input) => ipcRenderer.invoke(IPC_CHANNELS.QUERY_EXECUTE, input)
+  },
+  bulk: {
+    previewUpdate: (input) => ipcRenderer.invoke(IPC_CHANNELS.BULK_PREVIEW_UPDATE, input),
+    updateField: (input) => ipcRenderer.invoke(IPC_CHANNELS.BULK_UPDATE_FIELD, input),
+    delete: (input) => ipcRenderer.invoke(IPC_CHANNELS.BULK_DELETE, input)
   }
 }
 

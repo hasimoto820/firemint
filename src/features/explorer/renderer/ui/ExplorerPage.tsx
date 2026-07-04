@@ -2,8 +2,11 @@ import { useCallback, useEffect, useState } from 'react'
 import type { ConnectionStatus } from '@features/connection/shared/types'
 import type { DocumentSummary } from '@features/explorer/shared/types'
 import EnvironmentBadge from '@features/connection/renderer/ui/EnvironmentBadge'
+import AppNav from '@shared/shell/AppNav'
+import type { AppView } from '@shared/shell/AppNav'
 import AppShell from '@shared/shell/AppShell'
 import Button from '@shared/ui/Button'
+import BulkActionsPanel from '@features/bulk_operations/renderer/ui/BulkActionsPanel'
 import CollectionSidebar from './CollectionSidebar'
 import DocumentJsonPanel from './DocumentJsonPanel'
 import DocumentTable from './DocumentTable'
@@ -11,9 +14,10 @@ import DocumentTable from './DocumentTable'
 type ExplorerPageProps = {
   initialStatus: ConnectionStatus
   onDisconnected: () => void
+  onNavigate: (view: AppView) => void
 }
 
-function ExplorerPage({ initialStatus, onDisconnected }: ExplorerPageProps): React.JSX.Element {
+function ExplorerPage({ initialStatus, onDisconnected, onNavigate }: ExplorerPageProps): React.JSX.Element {
   const [status] = useState(initialStatus)
   const [rootCollections, setRootCollections] = useState<string[]>([])
   const [activeCollectionPath, setActiveCollectionPath] = useState<string | null>(null)
@@ -23,6 +27,7 @@ function ExplorerPage({ initialStatus, onDisconnected }: ExplorerPageProps): Rea
   const [jsonText, setJsonText] = useState('{\n  \n}')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [bulkSelectedPaths, setBulkSelectedPaths] = useState<Set<string>>(new Set())
 
   const loadRootCollections = useCallback(async (): Promise<void> => {
     const result = await window.api.explorer.listRootCollections()
@@ -50,6 +55,7 @@ function ExplorerPage({ initialStatus, onDisconnected }: ExplorerPageProps): Rea
       setSelectedDocumentPath(null)
       setSubcollections([])
       setJsonText('{\n  \n}')
+      setBulkSelectedPaths(new Set())
     } finally {
       setLoading(false)
     }
@@ -180,6 +186,37 @@ function ExplorerPage({ initialStatus, onDisconnected }: ExplorerPageProps): Rea
     }
   }
 
+  const handleBulkToggle = (documentPath: string, checked: boolean): void => {
+    setBulkSelectedPaths((current) => {
+      const next = new Set(current)
+
+      if (checked) {
+        next.add(documentPath)
+      } else {
+        next.delete(documentPath)
+      }
+
+      return next
+    })
+  }
+
+  const handleBulkToggleAll = (checked: boolean): void => {
+    if (checked) {
+      setBulkSelectedPaths(new Set(documents.map((document) => document.path)))
+      return
+    }
+
+    setBulkSelectedPaths(new Set())
+  }
+
+  const handleBulkOperationComplete = async (): Promise<void> => {
+    if (!activeCollectionPath) {
+      return
+    }
+
+    await loadDocuments(activeCollectionPath)
+  }
+
   return (
     <AppShell
       header={
@@ -189,6 +226,7 @@ function ExplorerPage({ initialStatus, onDisconnected }: ExplorerPageProps): Rea
             <p className="explorer-header__meta">
               {status.projectId} <EnvironmentBadge environment={status.environment} />
             </p>
+            <AppNav active="explorer" onChange={onNavigate} />
           </div>
           <Button variant="danger" onClick={() => void handleDisconnect()} disabled={loading}>
             切断
@@ -212,9 +250,22 @@ function ExplorerPage({ initialStatus, onDisconnected }: ExplorerPageProps): Rea
           <div className="explorer-main__path">
             {activeCollectionPath ? `コレクション: ${activeCollectionPath}` : 'コレクションを選択してください'}
           </div>
+          <BulkActionsPanel
+            environment={status.environment}
+            selectedPaths={Array.from(bulkSelectedPaths)}
+            loading={loading}
+            onLoadingChange={setLoading}
+            onClearSelection={() => setBulkSelectedPaths(new Set())}
+            onOperationComplete={() => void handleBulkOperationComplete()}
+            onError={setError}
+          />
           <DocumentTable
             documents={documents}
             selectedDocumentPath={selectedDocumentPath}
+            selectable
+            bulkSelectedPaths={bulkSelectedPaths}
+            onBulkToggle={handleBulkToggle}
+            onBulkToggleAll={handleBulkToggleAll}
             onSelectDocument={(path) => void loadDocument(path)}
           />
           <DocumentJsonPanel

@@ -10,6 +10,19 @@ import type {
   UpdateDocumentInput
 } from '@features/explorer/shared/types'
 
+import type {
+  QueryExecuteResult,
+  SimpleQueryInput
+} from '@features/query/shared/types'
+
+import type {
+  BulkDeleteInput,
+  BulkOperationSummary,
+  BulkResult,
+  BulkUpdateFieldInput,
+  DiffPreviewItem
+} from '@features/bulk_operations/shared/types'
+
 export type PingResult = {
   message: string
 }
@@ -31,8 +44,20 @@ export type ExplorerIpcApi = {
   listSubcollections: (documentPath: string) => Promise<ExplorerResult<string[]>>
 }
 
+export type QueryIpcApi = {
+  execute: (input: SimpleQueryInput) => Promise<QueryExecuteResult>
+}
+
+export type BulkOperationsIpcApi = {
+  previewUpdate: (input: BulkUpdateFieldInput) => Promise<BulkResult<DiffPreviewItem[]>>
+  updateField: (input: BulkUpdateFieldInput) => Promise<BulkResult<BulkOperationSummary>>
+  delete: (input: BulkDeleteInput) => Promise<BulkResult<BulkOperationSummary>>
+}
+
 export interface IpcApi {
   ping: () => Promise<PingResult>
   connection: ConnectionIpcApi
   explorer: ExplorerIpcApi
+  query: QueryIpcApi
+  bulk: BulkOperationsIpcApi
 }

@@ -8,6 +8,7 @@ type DocumentJsonPanelProps = {
   onSave: () => void
   onDelete: () => void
   onCreate: () => void
+  readOnly?: boolean
 }
 
 function DocumentJsonPanel({
@@ -17,22 +18,27 @@ function DocumentJsonPanel({
   onChange,
   onSave,
   onDelete,
-  onCreate
+  onCreate,
+  readOnly = false
 }: DocumentJsonPanelProps): React.JSX.Element {
   return (
     <div className="document-json-panel">
       <div className="document-json-panel__header">
         <h2 className="document-json-panel__title">JSON</h2>
         <div className="document-json-panel__actions">
-          <Button onClick={onCreate} disabled={loading}>
-            新規
-          </Button>
-          <Button onClick={onSave} disabled={loading || !documentPath}>
-            保存
-          </Button>
-          <Button variant="danger" onClick={onDelete} disabled={loading || !documentPath}>
-            削除
-          </Button>
+          {!readOnly && (
+            <>
+              <Button onClick={onCreate} disabled={loading}>
+                新規
+              </Button>
+              <Button onClick={onSave} disabled={loading || !documentPath}>
+                保存
+              </Button>
+              <Button variant="danger" onClick={onDelete} disabled={loading || !documentPath}>
+                削除
+              </Button>
+            </>
+          )}
         </div>
       </div>
       {documentPath && <p className="document-json-panel__path">{documentPath}</p>}
@@ -42,6 +48,7 @@ function DocumentJsonPanel({
         onChange={(event) => onChange(event.target.value)}
         placeholder='{ "field": "value" }'
         spellCheck={false}
+        readOnly={readOnly}
       />
     </div>
   )

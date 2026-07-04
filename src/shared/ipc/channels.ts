@@ -10,7 +10,11 @@ export const IPC_CHANNELS = {
   EXPLORER_CREATE_DOCUMENT: 'explorer:create_document',
   EXPLORER_UPDATE_DOCUMENT: 'explorer:update_document',
   EXPLORER_DELETE_DOCUMENT: 'explorer:delete_document',
-  EXPLORER_LIST_SUBCOLLECTIONS: 'explorer:list_subcollections'
+  EXPLORER_LIST_SUBCOLLECTIONS: 'explorer:list_subcollections',
+  QUERY_EXECUTE: 'query:execute',
+  BULK_PREVIEW_UPDATE: 'bulk:preview_update',
+  BULK_UPDATE_FIELD: 'bulk:update_field',
+  BULK_DELETE: 'bulk:delete'
 } as const
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS]
