@@ -6,7 +6,15 @@
 
 ＊　ハイフン禁止。アンスコで統一。
 
-
+＊　Firestore 接続ルール（必須）
+    - admin.firestore() 直叩き禁止
+    - 必ず shared/firestore/client.ts 経由
+    - initializeFirestore(app, { preferRest: true }) は client.ts のみ
+    背景:
+      - gRPC 通信は Node + firebase-admin でハングしやすい → REST 優先
+      - Node は Windows CA を自動信頼しない → main/env.ts で win-ca
+      - dev / プロダクト版の両方で必要
+      - gRPC　→　REST
 
 
 
