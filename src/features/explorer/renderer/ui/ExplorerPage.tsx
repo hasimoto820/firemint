@@ -11,7 +11,7 @@ import DocumentTable from '@shared/ui/DocumentTable'
 import EnvironmentBadge from '@shared/ui/EnvironmentBadge'
 import BulkActionsPanel from '@shared/ui/BulkActionsPanel'
 import ExportPanel from '@shared/ui/ExportPanel'
-import CollectionSidebar from './CollectionSidebar'
+import CollectionTree from './CollectionTree'
 
 type ExplorerPageProps = {
   initialStatus: ConnectionStatus
@@ -33,7 +33,11 @@ function ExplorerPage({
   const [activeCollectionPath, setActiveCollectionPath] = useState<string | null>(null)
   const [documents, setDocuments] = useState<DocumentSummary[]>([])
   const [selectedDocumentPath, setSelectedDocumentPath] = useState<string | null>(null)
-  const [subcollections, setSubcollections] = useState<string[]>([])
+  const [selectedCreateTime, setSelectedCreateTime] = useState<string | null>(null)
+  const [selectedUpdateTime, setSelectedUpdateTime] = useState<string | null>(null)
+  const [selectedDocumentData, setSelectedDocumentData] = useState<Record<string, unknown> | null>(
+    null
+  )
   const [jsonText, setJsonText] = useState('{\n  \n}')
   const [error, setError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
@@ -65,7 +69,9 @@ function ExplorerPage({
         setDocuments(result.data)
         setActiveCollectionPath(collectionPath)
         setSelectedDocumentPath(null)
-        setSubcollections([])
+        setSelectedCreateTime(null)
+        setSelectedUpdateTime(null)
+        setSelectedDocumentData(null)
         setJsonText('{\n  \n}')
         setBulkSelectedPaths(new Set())
       } finally {
@@ -81,10 +87,7 @@ function ExplorerPage({
       setError(null)
 
       try {
-        const [documentResult, subcollectionResult] = await Promise.all([
-          window.api.explorer.getDocument(projectId, documentPath),
-          window.api.explorer.listSubcollections(projectId, documentPath)
-        ])
+        const documentResult = await window.api.explorer.getDocument(projectId, documentPath)
 
         if (!documentResult.ok) {
           setError(documentResult.error)
@@ -92,14 +95,10 @@ function ExplorerPage({
         }
 
         setSelectedDocumentPath(documentPath)
+        setSelectedCreateTime(documentResult.data.createTime)
+        setSelectedUpdateTime(documentResult.data.updateTime)
+        setSelectedDocumentData(documentResult.data.data)
         setJsonText(JSON.stringify(documentResult.data.data, null, 2))
-
-        if (subcollectionResult.ok) {
-          setSubcollections(subcollectionResult.data)
-        } else {
-          setSubcollections([])
-          setError(subcollectionResult.error)
-        }
       } finally {
         setLoading(false)
       }
@@ -236,6 +235,83 @@ function ExplorerPage({
     await loadDocuments(activeCollectionPath)
   }
 
+  const handleDuplicateDocument = async (): Promise<void> => {
+    if (!selectedDocumentPath) {
+      return
+    }
+
+    const targetDocumentId = window.prompt('複製先ドキュメント ID（空欄で自動生成）', '')
+
+    if (targetDocumentId === null) {
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+
+    try {
+      const result = await window.api.explorer.duplicateDocument({
+        projectId,
+        documentPath: selectedDocumentPath,
+        targetDocumentId: targetDocumentId.trim() || undefined
+      })
+
+      if (!result.ok) {
+        setError(result.error)
+        return
+      }
+
+      if (activeCollectionPath) {
+        await loadDocuments(activeCollectionPath)
+        const newPath = `${activeCollectionPath}/${result.data}`
+        await loadDocument(newPath)
+        setSuccessMessage(`ドキュメントを複製しました: ${newPath}`)
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleDuplicateCollection = async (): Promise<void> => {
+    if (!activeCollectionPath) {
+      setError('コレクションを選択してください')
+      return
+    }
+
+    const targetCollectionPath = window.prompt(
+      '複製先コレクション path（空のコレクションである必要があります）',
+      `${activeCollectionPath}_copy`
+    )
+
+    if (!targetCollectionPath?.trim()) {
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+
+    try {
+      const result = await window.api.explorer.duplicateCollection({
+        projectId,
+        sourceCollectionPath: activeCollectionPath,
+        targetCollectionPath: targetCollectionPath.trim()
+      })
+
+      if (!result.ok) {
+        setError(result.error)
+        return
+      }
+
+      await loadRootCollections()
+      await loadDocuments(result.data.targetCollectionPath)
+      setSuccessMessage(
+        `${result.data.copiedCount} 件を ${result.data.targetCollectionPath} に複製しました`
+      )
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <AppShell
       header={
@@ -256,13 +332,14 @@ function ExplorerPage({
       sidebar={
         <div className="explorer-sidebar">
           <WorkspacePanel onChanged={onWorkspaceChanged} disabled={loading} />
-          <CollectionSidebar
+          <CollectionTree
+            projectId={projectId}
             rootCollections={rootCollections}
             activeCollectionPath={activeCollectionPath}
-            subcollections={subcollections}
             selectedDocumentPath={selectedDocumentPath}
             onSelectCollection={(path) => void loadDocuments(path)}
-            onSelectSubcollection={(path) => void loadDocuments(path)}
+            onSelectDocument={(path) => void loadDocument(path)}
+            disabled={loading}
           />
         </div>
       }
@@ -282,6 +359,13 @@ function ExplorerPage({
             onSuccess={setSuccessMessage}
             onError={setError}
           />
+          {!readOnly && activeCollectionPath && (
+            <div className="explorer-main__duplicate">
+              <Button onClick={() => void handleDuplicateCollection()} disabled={loading}>
+                コレクション複製
+              </Button>
+            </div>
+          )}
           {!readOnly && (
             <BulkActionsPanel
               projectId={projectId}
@@ -297,6 +381,7 @@ function ExplorerPage({
           <DocumentTable
             documents={documents}
             selectedDocumentPath={selectedDocumentPath}
+            tableKey={activeCollectionPath ?? undefined}
             selectable={!readOnly}
             bulkSelectedPaths={bulkSelectedPaths}
             onBulkToggle={handleBulkToggle}
@@ -306,11 +391,15 @@ function ExplorerPage({
           <DocumentJsonPanel
             documentPath={selectedDocumentPath}
             jsonText={jsonText}
+            createTime={selectedCreateTime}
+            updateTime={selectedUpdateTime}
+            documentData={selectedDocumentData}
             loading={loading}
             onChange={setJsonText}
             onSave={() => void handleSave()}
             onDelete={() => void handleDelete()}
             onCreate={() => void handleCreate()}
+            onDuplicate={() => void handleDuplicateDocument()}
             readOnly={readOnly}
           />
         </div>

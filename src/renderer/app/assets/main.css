@@ -279,33 +279,78 @@ code {
   cursor: pointer;
 }
 
-.collection-sidebar__title,
-.collection-sidebar__subtitle,
+.collection-tree__title,
 .document-json-panel__title {
   margin: 0 0 12px;
   font-size: 16px;
 }
 
-.collection-sidebar__list {
+.collection-tree__roots,
+.collection-tree__children {
   list-style: none;
   padding: 0;
-  margin: 0 0 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  margin: 0;
 }
 
-.collection-sidebar__doc,
-.collection-sidebar__empty,
+.collection-tree__branch {
+  margin: 0;
+}
+
+.collection-tree__row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 28px;
+  border-radius: 6px;
+}
+
+.collection-tree__row--active {
+  background: rgba(105, 136, 230, 0.2);
+}
+
+.collection-tree__toggle,
+.collection-tree__label {
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 4px;
+  font-size: 12px;
+}
+
+.collection-tree__toggle {
+  width: 20px;
+  flex-shrink: 0;
+  text-align: center;
+}
+
+.collection-tree__toggle:disabled,
+.collection-tree__label:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.collection-tree__label {
+  flex: 1;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  word-break: break-all;
+  font-size: 13px;
+}
+
+.collection-tree__kind {
+  flex-shrink: 0;
+}
+
+.collection-tree__error,
+.collection-tree__empty,
 .document-table__empty {
   color: var(--ev-c-text-2);
   font-size: 13px;
   word-break: break-all;
-}
-
-.collection-sidebar__sub {
-  border-top: 1px solid var(--ev-c-gray-1);
-  padding-top: 12px;
 }
 
 .explorer-main__path {
@@ -329,6 +374,95 @@ code {
   overflow: auto;
   border: 1px solid var(--ev-c-gray-1);
   border-radius: 8px;
+}
+
+.document-table-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.document-table-panel__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.document-table-panel__toolbar .fm-button {
+  width: auto;
+}
+
+.document-table-panel__count {
+  font-size: 12px;
+  color: var(--ev-c-text-2);
+}
+
+.document-table-panel__columns {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--ev-c-gray-1);
+  border-radius: 8px;
+  max-height: 200px;
+  overflow: auto;
+}
+
+.document-table-panel__column-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.document-table-panel__column-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.document-table-panel__column-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.document-table-panel__move {
+  border: 1px solid var(--ev-c-gray-1);
+  background: rgba(0, 0, 0, 0.2);
+  color: inherit;
+  border-radius: 4px;
+  padding: 2px 8px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.document-table__sort {
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+}
+
+.document-table__filter-head {
+  padding-top: 4px;
+  padding-bottom: 8px;
+}
+
+.document-table__filter {
+  width: 100%;
+  min-width: 72px;
+  border: 1px solid var(--ev-c-gray-1);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.2);
+  color: inherit;
+  padding: 4px 6px;
+  font-size: 12px;
+  box-sizing: border-box;
 }
 
 .document-table {
@@ -380,6 +514,42 @@ code {
   font-size: 12px;
   color: var(--ev-c-text-2);
   word-break: break-all;
+}
+
+.document-json-panel__metadata {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--ev-c-text-2);
+}
+
+.explorer-main__duplicate .fm-button {
+  width: auto;
+}
+
+.geopoint-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.geopoint-preview__title {
+  margin: 0;
+  font-size: 14px;
+}
+
+.geopoint-preview__label {
+  margin: 0 0 8px;
+  font-size: 12px;
+}
+
+.geopoint-preview__map {
+  width: 100%;
+  height: 180px;
+  border: 1px solid var(--ev-c-gray-1);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.2);
 }
 
 .document-json-panel__editor {

@@ -32,6 +32,11 @@ function QueryPage({
   const readOnly = status.readOnly
   const [documents, setDocuments] = useState<DocumentSummary[]>([])
   const [selectedDocumentPath, setSelectedDocumentPath] = useState<string | null>(null)
+  const [selectedCreateTime, setSelectedCreateTime] = useState<string | null>(null)
+  const [selectedUpdateTime, setSelectedUpdateTime] = useState<string | null>(null)
+  const [selectedDocumentData, setSelectedDocumentData] = useState<Record<string, unknown> | null>(
+    null
+  )
   const [jsonText, setJsonText] = useState('{\n  \n}')
   const [collectionGroup, setCollectionGroup] = useState(false)
   const [lastQueryLabel, setLastQueryLabel] = useState<string | null>(null)
@@ -64,6 +69,9 @@ function QueryPage({
       setDocuments(result.data)
       setCollectionGroup(input.collectionGroup)
       setSelectedDocumentPath(null)
+      setSelectedCreateTime(null)
+      setSelectedUpdateTime(null)
+      setSelectedDocumentData(null)
       setJsonText('{\n  \n}')
       setBulkSelectedPaths(new Set())
       setLastQueryInput(input)
@@ -90,6 +98,9 @@ function QueryPage({
       }
 
       setSelectedDocumentPath(documentPath)
+      setSelectedCreateTime(result.data.createTime)
+      setSelectedUpdateTime(result.data.updateTime)
+      setSelectedDocumentData(result.data.data)
       setJsonText(JSON.stringify(result.data.data, null, 2))
     } finally {
       setLoading(false)
@@ -196,6 +207,7 @@ function QueryPage({
             documents={documents}
             selectedDocumentPath={selectedDocumentPath}
             showPath={collectionGroup}
+            tableKey={lastQueryLabel ?? undefined}
             selectable={!readOnly}
             bulkSelectedPaths={bulkSelectedPaths}
             onBulkToggle={handleBulkToggle}
@@ -205,6 +217,9 @@ function QueryPage({
           <DocumentJsonPanel
             documentPath={selectedDocumentPath}
             jsonText={jsonText}
+            createTime={selectedCreateTime}
+            updateTime={selectedUpdateTime}
+            documentData={selectedDocumentData}
             loading={loading}
             onChange={setJsonText}
             onSave={() => undefined}

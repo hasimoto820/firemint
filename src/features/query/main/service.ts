@@ -83,7 +83,9 @@ function toDocumentSummary(snapshot: QueryDocumentSnapshot): DocumentSummary {
   return {
     id: snapshot.id,
     path: snapshot.ref.path,
-    data: serializeFirestoreValue(data) as Record<string, unknown>
+    data: serializeFirestoreValue(data) as Record<string, unknown>,
+    createTime: snapshot.createTime?.toDate().toISOString() ?? null,
+    updateTime: snapshot.updateTime?.toDate().toISOString() ?? null
   }
 }
 

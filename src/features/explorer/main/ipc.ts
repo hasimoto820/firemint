@@ -1,10 +1,12 @@
 import { ipcMain } from 'electron'
 import { IPC_CHANNELS } from '@shared/ipc/channels'
 import { logInfo } from '@shared/logging/logger'
-import type { CreateDocumentInput, UpdateDocumentInput } from '@features/explorer/shared/types'
+import type { CreateDocumentInput, DuplicateCollectionInput, DuplicateDocumentInput, UpdateDocumentInput } from '@features/explorer/shared/types'
 import {
   createDocument,
   deleteDocument,
+  duplicateCollection,
+  duplicateDocument,
   getDocument,
   listDocuments,
   listRootCollections,
@@ -57,6 +59,19 @@ export function registerExplorerHandlers(): void {
     async (_event, projectId: string, documentPath: string) => {
       logInfo('ipc:explorer', `listSubcollections invoked projectId=${projectId}`)
       return listSubcollections(projectId, documentPath)
+    }
+  )
+
+  ipcMain.handle(IPC_CHANNELS.EXPLORER_DUPLICATE_DOCUMENT, async (_event, input: DuplicateDocumentInput) => {
+    logInfo('ipc:explorer', `duplicateDocument invoked projectId=${input.projectId}`)
+    return duplicateDocument(input)
+  })
+
+  ipcMain.handle(
+    IPC_CHANNELS.EXPLORER_DUPLICATE_COLLECTION,
+    async (_event, input: DuplicateCollectionInput) => {
+      logInfo('ipc:explorer', `duplicateCollection invoked projectId=${input.projectId}`)
+      return duplicateCollection(input)
     }
   )
 }

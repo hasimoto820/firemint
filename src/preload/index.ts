@@ -37,7 +37,11 @@ const api: IpcApi = {
     deleteDocument: (projectId: string, documentPath: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.EXPLORER_DELETE_DOCUMENT, projectId, documentPath),
     listSubcollections: (projectId: string, documentPath: string) =>
-      ipcRenderer.invoke(IPC_CHANNELS.EXPLORER_LIST_SUBCOLLECTIONS, projectId, documentPath)
+      ipcRenderer.invoke(IPC_CHANNELS.EXPLORER_LIST_SUBCOLLECTIONS, projectId, documentPath),
+    duplicateDocument: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.EXPLORER_DUPLICATE_DOCUMENT, input),
+    duplicateCollection: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.EXPLORER_DUPLICATE_COLLECTION, input)
   },
   query: {
     execute: (input) => ipcRenderer.invoke(IPC_CHANNELS.QUERY_EXECUTE, input)

@@ -11,6 +11,8 @@ export const IPC_CHANNELS = {
   EXPLORER_UPDATE_DOCUMENT: 'explorer:update_document',
   EXPLORER_DELETE_DOCUMENT: 'explorer:delete_document',
   EXPLORER_LIST_SUBCOLLECTIONS: 'explorer:list_subcollections',
+  EXPLORER_DUPLICATE_DOCUMENT: 'explorer:duplicate_document',
+  EXPLORER_DUPLICATE_COLLECTION: 'explorer:duplicate_collection',
   QUERY_EXECUTE: 'query:execute',
   BULK_PREVIEW_UPDATE: 'bulk:preview_update',
   BULK_UPDATE_FIELD: 'bulk:update_field',

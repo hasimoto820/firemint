@@ -6,6 +6,9 @@ import type {
   CreateDocumentInput,
   DocumentDetail,
   DocumentSummary,
+  DuplicateCollectionInput,
+  DuplicateCollectionResult,
+  DuplicateDocumentInput,
   ExplorerResult,
   UpdateDocumentInput
 } from '@features/explorer/shared/types'
@@ -59,6 +62,10 @@ export type ExplorerIpcApi = {
   updateDocument: (input: UpdateDocumentInput) => Promise<ExplorerResult<null>>
   deleteDocument: (projectId: string, documentPath: string) => Promise<ExplorerResult<null>>
   listSubcollections: (projectId: string, documentPath: string) => Promise<ExplorerResult<string[]>>
+  duplicateDocument: (input: DuplicateDocumentInput) => Promise<ExplorerResult<string>>
+  duplicateCollection: (
+    input: DuplicateCollectionInput
+  ) => Promise<ExplorerResult<DuplicateCollectionResult>>
 }
 
 export type QueryIpcApi = {

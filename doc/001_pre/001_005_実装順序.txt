@@ -72,7 +72,7 @@ Phase 1 — connection
     shared/safety（最小）     … 本番警告・環境ラベル
 
   Done:
-    □ サービスアカウント JSON で Firestore に接続できる
+    ■ サービスアカウント JSON で Firestore に接続できる
 
 
 --------------------------------------------------------------------------------
@@ -85,9 +85,9 @@ Phase 2 — explorer
     features/explorer         … コレクション一覧、Table、JSON、ドキュメント CRUD
 
   Done:
-    □ コレクション一覧 → テーブル表示 → JSON 編集ができる
-    □ ドキュメント CRUD（作成・更新・削除）
-    □ サブコレクションの閲覧（最低限）
+    ■ コレクション一覧 → テーブル表示 → JSON 編集ができる
+    ■ ドキュメント CRUD（作成・更新・削除）
+    ■ サブコレクションの閲覧（最低限）
 
 
 --------------------------------------------------------------------------------
@@ -99,8 +99,8 @@ Phase 3 — query
     （結果表示は shared/ui の DocumentTable・DocumentJsonPanel を再利用）
 
   Done:
-    □ where 条件付きクエリが実行できる（where 1〜3、orderBy、limit）
-    □ Collection Group クエリが動く
+    ■ where 条件付きクエリが実行できる（where 1〜3、orderBy、limit）
+    ■ Collection Group クエリが動く
 
 
 --------------------------------------------------------------------------------
@@ -113,10 +113,10 @@ Phase 4 — bulk_operations
     （explorer / query との協調）
 
   Done:
-    □ テーブルで複数選択 → 一括削除できる
-    □ クエリ結果のフィールドを一括更新できる
-    □ 一括更新前に diff プレビューが見える
-    □ バッチ 500 件制限を UI で表示・自動分割
+    ■ テーブルで複数選択 → 一括削除できる
+    ■ クエリ結果のフィールドを一括更新できる
+    ■ 一括更新前に diff プレビューが見える
+    ■ バッチ 500 件制限を UI で表示・自動分割
 
 
 --------------------------------------------------------------------------------
@@ -127,9 +127,9 @@ Phase 5 — data_transfer
     features/data_transfer    … JSON / CSV エクスポートのみ（import は v1）
 
   Done:
-    □ コレクション → JSON エクスポート
-    □ クエリ結果 → JSON / CSV エクスポート
-    □ 001_002 の MVP Done 基準をすべて満たす → β版として使える状態
+    ■ コレクション → JSON エクスポート
+    ■ クエリ結果 → JSON / CSV エクスポート
+    ■ 001_002 の MVP Done 基準をすべて満たす → β版として使える状態
 
 
 --------------------------------------------------------------------------------
@@ -222,7 +222,7 @@ Phase 7 — workspace（001_007_workspace.txt 参照）
     doc/001_007_workspace.txt … 設計合意（7-a）
     features/workspace/
       shared/                 … WorkspaceEntry 型、永続化スキーマ
-      main/                   … 名簿 CRUD、load/unload、userData 保存
+      main/                   … 名簿 CRUD、load/unload、config/workspaces.json 永続化
       renderer/               … プロジェクト一覧、ラベル・read-only 編集
     shared/firestore/         … Map<projectId, 接続> プール（1本限定にしない）
     features/connection/      … JSON 選択、getStatus(projectId) 整理
@@ -241,11 +241,11 @@ Phase 7 — workspace（001_007_workspace.txt 参照）
     7-c  UI + 永続化 + read-only 門番 + 既存 feature に projectId 配線
 
   Done:
-    □ 複数のサービスアカウント JSON を登録・同時にロードできる
-    □ プロジェクト一覧から focused を切り替えられる
-    □ プロジェクトに色ラベルを付けられる
-    □ read-only プロジェクトでは書込・削除・一括操作が無効になる（UI + main）
-    □ 接続情報はローカルに保存され、再起動後も復元できる
+    ■ 複数のサービスアカウント JSON を登録・同時にロードできる
+    ■ プロジェクト一覧から focused を切り替えられる
+    ■ プロジェクトに色ラベルを付けられる
+    ■ read-only プロジェクトでは書込・削除・一括操作が無効になる（UI + main）
+    ■ 接続情報は config/workspaces.json に保存され、再起動後も復元できる
 
 
 --------------------------------------------------------------------------------
@@ -265,13 +265,18 @@ Phase 8 — explorer 拡張
       Geopoint 地図           … 地図上プロット
       画像プレビュー          … Firestore 内画像
 
+  実装順:
+    8-a Tree ビュー + サブコレクション辿り
+    8-b テーブル（カラム・ソート・フィルタ）
+    8-c 複製 / メタデータ / Geopoint など
+
   Done:
-    □ Tree ビューでサブコレクションを辿れる
-    □ テーブルでカラムの表示/非表示・ソートができる
-    □ テーブルでフィルタできる
-    □ ドキュメント・コレクションを複製できる
-    □ createTime / updateTime が表示できる
-    □ Geopoint を地図表示できる（最低1形式）
+    ■ Tree ビューでサブコレクションを辿れる
+    ■ テーブルでカラムの表示/非表示・ソートができる
+    ■ テーブルでフィルタできる
+    ■ ドキュメント・コレクションを複製できる
+    ■ createTime / updateTime が表示できる
+    ■ Geopoint を地図表示できる（最低1形式）
 
 
 --------------------------------------------------------------------------------

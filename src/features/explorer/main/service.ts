@@ -1,3 +1,4 @@
+import type { DocumentSnapshot, QueryDocumentSnapshot } from 'firebase-admin/firestore'
 import { getFirestore, isFirestoreConnected } from '@shared/firestore/client'
 import {
   getCollectionRef,
@@ -15,6 +16,9 @@ import type {
   CreateDocumentInput,
   DocumentDetail,
   DocumentSummary,
+  DuplicateCollectionInput,
+  DuplicateCollectionResult,
+  DuplicateDocumentInput,
   ExplorerResult,
   UpdateDocumentInput
 } from '@features/explorer/shared/types'
@@ -25,6 +29,9 @@ function ensureConnected(projectId: string): void {
   }
 }
 
+const DUPLICATE_COLLECTION_LIMIT = 500
+const BATCH_LIMIT = 500
+
 function toExplorerError<T>(error: unknown): ExplorerResult<T> {
   logError('explorer', 'operation failed', error)
   return {
@@ -33,16 +40,41 @@ function toExplorerError<T>(error: unknown): ExplorerResult<T> {
   }
 }
 
+function snapshotTimestamps(snapshot: DocumentSnapshot | QueryDocumentSnapshot): {
+  createTime: string | null
+  updateTime: string | null
+} {
+  return {
+    createTime: snapshot.createTime?.toDate().toISOString() ?? null,
+    updateTime: snapshot.updateTime?.toDate().toISOString() ?? null
+  }
+}
+
 function toDocumentSummary(
   collectionPath: string,
   id: string,
-  data: Record<string, unknown>
+  data: Record<string, unknown>,
+  timestamps?: { createTime: string | null; updateTime: string | null }
 ): DocumentSummary {
   return {
     id,
     path: joinDocumentPath(collectionPath, id),
-    data: serializeFirestoreValue(data) as Record<string, unknown>
+    data: serializeFirestoreValue(data) as Record<string, unknown>,
+    createTime: timestamps?.createTime ?? null,
+    updateTime: timestamps?.updateTime ?? null
   }
+}
+
+function toDocumentSummaryFromSnapshot(
+  collectionPath: string,
+  snapshot: DocumentSnapshot | QueryDocumentSnapshot
+): DocumentSummary {
+  return toDocumentSummary(
+    collectionPath,
+    snapshot.id,
+    snapshot.data() as Record<string, unknown>,
+    snapshotTimestamps(snapshot)
+  )
 }
 
 export async function listRootCollections(projectId: string): Promise<ExplorerResult<string[]>> {
@@ -66,9 +98,7 @@ export async function listDocuments(
     logInfo('explorer', `listDocuments projectId=${projectId} path=${collectionPath}`)
     const snapshot = await getCollectionRef(collectionPath, projectId).limit(200).get()
 
-    const documents = snapshot.docs.map((doc) =>
-      toDocumentSummary(collectionPath, doc.id, doc.data() as Record<string, unknown>)
-    )
+    const documents = snapshot.docs.map((doc) => toDocumentSummaryFromSnapshot(collectionPath, doc))
 
     return { ok: true, data: documents }
   } catch (error) {
@@ -94,7 +124,7 @@ export async function getDocument(
 
     return {
       ok: true,
-      data: toDocumentSummary(collectionPath, snapshot.id, snapshot.data() as Record<string, unknown>)
+      data: toDocumentSummaryFromSnapshot(collectionPath, snapshot)
     }
   } catch (error) {
     return toExplorerError(error)
@@ -164,4 +194,104 @@ export async function listSubcollections(
 
 export function buildSubcollectionPath(documentPath: string, subcollectionId: string): string {
   return joinCollectionPath(documentPath, subcollectionId)
+}
+
+export async function duplicateDocument(
+  input: DuplicateDocumentInput
+): Promise<ExplorerResult<string>> {
+  try {
+    ensureConnected(input.projectId)
+    ensureWritable(input.projectId)
+
+    logInfo('explorer', `duplicateDocument projectId=${input.projectId} path=${input.documentPath}`)
+
+    const snapshot = await getDocumentRef(input.documentPath, input.projectId).get()
+
+    if (!snapshot.exists) {
+      throw new Error('Document not found')
+    }
+
+    const segments = input.documentPath.split('/').filter(Boolean)
+    const collectionPath = segments.slice(0, -1).join('/')
+    const collectionRef = getCollectionRef(collectionPath, input.projectId)
+    const targetRef = input.targetDocumentId
+      ? collectionRef.doc(input.targetDocumentId)
+      : collectionRef.doc()
+
+    const existing = await targetRef.get()
+
+    if (existing.exists) {
+      throw new Error('複製先のドキュメント ID は既に存在します')
+    }
+
+    await targetRef.set(snapshot.data() as Record<string, unknown>)
+
+    return { ok: true, data: targetRef.id }
+  } catch (error) {
+    return toExplorerError(error)
+  }
+}
+
+export async function duplicateCollection(
+  input: DuplicateCollectionInput
+): Promise<ExplorerResult<DuplicateCollectionResult>> {
+  try {
+    ensureConnected(input.projectId)
+    ensureWritable(input.projectId)
+
+    const sourceCollectionPath = input.sourceCollectionPath.trim()
+    const targetCollectionPath = input.targetCollectionPath.trim()
+
+    if (!sourceCollectionPath || !targetCollectionPath) {
+      throw new Error('コレクション path を指定してください')
+    }
+
+    if (sourceCollectionPath === targetCollectionPath) {
+      throw new Error('複製先は別のコレクション path を指定してください')
+    }
+
+    logInfo(
+      'explorer',
+      `duplicateCollection projectId=${input.projectId} from=${sourceCollectionPath} to=${targetCollectionPath}`
+    )
+
+    const snapshot = await getCollectionRef(sourceCollectionPath, input.projectId)
+      .limit(DUPLICATE_COLLECTION_LIMIT)
+      .get()
+
+    if (snapshot.empty) {
+      throw new Error('複製元のコレクションにドキュメントがありません')
+    }
+
+    const targetRef = getCollectionRef(targetCollectionPath, input.projectId)
+    const targetSnapshot = await targetRef.limit(1).get()
+
+    if (!targetSnapshot.empty) {
+      throw new Error('複製先コレクションは空である必要があります')
+    }
+
+    let copiedCount = 0
+
+    for (let index = 0; index < snapshot.docs.length; index += BATCH_LIMIT) {
+      const chunk = snapshot.docs.slice(index, index + BATCH_LIMIT)
+      const batch = getFirestore(input.projectId).batch()
+
+      for (const doc of chunk) {
+        batch.set(targetRef.doc(doc.id), doc.data())
+        copiedCount += 1
+      }
+
+      await batch.commit()
+    }
+
+    return {
+      ok: true,
+      data: {
+        copiedCount,
+        targetCollectionPath
+      }
+    }
+  } catch (error) {
+    return toExplorerError(error)
+  }
 }
