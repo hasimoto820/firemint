@@ -5,6 +5,17 @@ import type { IpcApi } from '@shared/ipc/types'
 
 const api: IpcApi = {
   ping: () => ipcRenderer.invoke(IPC_CHANNELS.PING),
+  app: {
+    quit: () => ipcRenderer.invoke(IPC_CHANNELS.APP_QUIT),
+    getAbout: () => ipcRenderer.invoke(IPC_CHANNELS.APP_GET_ABOUT),
+    openExternal: (url: string) => ipcRenderer.invoke(IPC_CHANNELS.APP_OPEN_EXTERNAL, url)
+  },
+  window: {
+    minimize: () => ipcRenderer.invoke(IPC_CHANNELS.WINDOW_MINIMIZE),
+    maximizeToggle: () => ipcRenderer.invoke(IPC_CHANNELS.WINDOW_MAXIMIZE_TOGGLE),
+    close: () => ipcRenderer.invoke(IPC_CHANNELS.WINDOW_CLOSE),
+    isMaximized: () => ipcRenderer.invoke(IPC_CHANNELS.WINDOW_IS_MAXIMIZED)
+  },
   connection: {
     selectServiceAccountFile: () => ipcRenderer.invoke(IPC_CHANNELS.CONNECTION_SELECT_FILE),
     connect: (filePath: string) => ipcRenderer.invoke(IPC_CHANNELS.CONNECTION_CONNECT, filePath),

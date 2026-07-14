@@ -3,13 +3,11 @@ import type { ConnectionStatus } from '@features/connection/shared/types'
 import type { DocumentSummary } from '@features/explorer/shared/types'
 import type { SimpleQueryInput } from '@features/query/shared/types'
 import WorkspacePanel from '@features/workspace/renderer/ui/WorkspacePanel'
-import AppNav from '@shared/shell/AppNav'
 import type { AppView } from '@shared/shell/AppNav'
+import AppHeader from '@shared/shell/AppHeader'
 import AppShell from '@shared/shell/AppShell'
-import Button from '@shared/ui/Button'
 import DocumentJsonPanel from '@shared/ui/DocumentJsonPanel'
 import DocumentTable from '@shared/ui/DocumentTable'
-import EnvironmentBadge from '@shared/ui/EnvironmentBadge'
 import BulkActionsPanel from '@shared/ui/BulkActionsPanel'
 import ExportPanel from '@shared/ui/ExportPanel'
 import QueryForm from './QueryForm'
@@ -141,19 +139,13 @@ function QueryPage({
   return (
     <AppShell
       header={
-        <div className="explorer-header">
-          <div>
-            <h1 className="explorer-header__title">FireMint</h1>
-            <p className="explorer-header__meta">
-              {status.projectId} <EnvironmentBadge environment={status.environment} />
-              {readOnly && <span className="explorer-header__readonly">read-only</span>}
-            </p>
-            <AppNav active="query" onChange={onNavigate} />
-          </div>
-          <Button variant="danger" onClick={() => void handleDisconnect()} disabled={loading}>
-            切断
-          </Button>
-        </div>
+        <AppHeader
+          status={status}
+          activeView="query"
+          onNavigate={onNavigate}
+          onDisconnect={() => void handleDisconnect()}
+          disconnectDisabled={loading}
+        />
       }
       sidebar={
         <div className="query-sidebar">

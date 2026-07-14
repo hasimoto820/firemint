@@ -44,6 +44,25 @@ export type PingResult = {
   message: string
 }
 
+export type AppAboutInfo = {
+  name: string
+  version: string
+  description: string
+}
+
+export type AppIpcApi = {
+  quit: () => Promise<void>
+  getAbout: () => Promise<AppAboutInfo>
+  openExternal: (url: string) => Promise<void>
+}
+
+export type WindowIpcApi = {
+  minimize: () => Promise<void>
+  maximizeToggle: () => Promise<boolean>
+  close: () => Promise<void>
+  isMaximized: () => Promise<boolean>
+}
+
 export type ConnectionIpcApi = {
   selectServiceAccountFile: () => Promise<string | null>
   connect: (filePath: string) => Promise<ConnectResult>
@@ -99,6 +118,8 @@ export type WorkspaceIpcApi = {
 
 export interface IpcApi {
   ping: () => Promise<PingResult>
+  app: AppIpcApi
+  window: WindowIpcApi
   connection: ConnectionIpcApi
   workspace: WorkspaceIpcApi
   explorer: ExplorerIpcApi

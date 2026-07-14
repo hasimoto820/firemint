@@ -7,12 +7,16 @@ import { registerQueryHandlers } from '@features/query/main/ipc'
 import { registerBulkOperationsHandlers } from '@features/bulk_operations/main/ipc'
 import { registerDataTransferHandlers } from '@features/data_transfer/main/ipc'
 import { registerWorkspaceHandlers } from '@features/workspace/main/ipc'
+import { registerWindowHandlers } from '../shell/window_ipc'
+import { registerAppHandlers } from '../shell/app_ipc'
 
 export function registerIpcHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.PING, (): PingResult => {
     return { message: 'pong' }
   })
 
+  registerAppHandlers()
+  registerWindowHandlers()
   registerConnectionHandlers()
   registerWorkspaceHandlers()
   registerExplorerHandlers()

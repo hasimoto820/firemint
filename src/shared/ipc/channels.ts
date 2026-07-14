@@ -1,5 +1,12 @@
 export const IPC_CHANNELS = {
   PING: 'app:ping',
+  APP_QUIT: 'app:quit',
+  APP_GET_ABOUT: 'app:get_about',
+  APP_OPEN_EXTERNAL: 'app:open_external',
+  WINDOW_MINIMIZE: 'window:minimize',
+  WINDOW_MAXIMIZE_TOGGLE: 'window:maximize_toggle',
+  WINDOW_CLOSE: 'window:close',
+  WINDOW_IS_MAXIMIZED: 'window:is_maximized',
   CONNECTION_SELECT_FILE: 'connection:select_service_account_file',
   CONNECTION_CONNECT: 'connection:connect',
   CONNECTION_DISCONNECT: 'connection:disconnect',

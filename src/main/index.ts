@@ -6,8 +6,17 @@ import icon from '../../resources/icon.png?asset'
 import { registerIpcHandlers } from './ipc/register_handlers'
 import { initializeWorkspace } from '@features/workspace/main/service'
 
+const TITLE_BAR_HEIGHT = 32
+const TITLE_BAR_OVERLAY = {
+  color: '#222222',
+  symbolColor: '#ebebf5'
+} as const
+
 function createWindow(): void {
-  // Create the browser window.
+  const isMac = process.platform === 'darwin'
+  const isWin = process.platform === 'win32'
+  const isLinux = process.platform === 'linux'
+
   const mainWindow = new BrowserWindow({
     width: 960,
     height: 800,
@@ -15,7 +24,23 @@ function createWindow(): void {
     minHeight: 600,
     show: false,
     autoHideMenuBar: true,
-    ...(process.platform === 'linux' ? { icon } : {}),
+    backgroundColor: '#1b1b1f',
+    ...(isMac
+      ? {
+          titleBarStyle: 'hiddenInset',
+          trafficLightPosition: { x: 14, y: 10 }
+        }
+      : {}),
+    ...(isWin
+      ? {
+          titleBarStyle: 'hidden',
+          titleBarOverlay: {
+            ...TITLE_BAR_OVERLAY,
+            height: TITLE_BAR_HEIGHT
+          }
+        }
+      : {}),
+    ...(isLinux ? { frame: false, icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false
