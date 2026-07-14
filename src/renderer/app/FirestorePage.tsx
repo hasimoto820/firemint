@@ -372,7 +372,7 @@ function FirestorePage({
         id: 'view-simple',
         group: '表示',
         label: 'Simple モード',
-        run: () => onNavigate('explorer')
+        run: () => onNavigate('simple')
       },
       {
         id: 'view-query',
@@ -490,7 +490,7 @@ function FirestorePage({
         <WorkspacePane
           status={status}
           tab={active}
-          menuEnabled={focusedPane === pane && active.view === 'explorer'}
+          menuEnabled={focusedPane === pane && active.view === 'simple'}
           onChangeView={(nextView) => handlePaneViewChange(active.id, nextView)}
           onSelectCollection={(path) => handlePaneCollectionChange(active.id, path)}
           onSelectDocument={(path) => handlePaneDocumentChange(active.id, path)}
@@ -498,10 +498,10 @@ function FirestorePage({
         />
       ) : (
         <div className="firestore-split__pane-empty">
-          <p className="explorer-main__empty-title">
+          <p className="simple-main__empty-title">
             {pane === 'primary' ? '左ペイン' : '右ペイン'}
           </p>
-          <p className="explorer-main__empty-hint">
+          <p className="simple-main__empty-hint">
             このペインをクリックしてフォーカスし、ツリーまたは Command Palette
             からコレクションを開くと、ここにタブが追加されます。
           </p>
@@ -529,9 +529,9 @@ function FirestorePage({
         main={
           <div className="firestore-main">
             {tabs.length === 0 ? (
-              <div className="explorer-main explorer-main--empty">
-                <p className="explorer-main__empty-title">コレクションを開いてください</p>
-                <p className="explorer-main__empty-hint">
+              <div className="simple-main simple-main--empty">
+                <p className="simple-main__empty-title">コレクションを開いてください</p>
+                <p className="simple-main__empty-hint">
                   左のツリーからコレクションを選ぶか、Ctrl+P（Mac: ⌘P）で Command Palette
                   を開き、タブとして開けます。
                 </p>

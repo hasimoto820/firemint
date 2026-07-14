@@ -34,7 +34,7 @@ export function createWorkspaceTab(input: {
     id: createWorkspaceTabId(),
     projectId: input.projectId,
     collectionPath: input.collectionPath,
-    view: input.view ?? 'explorer',
+    view: input.view ?? 'simple',
     selectedDocumentPath: input.selectedDocumentPath ?? null,
     pane: input.pane ?? 'primary'
   }

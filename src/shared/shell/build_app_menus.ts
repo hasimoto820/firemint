@@ -137,10 +137,10 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
       items: [
         {
           type: 'item',
-          id: 'view-explorer',
-          label: handlers.activeView === 'explorer' ? 'Simple ✓' : 'Simple',
+          id: 'view-simple',
+          label: handlers.activeView === 'simple' ? 'Simple ✓' : 'Simple',
           disabled: !handlers.connected,
-          onClick: () => handlers.onNavigate('explorer')
+          onClick: () => handlers.onNavigate('simple')
         },
         {
           type: 'item',

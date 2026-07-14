@@ -184,7 +184,8 @@ Phase 6〜16：v1（MVP 後）
        Phase 0〜8 完了。
        Phase 8.5（UI 練り直し）完了。
        Phase 9（タブ・Split・Command Palette）完了。
-       Phase 10 以降は保留（任意で再開可）。
+       Phase 10-0（JS Query 基本画面）完了。
+       Phase 10 Saved Queries 完了（オートコンプリートは保留）。
 
 
   Phase   内容
@@ -194,10 +195,11 @@ Phase 6〜16：v1（MVP 後）
   8       explorer 拡張          … Tree、フィルタ、複製、Geopoint 等 ✅
   8.5     UI 練り直し            … メニュー・左ツリー・Simple/Query ✅
   9       shared/shell 拡張      … タブ、Split View、Command Palette ✅
-  10      query 拡張             … 【保留】Saved Queries、starts-with 等 ★次候補
+  10-0    JS Query 基本          … コード入力 → Run → テーブル     ✅
+  10      query 拡張             … Saved Queries ✅ / オートコンプリート保留 ★次候補可
   11      data_transfer 拡張     … 【保留】import、バックアップ、転送
   12      connection 拡張        … 【保留】Google サインイン、Emulator
-  13      script_runner          … 【保留】JS エディタ、Background Tasks
+  13      script_runner          … 【保留】長時間 Tasks 等（JS Query 本体は 10-0）
   14      auth                   … 【保留】Firebase Auth ユーザー管理
   15      onboarding             … 【保留】初回オンボーディング
   16      shared/i18n, settings  … 【保留】日本語 UI、テーマ、ショートカット
@@ -335,6 +337,7 @@ Phase 8.5 — UI 練り直し（✅ 完了）
     8.5-ui-d    Simple / Query モード化                                   ✅
                 FirestorePage 親・左ツリー固定・ナビを右メイン最上段へ
                 旧 ExplorerPage / QueryPage は SimpleView / QueryView に格下げ
+                ※ モード id は AppView = 'simple' | 'query'（旧 'explorer' を解消）
     （付帯）    DocumentTable の FireFoo 風フィルタ強化 / 文字選択可       ✅
     8.5-toolbar Simple 上段整理（Export/複製カード撤去、薄いツールバー、
                 JSON 下固定、コレクション複製を Edit メニューへ）         ✅
@@ -374,19 +377,48 @@ Phase 9 — shared/shell 拡張（✅ 完了）
 
 
 --------------------------------------------------------------------------------
-Phase 10 — query 拡張 【保留】
+Phase 10-0 — JS Query 基本画面（✅ 完了）
+--------------------------------------------------------------------------------
+
+  方針:
+    - Simple = フィールド＋演算子＋値（既存）
+    - Query = ユーザーが JS を書いて絞る（FireFoo JS Query）
+    - 結果テーブルは共通流用。旧フォーム Query（where/orderBy UI）は撤去
+
+  作るもの:
+    features/query/
+      QueryEditor             … コード入力 + Run
+      QueryView               … 実行結果を DocumentTable 等へ
+      main/service executeJsQuery … db / admin を渡して run() を実行
+
+  Done:
+    ■ async function run() を書いて Query 実行できる
+    ■ 結果がテーブル / JSON に出る
+    ■ 旧フォーム Query UI を撤去した
+
+
+--------------------------------------------------------------------------------
+Phase 10 — query 拡張
 --------------------------------------------------------------------------------
 
   作るもの:
     features/query/
-      starts-with 演算子      … 先頭一致クエリ（Firestore range クエリ）
-      Saved Queries           … クエリ条件の保存・復元
-      オートコンプリート      … コレクション名・フィールド名
+      Saved Queries           … JS クエリの保存・復元               ✅
+                              … config/saved_queries.json
+                              … workspaces.json には入れない
+      オートコンプリート      … 【保留】コレクション path / フィールド名
+                              … UI: shared/ui の SuggestInput
+                              … 違和感があれば撤去可
+
+  オートコンプリート候補の充填タイミング（固定・実装時）:
+    - 接続後〜ツリー表示時に、コレクション path 候補をプールへ入れる
+    - フィールド名は、当該コレクションを開いた・Query 実行した結果から追加する
+
+  ※ starts-with は不要（Simple の部分一致で足りる）→ Phase 10 対象外
 
   Done:
-    □ starts-with 条件でクエリ実行できる
-    □ クエリ条件を名前付きで保存・読み込みできる
-    □ コレクション名・フィールド名が入力補完される
+    ■ クエリ（JS ソース）を名前付きで保存・読み込みできる（saved_queries.json）
+    □ コレクション path / フィールド名が入力補完される（保留）
 
 
 --------------------------------------------------------------------------------

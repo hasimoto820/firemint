@@ -1,4 +1,4 @@
-import admin from 'firebase-admin'
+import { DocumentReference, GeoPoint, Timestamp } from 'firebase-admin/firestore'
 import { getFirestore } from './client'
 
 export function serializeFirestoreValue(value: unknown): unknown {
@@ -6,14 +6,14 @@ export function serializeFirestoreValue(value: unknown): unknown {
     return value
   }
 
-  if (value instanceof admin.firestore.Timestamp) {
+  if (value instanceof Timestamp) {
     return {
       __firemint_type: 'timestamp',
       iso: value.toDate().toISOString()
     }
   }
 
-  if (value instanceof admin.firestore.GeoPoint) {
+  if (value instanceof GeoPoint) {
     return {
       __firemint_type: 'geopoint',
       latitude: value.latitude,
@@ -21,7 +21,7 @@ export function serializeFirestoreValue(value: unknown): unknown {
     }
   }
 
-  if (value instanceof admin.firestore.DocumentReference) {
+  if (value instanceof DocumentReference) {
     return {
       __firemint_type: 'reference',
       path: value.path
@@ -60,7 +60,7 @@ export function deserializeFirestoreValue(value: unknown): unknown {
     const typeMarker = record.__firemint_type
 
     if (typeMarker === 'timestamp' && typeof record.iso === 'string') {
-      return admin.firestore.Timestamp.fromDate(new Date(record.iso))
+      return Timestamp.fromDate(new Date(record.iso))
     }
 
     if (
@@ -68,7 +68,7 @@ export function deserializeFirestoreValue(value: unknown): unknown {
       typeof record.latitude === 'number' &&
       typeof record.longitude === 'number'
     ) {
-      return new admin.firestore.GeoPoint(record.latitude, record.longitude)
+      return new GeoPoint(record.latitude, record.longitude)
     }
 
     if (typeMarker === 'reference' && typeof record.path === 'string') {

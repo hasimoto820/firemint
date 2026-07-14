@@ -1,4 +1,4 @@
-export type AppView = 'explorer' | 'query'
+export type AppView = 'simple' | 'query'
 
 type AppNavProps = {
   active: AppView
@@ -10,8 +10,8 @@ function AppNav({ active, onChange }: AppNavProps): React.JSX.Element {
     <nav className="app-nav">
       <button
         type="button"
-        className={active === 'explorer' ? 'app-nav__item app-nav__item--active' : 'app-nav__item'}
-        onClick={() => onChange('explorer')}
+        className={active === 'simple' ? 'app-nav__item app-nav__item--active' : 'app-nav__item'}
+        onClick={() => onChange('simple')}
       >
         Simple
       </button>

@@ -56,7 +56,7 @@ export function collectDataColumns(documents: DocumentSummary[]): string[] {
   const columns = new Set<string>()
 
   for (const document of documents) {
-    for (const key of Object.keys(document.data)) {
+    for (const key of Object.keys(document.data ?? {})) {
       columns.add(key)
     }
   }

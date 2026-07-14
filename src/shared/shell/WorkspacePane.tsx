@@ -34,9 +34,9 @@ function WorkspacePane({
           <button
             type="button"
             className={
-              tab.view === 'explorer' ? 'app-nav__item app-nav__item--active' : 'app-nav__item'
+              tab.view === 'simple' ? 'app-nav__item app-nav__item--active' : 'app-nav__item'
             }
-            onClick={() => onChangeView('explorer')}
+            onClick={() => onChangeView('simple')}
           >
             Simple
           </button>

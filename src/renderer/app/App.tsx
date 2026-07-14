@@ -16,7 +16,7 @@ function App(): React.JSX.Element {
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus | null | undefined>(
     undefined
   )
-  const [view, setView] = useState<AppView>('explorer')
+  const [view, setView] = useState<AppView>('simple')
   const [refreshKey, setRefreshKey] = useState(0)
   const [menuContext, setMenuContext] = useState<AppMenuContextActions | null>(null)
   const [shellCommands, setShellCommands] = useState<ShellCommands | null>(null)

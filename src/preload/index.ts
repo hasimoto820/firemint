@@ -55,7 +55,11 @@ const api: IpcApi = {
       ipcRenderer.invoke(IPC_CHANNELS.EXPLORER_DUPLICATE_COLLECTION, input)
   },
   query: {
-    execute: (input) => ipcRenderer.invoke(IPC_CHANNELS.QUERY_EXECUTE, input)
+    execute: (input) => ipcRenderer.invoke(IPC_CHANNELS.QUERY_EXECUTE, input),
+    listSaved: (projectId?: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.QUERY_LIST_SAVED, projectId),
+    saveSaved: (input) => ipcRenderer.invoke(IPC_CHANNELS.QUERY_SAVE_SAVED, input),
+    deleteSaved: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.QUERY_DELETE_SAVED, id)
   },
   bulk: {
     previewUpdate: (input) => ipcRenderer.invoke(IPC_CHANNELS.BULK_PREVIEW_UPDATE, input),

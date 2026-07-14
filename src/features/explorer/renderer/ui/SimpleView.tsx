@@ -364,9 +364,9 @@ function SimpleView({
 
   if (!activeCollectionPath) {
     return (
-      <div className="explorer-main explorer-main--empty">
-        <p className="explorer-main__empty-title">コレクションを選択してください</p>
-        <p className="explorer-main__empty-hint">
+      <div className="simple-main simple-main--empty">
+        <p className="simple-main__empty-title">コレクションを選択してください</p>
+        <p className="simple-main__empty-hint">
           左のツリーからコレクションを選ぶと、ドキュメント一覧と JSON 編集が表示されます。
         </p>
       </div>
@@ -374,16 +374,16 @@ function SimpleView({
   }
 
   return (
-    <div className="explorer-main">
+    <div className="simple-main">
       {(error || successMessage || loading) && (
-        <div className="explorer-main__status">
-          {error && <p className="explorer-main__error">{error}</p>}
-          {successMessage && <p className="explorer-main__success">{successMessage}</p>}
-          {loading && <p className="explorer-main__loading">読み込み中...</p>}
+        <div className="simple-main__status">
+          {error && <p className="simple-main__error">{error}</p>}
+          {successMessage && <p className="simple-main__success">{successMessage}</p>}
+          {loading && <p className="simple-main__loading">読み込み中...</p>}
         </div>
       )}
 
-      <div className="explorer-main__workspace">
+      <div className="simple-main__workspace">
         <DocumentTable
           documents={documents}
           selectedDocumentPath={selectedDocumentPath}
@@ -409,7 +409,7 @@ function SimpleView({
         )}
       </div>
 
-      <div className="explorer-main__json">
+      <div className="simple-main__json">
         <DocumentJsonPanel
           documentPath={selectedDocumentPath}
           jsonText={jsonText}

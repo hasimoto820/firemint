@@ -15,7 +15,10 @@ import type {
 
 import type {
   QueryExecuteResult,
-  SimpleQueryInput
+  JsQueryInput,
+  SavedQuery,
+  SavedQueryResult,
+  SaveSavedQueryInput
 } from '@features/query/shared/types'
 
 import type {
@@ -88,7 +91,10 @@ export type ExplorerIpcApi = {
 }
 
 export type QueryIpcApi = {
-  execute: (input: SimpleQueryInput) => Promise<QueryExecuteResult>
+  execute: (input: JsQueryInput) => Promise<QueryExecuteResult>
+  listSaved: (projectId?: string) => Promise<SavedQueryResult<SavedQuery[]>>
+  saveSaved: (input: SaveSavedQueryInput) => Promise<SavedQueryResult<SavedQuery>>
+  deleteSaved: (id: string) => Promise<SavedQueryResult<null>>
 }
 
 export type BulkOperationsIpcApi = {
