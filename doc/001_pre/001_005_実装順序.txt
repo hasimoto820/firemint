@@ -154,7 +154,7 @@ shared の実装タイミング
   firestore       Phase 1
   safety          Phase 1（最小）→ Phase 4（拡張）
   shell           Phase 2（最小）→ Phase 8.5（メニュー・ヘッダー・タイトルバー）
-                  → Phase 9（タブ・Split）は保留
+                  → Phase 9（タブ・Split・Command Palette）✅
   ui              Phase 2（最小）→ Phase 6 で横断整理 → Phase 8 / 8.5 で拡張
   i18n            v1（Phase 16）※ Phase 2 から日本語文字列だけ先でも可
   settings        v1（Phase 16）
@@ -183,7 +183,8 @@ Phase 6〜16：v1（MVP 後）
   ※ 現在地（2026-07-14）:
        Phase 0〜8 完了。
        Phase 8.5（UI 練り直し）完了。
-       Phase 9 以降の機能追加は一旦保留（任意で再開可）。
+       Phase 9（タブ・Split・Command Palette）完了。
+       Phase 10 以降は保留（任意で再開可）。
 
 
   Phase   内容
@@ -192,8 +193,8 @@ Phase 6〜16：v1（MVP 後）
   7       workspace              … 複数プロジェクト、ラベル、read-only ✅
   8       explorer 拡張          … Tree、フィルタ、複製、Geopoint 等 ✅
   8.5     UI 練り直し            … メニュー・左ツリー・Simple/Query ✅
-  9       shared/shell 拡張      … 【保留】タブ、Split View、Command Palette ★次候補
-  10      query 拡張             … 【保留】Saved Queries、starts-with 等
+  9       shared/shell 拡張      … タブ、Split View、Command Palette ✅
+  10      query 拡張             … 【保留】Saved Queries、starts-with 等 ★次候補
   11      data_transfer 拡張     … 【保留】import、バックアップ、転送
   12      connection 拡張        … 【保留】Google サインイン、Emulator
   13      script_runner          … 【保留】JS エディタ、Background Tasks
@@ -354,21 +355,22 @@ Phase 8.5 — UI 練り直し（✅ 完了）
 
 
 --------------------------------------------------------------------------------
-Phase 9 — shared/shell 拡張 【保留】
+Phase 9 — shared/shell 拡張（✅ 完了）
 --------------------------------------------------------------------------------
 
   作るもの:
     shared/shell/             … アプリ枠の拡張（001_003 参照）
-      タブ                    … 複数コレクションを同時に開く
-      Split View              … 左右にコレクション並列表示
-      Command Palette         … Cmd/Ctrl+P でジャンプ
-    renderer/app/             … タブ状態・Split 状態のルーティング連携
-    features/explorer/        … タブ/Split の中身としてコレクション表示
+      workspace_tab           … タブ状態 { projectId, collectionPath, view, selectedDocumentPath }
+      TabBar                  … 複数コレクションのタブ一覧
+      WorkspacePane           … タブ 1 枚の Simple / Query 中身
+      CommandPalette          … Cmd/Ctrl+P でジャンプ
+    renderer/app/FirestorePage … タブ状態・Split 状態・ツリー連携
+    features/explorer/        … SimpleView をタブ／Split の中身として利用（menuEnabled）
 
   Done:
-    □ 複数コレクションをタブで開ける
-    □ Split View で左右に別コレクションを表示できる
-    □ Command Palette からコレクション・主要画面へジャンプできる
+    ■ 複数コレクションをタブで開ける
+    ■ Split View で左右に別コレクションを表示できる
+    ■ Command Palette からコレクション・主要画面へジャンプできる
 
 
 --------------------------------------------------------------------------------

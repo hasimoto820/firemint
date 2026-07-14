@@ -13,6 +13,8 @@ type SimpleViewProps = {
   onSelectCollection: (collectionPath: string) => void
   onSelectDocument: (documentPath: string | null) => void
   onRootCollectionsChanged: () => void
+  /** Split 時など、メニュー登録を行うのはフォーカス側のペインのみ */
+  menuEnabled?: boolean
 }
 
 /**
@@ -26,7 +28,8 @@ function SimpleView({
   selectedDocumentPath,
   onSelectCollection,
   onSelectDocument,
-  onRootCollectionsChanged
+  onRootCollectionsChanged,
+  menuEnabled = true
 }: SimpleViewProps): React.JSX.Element {
   const projectId = status.projectId
   const readOnly = status.readOnly
@@ -333,21 +336,30 @@ function SimpleView({
   }
 
   useRegisterAppMenu(
-    {
-      canCreate: !readOnly && Boolean(activeCollectionPath),
-      canSave: !readOnly && Boolean(selectedDocumentPath),
-      canDuplicate: !readOnly && Boolean(selectedDocumentPath),
-      canDelete: !readOnly && Boolean(selectedDocumentPath),
-      canExport: Boolean(activeCollectionPath),
-      canDuplicateCollection: !readOnly && Boolean(activeCollectionPath),
-      onCreate: () => void handleCreate(),
-      onSave: () => void handleSave(),
-      onDuplicate: () => void handleDuplicateDocument(),
-      onDelete: () => void handleDelete(),
-      onExport: () => void handleExportCollection(),
-      onDuplicateCollection: () => void handleDuplicateCollection()
-    },
-    [readOnly, activeCollectionPath, selectedDocumentPath, jsonText]
+    menuEnabled
+      ? {
+          canCreate: !readOnly && Boolean(activeCollectionPath),
+          canSave: !readOnly && Boolean(selectedDocumentPath),
+          canDuplicate: !readOnly && Boolean(selectedDocumentPath),
+          canDelete: !readOnly && Boolean(selectedDocumentPath),
+          canExport: Boolean(activeCollectionPath),
+          canDuplicateCollection: !readOnly && Boolean(activeCollectionPath),
+          onCreate: () => void handleCreate(),
+          onSave: () => void handleSave(),
+          onDuplicate: () => void handleDuplicateDocument(),
+          onDelete: () => void handleDelete(),
+          onExport: () => void handleExportCollection(),
+          onDuplicateCollection: () => void handleDuplicateCollection()
+        }
+      : {
+          canCreate: false,
+          canSave: false,
+          canDuplicate: false,
+          canDelete: false,
+          canExport: false,
+          canDuplicateCollection: false
+        },
+    [menuEnabled, readOnly, activeCollectionPath, selectedDocumentPath, jsonText]
   )
 
   if (!activeCollectionPath) {

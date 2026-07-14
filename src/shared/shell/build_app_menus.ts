@@ -22,6 +22,16 @@ export type AppMenuContextActions = {
   onDuplicateCollection?: () => void
 }
 
+export type AppShellMenuActions = {
+  openCommandPalette?: () => void
+  toggleSplit?: () => void
+  closeActiveTab?: () => void
+  closeOtherTabs?: () => void
+  canCloseTab?: boolean
+  canCloseOtherTabs?: boolean
+  splitEnabled?: boolean
+}
+
 export type AppMenuHandlers = {
   connected: boolean
   activeView: AppView
@@ -33,11 +43,13 @@ export type AppMenuHandlers = {
   onMinimize?: () => void
   onMaximizeToggle?: () => void
   context?: AppMenuContextActions | null
+  shell?: AppShellMenuActions | null
 }
 
 export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
   const showWindowItems = Boolean(handlers.onMinimize && handlers.onMaximizeToggle)
   const context = handlers.context ?? null
+  const shell = handlers.shell ?? null
 
   return [
     {
@@ -136,6 +148,43 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
           label: handlers.activeView === 'query' ? 'Query ✓' : 'Query',
           disabled: !handlers.connected,
           onClick: () => handlers.onNavigate('query')
+        },
+        { type: 'separator' },
+        {
+          type: 'item',
+          id: 'view-command-palette',
+          label: 'Command Palette…',
+          shortcut: 'Ctrl+P',
+          disabled: !handlers.connected,
+          onClick: shell?.openCommandPalette
+        },
+        {
+          type: 'item',
+          id: 'view-split',
+          label: shell?.splitEnabled ? 'Split View ✓' : 'Split View',
+          disabled: !handlers.connected,
+          onClick: shell?.toggleSplit
+        }
+      ]
+    },
+    {
+      id: 'tab',
+      label: 'Tab',
+      items: [
+        {
+          type: 'item',
+          id: 'tab-close',
+          label: 'タブを閉じる',
+          shortcut: 'Ctrl+W',
+          disabled: !shell?.canCloseTab,
+          onClick: shell?.closeActiveTab
+        },
+        {
+          type: 'item',
+          id: 'tab-close-others',
+          label: '他のタブを閉じる',
+          disabled: !shell?.canCloseOtherTabs,
+          onClick: shell?.closeOtherTabs
         }
       ]
     },

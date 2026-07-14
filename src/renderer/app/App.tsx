@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ConnectionStatus } from '@features/connection/shared/types'
 import ConnectionPanel from '@features/connection/renderer/ui/ConnectionPanel'
 import WorkspacePanel from '@features/workspace/renderer/ui/WorkspacePanel'
-import FirestorePage from './FirestorePage'
+import FirestorePage, { type ShellCommands } from './FirestorePage'
 import type { AppView } from '@shared/shell/AppNav'
 import AppChrome from '@shared/shell/AppChrome'
 import { AppMenuRegistryProvider } from '@shared/shell/AppMenuContext'
@@ -19,6 +19,7 @@ function App(): React.JSX.Element {
   const [view, setView] = useState<AppView>('explorer')
   const [refreshKey, setRefreshKey] = useState(0)
   const [menuContext, setMenuContext] = useState<AppMenuContextActions | null>(null)
+  const [shellCommands, setShellCommands] = useState<ShellCommands | null>(null)
 
   const refreshStatus = useCallback(async (): Promise<void> => {
     setConnectionStatus(await window.api.connection.getStatus())
@@ -69,6 +70,17 @@ function App(): React.JSX.Element {
         onAbout: () => void handleAbout(),
         onOpenDocs: handleOpenDocs,
         context: menuContext,
+        shell: shellCommands
+          ? {
+              openCommandPalette: shellCommands.openCommandPalette,
+              toggleSplit: shellCommands.toggleSplit,
+              closeActiveTab: shellCommands.closeActiveTab,
+              closeOtherTabs: shellCommands.closeOtherTabs,
+              canCloseTab: shellCommands.canCloseTab,
+              canCloseOtherTabs: shellCommands.canCloseOtherTabs,
+              splitEnabled: shellCommands.splitEnabled
+            }
+          : null,
         ...(useWindowMenuActions
           ? {
               onMinimize: () => void window.api.window.minimize(),
@@ -84,6 +96,7 @@ function App(): React.JSX.Element {
       handleAbout,
       handleOpenDocs,
       menuContext,
+      shellCommands,
       useWindowMenuActions
     ]
   )
@@ -110,6 +123,7 @@ function App(): React.JSX.Element {
         onNavigate={setView}
         onDisconnected={handleWorkspaceChanged}
         onWorkspaceChanged={handleWorkspaceChanged}
+        onShellCommandsChange={setShellCommands}
       />
     )
   }
