@@ -77,16 +77,26 @@ function AppMenuBar({ menus }: AppMenuBarProps): React.JSX.Element {
                     return <div key={`${section.id}-sep-${index}`} className="app-menu-bar__separator" />
                   }
 
+                  if (entry.type === 'header') {
+                    return (
+                      <div key={`${section.id}-header-${index}`} className="app-menu-bar__header">
+                        {entry.label}
+                      </div>
+                    )
+                  }
+
                   return (
                     <button
                       key={entry.id}
                       type="button"
                       role="menuitem"
-                      className={
-                        entry.disabled
-                          ? 'app-menu-bar__item app-menu-bar__item--disabled'
-                          : 'app-menu-bar__item'
-                      }
+                      className={[
+                        'app-menu-bar__item',
+                        entry.disabled ? 'app-menu-bar__item--disabled' : '',
+                        entry.indent ? 'app-menu-bar__item--indent' : ''
+                      ]
+                        .filter(Boolean)
+                        .join(' ')}
                       disabled={entry.disabled}
                       onClick={() => handleItemClick(entry)}
                     >

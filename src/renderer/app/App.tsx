@@ -1,12 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ConnectionStatus } from '@features/connection/shared/types'
 import ConnectionPanel from '@features/connection/renderer/ui/ConnectionPanel'
-import ExplorerPage from '@features/explorer/renderer/ui/ExplorerPage'
-import QueryPage from '@features/query/renderer/ui/QueryPage'
 import WorkspacePanel from '@features/workspace/renderer/ui/WorkspacePanel'
+import FirestorePage from './FirestorePage'
 import type { AppView } from '@shared/shell/AppNav'
 import AppChrome from '@shared/shell/AppChrome'
-import { buildAppMenus, FIREMINT_DOCS_URL } from '@shared/shell/build_app_menus'
+import { AppMenuRegistryProvider } from '@shared/shell/AppMenuContext'
+import {
+  buildAppMenus,
+  FIREMINT_DOCS_URL,
+  type AppMenuContextActions
+} from '@shared/shell/build_app_menus'
 
 function App(): React.JSX.Element {
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus | null | undefined>(
@@ -14,6 +18,7 @@ function App(): React.JSX.Element {
   )
   const [view, setView] = useState<AppView>('explorer')
   const [refreshKey, setRefreshKey] = useState(0)
+  const [menuContext, setMenuContext] = useState<AppMenuContextActions | null>(null)
 
   const refreshStatus = useCallback(async (): Promise<void> => {
     setConnectionStatus(await window.api.connection.getStatus())
@@ -45,6 +50,10 @@ function App(): React.JSX.Element {
     void window.api.app.quit()
   }, [])
 
+  const registerMenu = useCallback((actions: AppMenuContextActions | null): void => {
+    setMenuContext(actions)
+  }, [])
+
   const connected = Boolean(connectionStatus)
   const platform = window.electron.process.platform
   const useWindowMenuActions = platform === 'linux'
@@ -59,6 +68,7 @@ function App(): React.JSX.Element {
         onQuit: handleQuit,
         onAbout: () => void handleAbout(),
         onOpenDocs: handleOpenDocs,
+        context: menuContext,
         ...(useWindowMenuActions
           ? {
               onMinimize: () => void window.api.window.minimize(),
@@ -73,6 +83,7 @@ function App(): React.JSX.Element {
       handleQuit,
       handleAbout,
       handleOpenDocs,
+      menuContext,
       useWindowMenuActions
     ]
   )
@@ -90,32 +101,25 @@ function App(): React.JSX.Element {
         <ConnectionPanel onConnected={handleWorkspaceChanged} />
       </main>
     )
-  } else if (view === 'query') {
-    content = (
-      <QueryPage
-        key={connectionStatus.projectId}
-        initialStatus={connectionStatus}
-        onDisconnected={handleWorkspaceChanged}
-        onWorkspaceChanged={handleWorkspaceChanged}
-        onNavigate={setView}
-      />
-    )
   } else {
     content = (
-      <ExplorerPage
+      <FirestorePage
         key={connectionStatus.projectId}
-        initialStatus={connectionStatus}
+        status={connectionStatus}
+        view={view}
+        onNavigate={setView}
         onDisconnected={handleWorkspaceChanged}
         onWorkspaceChanged={handleWorkspaceChanged}
-        onNavigate={setView}
       />
     )
   }
 
   return (
-    <AppChrome title={chromeTitle} menus={menus}>
-      {content}
-    </AppChrome>
+    <AppMenuRegistryProvider value={registerMenu}>
+      <AppChrome title={chromeTitle} menus={menus}>
+        {content}
+      </AppChrome>
+    </AppMenuRegistryProvider>
   )
 }
 

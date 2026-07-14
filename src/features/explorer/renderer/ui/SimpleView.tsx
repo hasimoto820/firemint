@@ -1,37 +1,38 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { ConnectionStatus } from '@features/connection/shared/types'
 import type { DocumentSummary } from '@features/explorer/shared/types'
-import WorkspacePanel from '@features/workspace/renderer/ui/WorkspacePanel'
-import type { AppView } from '@shared/shell/AppNav'
-import AppHeader from '@shared/shell/AppHeader'
-import AppShell from '@shared/shell/AppShell'
+import { useRegisterAppMenu } from '@shared/shell/AppMenuContext'
 import Button from '@shared/ui/Button'
 import DocumentJsonPanel from '@shared/ui/DocumentJsonPanel'
 import DocumentTable from '@shared/ui/DocumentTable'
 import BulkActionsPanel from '@shared/ui/BulkActionsPanel'
 import ExportPanel from '@shared/ui/ExportPanel'
-import CollectionTree from './CollectionTree'
 
-type ExplorerPageProps = {
-  initialStatus: ConnectionStatus
-  onDisconnected: () => void
-  onWorkspaceChanged: () => void
-  onNavigate: (view: AppView) => void
+type SimpleViewProps = {
+  status: ConnectionStatus
+  activeCollectionPath: string | null
+  selectedDocumentPath: string | null
+  onSelectCollection: (collectionPath: string) => void
+  onSelectDocument: (documentPath: string | null) => void
+  onRootCollectionsChanged: () => void
 }
 
-function ExplorerPage({
-  initialStatus,
-  onDisconnected,
-  onWorkspaceChanged,
-  onNavigate
-}: ExplorerPageProps): React.JSX.Element {
-  const [status] = useState(initialStatus)
+/**
+ * Firestore 作業エリアの「Simple」モード。ツリーで選択中のコレクション /
+ * ドキュメントを一覧・JSON 表示し、CRUD を行う。選択状態は親（FirestorePage）
+ * が保持し、props で受け取る。
+ */
+function SimpleView({
+  status,
+  activeCollectionPath,
+  selectedDocumentPath,
+  onSelectCollection,
+  onSelectDocument,
+  onRootCollectionsChanged
+}: SimpleViewProps): React.JSX.Element {
   const projectId = status.projectId
   const readOnly = status.readOnly
-  const [rootCollections, setRootCollections] = useState<string[]>([])
-  const [activeCollectionPath, setActiveCollectionPath] = useState<string | null>(null)
   const [documents, setDocuments] = useState<DocumentSummary[]>([])
-  const [selectedDocumentPath, setSelectedDocumentPath] = useState<string | null>(null)
   const [selectedCreateTime, setSelectedCreateTime] = useState<string | null>(null)
   const [selectedUpdateTime, setSelectedUpdateTime] = useState<string | null>(null)
   const [selectedDocumentData, setSelectedDocumentData] = useState<Record<string, unknown> | null>(
@@ -42,15 +43,6 @@ function ExplorerPage({
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [bulkSelectedPaths, setBulkSelectedPaths] = useState<Set<string>>(new Set())
-
-  const loadRootCollections = useCallback(async (): Promise<void> => {
-    const result = await window.api.explorer.listRootCollections(projectId)
-    if (!result.ok) {
-      setError(result.error)
-      return
-    }
-    setRootCollections(result.data)
-  }, [projectId])
 
   const loadDocuments = useCallback(
     async (collectionPath: string): Promise<void> => {
@@ -66,12 +58,6 @@ function ExplorerPage({
         }
 
         setDocuments(result.data)
-        setActiveCollectionPath(collectionPath)
-        setSelectedDocumentPath(null)
-        setSelectedCreateTime(null)
-        setSelectedUpdateTime(null)
-        setSelectedDocumentData(null)
-        setJsonText('{\n  \n}')
         setBulkSelectedPaths(new Set())
       } finally {
         setLoading(false)
@@ -93,7 +79,6 @@ function ExplorerPage({
           return
         }
 
-        setSelectedDocumentPath(documentPath)
         setSelectedCreateTime(documentResult.data.createTime)
         setSelectedUpdateTime(documentResult.data.updateTime)
         setSelectedDocumentData(documentResult.data.data)
@@ -106,13 +91,26 @@ function ExplorerPage({
   )
 
   useEffect(() => {
-    void loadRootCollections()
-  }, [loadRootCollections])
+    if (!activeCollectionPath) {
+      setDocuments([])
+      setBulkSelectedPaths(new Set())
+      return
+    }
 
-  const handleDisconnect = async (): Promise<void> => {
-    await window.api.connection.disconnect()
-    onDisconnected()
-  }
+    void loadDocuments(activeCollectionPath)
+  }, [activeCollectionPath, loadDocuments])
+
+  useEffect(() => {
+    if (!selectedDocumentPath) {
+      setSelectedCreateTime(null)
+      setSelectedUpdateTime(null)
+      setSelectedDocumentData(null)
+      setJsonText('{\n  \n}')
+      return
+    }
+
+    void loadDocument(selectedDocumentPath)
+  }, [selectedDocumentPath, loadDocument])
 
   const handleSave = async (): Promise<void> => {
     if (!selectedDocumentPath) {
@@ -166,6 +164,7 @@ function ExplorerPage({
       }
 
       await loadDocuments(activeCollectionPath)
+      onSelectDocument(null)
     } finally {
       setLoading(false)
     }
@@ -194,8 +193,7 @@ function ExplorerPage({
       }
 
       await loadDocuments(activeCollectionPath)
-      const newPath = `${activeCollectionPath}/${result.data}`
-      await loadDocument(newPath)
+      onSelectDocument(`${activeCollectionPath}/${result.data}`)
     } catch (parseError) {
       setError(parseError instanceof Error ? parseError.message : 'JSON の形式が正しくありません')
     } finally {
@@ -235,7 +233,7 @@ function ExplorerPage({
   }
 
   const handleDuplicateDocument = async (): Promise<void> => {
-    if (!selectedDocumentPath) {
+    if (!selectedDocumentPath || !activeCollectionPath) {
       return
     }
 
@@ -260,11 +258,36 @@ function ExplorerPage({
         return
       }
 
-      if (activeCollectionPath) {
-        await loadDocuments(activeCollectionPath)
-        const newPath = `${activeCollectionPath}/${result.data}`
-        await loadDocument(newPath)
-        setSuccessMessage(`ドキュメントを複製しました: ${newPath}`)
+      await loadDocuments(activeCollectionPath)
+      const newPath = `${activeCollectionPath}/${result.data}`
+      onSelectDocument(newPath)
+      setSuccessMessage(`ドキュメントを複製しました: ${newPath}`)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleExportCollection = async (): Promise<void> => {
+    if (!activeCollectionPath) {
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+
+    try {
+      const result = await window.api.dataTransfer.exportCollectionJson({
+        projectId,
+        collectionPath: activeCollectionPath
+      })
+
+      if (result.ok) {
+        setSuccessMessage(`${result.data.documentCount} 件を ${result.data.filePath} に保存しました`)
+        return
+      }
+
+      if (!result.canceled) {
+        setError(result.error)
       }
     } finally {
       setLoading(false)
@@ -301,8 +324,8 @@ function ExplorerPage({
         return
       }
 
-      await loadRootCollections()
-      await loadDocuments(result.data.targetCollectionPath)
+      onRootCollectionsChanged()
+      onSelectCollection(result.data.targetCollectionPath)
       setSuccessMessage(
         `${result.data.copiedCount} 件を ${result.data.targetCollectionPath} に複製しました`
       )
@@ -311,94 +334,83 @@ function ExplorerPage({
     }
   }
 
+  useRegisterAppMenu(
+    {
+      canCreate: !readOnly && Boolean(activeCollectionPath),
+      canSave: !readOnly && Boolean(selectedDocumentPath),
+      canDuplicate: !readOnly && Boolean(selectedDocumentPath),
+      canDelete: !readOnly && Boolean(selectedDocumentPath),
+      canExport: Boolean(activeCollectionPath),
+      onCreate: () => void handleCreate(),
+      onSave: () => void handleSave(),
+      onDuplicate: () => void handleDuplicateDocument(),
+      onDelete: () => void handleDelete(),
+      onExport: () => void handleExportCollection()
+    },
+    [readOnly, activeCollectionPath, selectedDocumentPath, jsonText]
+  )
+
   return (
-    <AppShell
-      header={
-        <AppHeader
-          status={status}
-          activeView="explorer"
-          onNavigate={onNavigate}
-          onDisconnect={() => void handleDisconnect()}
-          disconnectDisabled={loading}
+    <div className="explorer-main">
+      {error && <p className="explorer-main__error">{error}</p>}
+      {successMessage && <p className="explorer-main__success">{successMessage}</p>}
+      {loading && <p className="explorer-main__loading">読み込み中...</p>}
+      <div className="explorer-main__path">
+        {activeCollectionPath ? `コレクション: ${activeCollectionPath}` : 'コレクションを選択してください'}
+      </div>
+      <ExportPanel
+        mode="collection"
+        projectId={projectId}
+        collectionPath={activeCollectionPath}
+        disabled={loading}
+        onSuccess={setSuccessMessage}
+        onError={setError}
+      />
+      {!readOnly && activeCollectionPath && (
+        <div className="explorer-main__duplicate">
+          <Button onClick={() => void handleDuplicateCollection()} disabled={loading}>
+            コレクション複製
+          </Button>
+        </div>
+      )}
+      {!readOnly && (
+        <BulkActionsPanel
+          projectId={projectId}
+          environment={status.environment}
+          selectedPaths={Array.from(bulkSelectedPaths)}
+          loading={loading}
+          onLoadingChange={setLoading}
+          onClearSelection={() => setBulkSelectedPaths(new Set())}
+          onOperationComplete={() => void handleBulkOperationComplete()}
+          onError={setError}
         />
-      }
-      sidebar={
-        <div className="explorer-sidebar">
-          <WorkspacePanel onChanged={onWorkspaceChanged} disabled={loading} />
-          <CollectionTree
-            projectId={projectId}
-            rootCollections={rootCollections}
-            activeCollectionPath={activeCollectionPath}
-            selectedDocumentPath={selectedDocumentPath}
-            onSelectCollection={(path) => void loadDocuments(path)}
-            onSelectDocument={(path) => void loadDocument(path)}
-            disabled={loading}
-          />
-        </div>
-      }
-      main={
-        <div className="explorer-main">
-          {error && <p className="explorer-main__error">{error}</p>}
-          {successMessage && <p className="explorer-main__success">{successMessage}</p>}
-          {loading && <p className="explorer-main__loading">読み込み中...</p>}
-          <div className="explorer-main__path">
-            {activeCollectionPath ? `コレクション: ${activeCollectionPath}` : 'コレクションを選択してください'}
-          </div>
-          <ExportPanel
-            mode="collection"
-            projectId={projectId}
-            collectionPath={activeCollectionPath}
-            disabled={loading}
-            onSuccess={setSuccessMessage}
-            onError={setError}
-          />
-          {!readOnly && activeCollectionPath && (
-            <div className="explorer-main__duplicate">
-              <Button onClick={() => void handleDuplicateCollection()} disabled={loading}>
-                コレクション複製
-              </Button>
-            </div>
-          )}
-          {!readOnly && (
-            <BulkActionsPanel
-              projectId={projectId}
-              environment={status.environment}
-              selectedPaths={Array.from(bulkSelectedPaths)}
-              loading={loading}
-              onLoadingChange={setLoading}
-              onClearSelection={() => setBulkSelectedPaths(new Set())}
-              onOperationComplete={() => void handleBulkOperationComplete()}
-              onError={setError}
-            />
-          )}
-          <DocumentTable
-            documents={documents}
-            selectedDocumentPath={selectedDocumentPath}
-            tableKey={activeCollectionPath ?? undefined}
-            selectable={!readOnly}
-            bulkSelectedPaths={bulkSelectedPaths}
-            onBulkToggle={handleBulkToggle}
-            onBulkToggleAll={handleBulkToggleAll}
-            onSelectDocument={(path) => void loadDocument(path)}
-          />
-          <DocumentJsonPanel
-            documentPath={selectedDocumentPath}
-            jsonText={jsonText}
-            createTime={selectedCreateTime}
-            updateTime={selectedUpdateTime}
-            documentData={selectedDocumentData}
-            loading={loading}
-            onChange={setJsonText}
-            onSave={() => void handleSave()}
-            onDelete={() => void handleDelete()}
-            onCreate={() => void handleCreate()}
-            onDuplicate={() => void handleDuplicateDocument()}
-            readOnly={readOnly}
-          />
-        </div>
-      }
-    />
+      )}
+      <DocumentTable
+        documents={documents}
+        selectedDocumentPath={selectedDocumentPath}
+        tableKey={activeCollectionPath ?? undefined}
+        selectable={!readOnly}
+        bulkSelectedPaths={bulkSelectedPaths}
+        onBulkToggle={handleBulkToggle}
+        onBulkToggleAll={handleBulkToggleAll}
+        onSelectDocument={(path) => onSelectDocument(path)}
+      />
+      <DocumentJsonPanel
+        documentPath={selectedDocumentPath}
+        jsonText={jsonText}
+        createTime={selectedCreateTime}
+        updateTime={selectedUpdateTime}
+        documentData={selectedDocumentData}
+        loading={loading}
+        onChange={setJsonText}
+        onSave={() => void handleSave()}
+        onDelete={() => void handleDelete()}
+        onCreate={() => void handleCreate()}
+        onDuplicate={() => void handleDuplicateDocument()}
+        readOnly={readOnly}
+      />
+    </div>
   )
 }
 
-export default ExplorerPage
+export default SimpleView

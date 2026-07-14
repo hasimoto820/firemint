@@ -15,6 +15,7 @@ type CollectionTreeProps = {
   onSelectCollection: (collectionPath: string) => void
   onSelectDocument: (documentPath: string) => void
   disabled?: boolean
+  title?: string
 }
 
 function CollectionTree({
@@ -24,7 +25,8 @@ function CollectionTree({
   selectedDocumentPath,
   onSelectCollection,
   onSelectDocument,
-  disabled = false
+  disabled = false,
+  title = 'コレクション'
 }: CollectionTreeProps): React.JSX.Element {
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set())
   const [childrenByPath, setChildrenByPath] = useState<Record<string, TreeNode[]>>({})
@@ -224,7 +226,7 @@ function CollectionTree({
 
   return (
     <div className="collection-tree">
-      <h2 className="collection-tree__title">コレクション</h2>
+      <h2 className="collection-tree__title">{title}</h2>
       {error && <p className="collection-tree__error">{error}</p>}
       {rootNodes.length === 0 ? (
         <p className="collection-tree__empty">（コレクションなし）</p>

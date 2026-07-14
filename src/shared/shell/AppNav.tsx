@@ -13,7 +13,7 @@ function AppNav({ active, onChange }: AppNavProps): React.JSX.Element {
         className={active === 'explorer' ? 'app-nav__item app-nav__item--active' : 'app-nav__item'}
         onClick={() => onChange('explorer')}
       >
-        Explorer
+        Simple
       </button>
       <button
         type="button"

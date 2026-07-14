@@ -3,6 +3,23 @@ import type { AppMenuSection } from './app_menu'
 
 export const FIREMINT_DOCS_URL = 'https://electron-vite.org'
 
+/**
+ * 画面（Explorer など）から登録される、文脈依存メニューの状態とハンドラ。
+ * 何も登録されていない場合は null。
+ */
+export type AppMenuContextActions = {
+  canCreate: boolean
+  canSave: boolean
+  canDuplicate: boolean
+  canDelete: boolean
+  canExport: boolean
+  onCreate?: () => void
+  onSave?: () => void
+  onDuplicate?: () => void
+  onDelete?: () => void
+  onExport?: () => void
+}
+
 export type AppMenuHandlers = {
   connected: boolean
   activeView: AppView
@@ -13,10 +30,12 @@ export type AppMenuHandlers = {
   onOpenDocs: () => void
   onMinimize?: () => void
   onMaximizeToggle?: () => void
+  context?: AppMenuContextActions | null
 }
 
 export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
   const showWindowItems = Boolean(handlers.onMinimize && handlers.onMaximizeToggle)
+  const context = handlers.context ?? null
 
   return [
     {
@@ -30,7 +49,13 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
           disabled: !handlers.connected,
           onClick: handlers.onDisconnect
         },
-        { type: 'item', id: 'file-export', label: 'エクスポート…', disabled: true },
+        {
+          type: 'item',
+          id: 'file-export',
+          label: 'エクスポート…',
+          disabled: !context?.canExport,
+          onClick: context?.onExport
+        },
         { type: 'separator' },
         {
           type: 'item',
@@ -45,11 +70,42 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
       id: 'edit',
       label: 'Edit',
       items: [
-        { type: 'item', id: 'edit-new', label: '新規ドキュメント', shortcut: 'Ctrl+N', disabled: true },
-        { type: 'item', id: 'edit-save', label: '保存', shortcut: 'Ctrl+S', disabled: true },
-        { type: 'item', id: 'edit-duplicate', label: '複製', disabled: true },
-        { type: 'separator' },
-        { type: 'item', id: 'edit-delete', label: '削除', shortcut: 'Del', disabled: true }
+        { type: 'header', label: 'ドキュメント' },
+        {
+          type: 'item',
+          id: 'edit-new',
+          label: '新規',
+          shortcut: 'Ctrl+N',
+          indent: true,
+          disabled: !context?.canCreate,
+          onClick: context?.onCreate
+        },
+        {
+          type: 'item',
+          id: 'edit-save',
+          label: '保存',
+          shortcut: 'Ctrl+S',
+          indent: true,
+          disabled: !context?.canSave,
+          onClick: context?.onSave
+        },
+        {
+          type: 'item',
+          id: 'edit-duplicate',
+          label: '複製',
+          indent: true,
+          disabled: !context?.canDuplicate,
+          onClick: context?.onDuplicate
+        },
+        {
+          type: 'item',
+          id: 'edit-delete',
+          label: '削除',
+          shortcut: 'Del',
+          indent: true,
+          disabled: !context?.canDelete,
+          onClick: context?.onDelete
+        }
       ]
     },
     {
@@ -59,7 +115,7 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
         {
           type: 'item',
           id: 'view-explorer',
-          label: handlers.activeView === 'explorer' ? 'Explorer ✓' : 'Explorer',
+          label: handlers.activeView === 'explorer' ? 'Simple ✓' : 'Simple',
           disabled: !handlers.connected,
           onClick: () => handlers.onNavigate('explorer')
         },

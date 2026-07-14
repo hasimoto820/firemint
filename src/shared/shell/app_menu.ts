@@ -4,6 +4,7 @@ export type AppMenuItem = {
   label: string
   shortcut?: string
   disabled?: boolean
+  indent?: boolean
   onClick?: () => void
 }
 
@@ -11,7 +12,12 @@ export type AppMenuSeparator = {
   type: 'separator'
 }
 
-export type AppMenuEntry = AppMenuItem | AppMenuSeparator
+export type AppMenuHeader = {
+  type: 'header'
+  label: string
+}
+
+export type AppMenuEntry = AppMenuItem | AppMenuSeparator | AppMenuHeader
 
 export type AppMenuSection = {
   id: string
