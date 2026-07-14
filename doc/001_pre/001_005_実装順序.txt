@@ -3,11 +3,13 @@
 
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
+
 関連ドキュメント:
   機能・優先度    → 001_002_firefoo.txt
   ディレクトリ構成 → 001_003_ディレクトリ構成.txt
   命名ルール      → 001_004_ルール_and_misc.txt
   全体計画        → 001_001_plan.txt
+  UI 方針         → 001_006_UI.txt（Phase 8.5）
   workspace 設計  → 001_007_workspace.txt（Phase 7）
 
 
@@ -136,10 +138,11 @@ Phase 5 — data_transfer
 MVP で触らない feature（箱のみ）
 --------------------------------------------------------------------------------
 
-  workspace       … 単一接続で足りる。実装は v1（Phase 7）
   script_runner   … v1（Phase 13）
   auth            … v1（Phase 14）
   onboarding      … v1（Phase 15）
+
+  ※ workspace は当初「箱のみ → Phase 7」だったが、Phase 7 で実装済み。
 
 
 ================================================================================
@@ -150,8 +153,9 @@ shared の実装タイミング
   ──────────────  ──────────────────────────────────────────
   firestore       Phase 1
   safety          Phase 1（最小）→ Phase 4（拡張）
-  shell           Phase 2（最小）→ Phase 9（v1 でタブ・Split）
-  ui              Phase 2（最小）→ 随時
+  shell           Phase 2（最小）→ Phase 8.5（メニュー・ヘッダー・タイトルバー）
+                  → Phase 9（タブ・Split）は保留
+  ui              Phase 2（最小）→ Phase 6 で横断整理 → Phase 8 / 8.5 で拡張
   i18n            v1（Phase 16）※ Phase 2 から日本語文字列だけ先でも可
   settings        v1（Phase 16）
 
@@ -176,17 +180,19 @@ Phase 6〜16：v1（MVP 後）
   以降は依存の少ない・体験インパクトの大きい順。順番は v1 着手前に再確認可。
   詳細・Done は 001_002 v1 節をベースに各 Phase で具体化する。
 
-  ※ 現在地（2026-07）: Phase 8 完了。Phase 9 以降の機能追加は一旦保留し、
-     Phase 8.5（UI 練り直し）を優先する。タブ・Split 等は UI 固め後に再開。
+  ※ 現在地（2026-07-14）:
+       Phase 0〜8 完了。
+       Phase 8.5（UI 練り直し）完了。
+       Phase 9 以降の機能追加は一旦保留（任意で再開可）。
 
 
   Phase   内容
   ──────  ─────────────────────────────────────────────────────
-  6       shared/ui 整理         … 部品共通化
-  7       workspace              … 複数プロジェクト、ラベル、read-only
-  8       explorer 拡張          … Tree、フィルタ、複製、Geopoint 等
-  8.5     UI 練り直し            … レイアウト・階層・空状態（★現在地）
-  9       shared/shell 拡張      … 【保留】タブ、Split View、Command Palette
+  6       shared/ui 整理         … 部品共通化                    ✅
+  7       workspace              … 複数プロジェクト、ラベル、read-only ✅
+  8       explorer 拡張          … Tree、フィルタ、複製、Geopoint 等 ✅
+  8.5     UI 練り直し            … メニュー・左ツリー・Simple/Query ✅
+  9       shared/shell 拡張      … 【保留】タブ、Split View、Command Palette ★次候補
   10      query 拡張             … 【保留】Saved Queries、starts-with 等
   11      data_transfer 拡張     … 【保留】import、バックアップ、転送
   12      connection 拡張        … 【保留】Google サインイン、Emulator
@@ -260,14 +266,14 @@ Phase 8 — explorer 拡張
     features/explorer/        … 001_002 v1「データ閲覧・編集」
       Tree ビュー             … コレクション / サブコレクション階層表示
       テーブル拡張            … カラム表示/非表示・並べ替え・ヘッダーソート
-      フィルタ                … ヘッダー/セルからの絞り込み
+      フィルタ                … 当初ヘッダー行 → Phase 8.5 で field/演算子/value に強化
       複製                    … ドキュメント・コレクション
-      リネーム                … コレクション・フィールド名（コレクション全体）
-      サブコレクション CRUD   … 作成・編集・削除の完全対応
+      リネーム                … コレクション・フィールド名（コレクション全体）※未着手
+      サブコレクション CRUD   … 作成・編集・削除の完全対応 ※閲覧は済・CRUD は未完
       メタデータ表示          … createTime / updateTime
       表示形式                … Timestamp / Geopoint / 数値のカスタム
       Geopoint 地図           … 地図上プロット
-      画像プレビュー          … Firestore 内画像
+      画像プレビュー          … Firestore 内画像 ※未着手
 
   実装順:
     8-a Tree ビュー + サブコレクション辿り
@@ -277,49 +283,74 @@ Phase 8 — explorer 拡張
   Done:
     ■ Tree ビューでサブコレクションを辿れる
     ■ テーブルでカラムの表示/非表示・ソートができる
-    ■ テーブルでフィルタできる
+    ■ テーブルでフィルタできる（初期実装）
     ■ ドキュメント・コレクションを複製できる
     ■ createTime / updateTime が表示できる
     ■ Geopoint を地図表示できる（最低1形式）
 
 
 --------------------------------------------------------------------------------
-Phase 8.5 — UI 練り直し（★現在地）
+Phase 8.5 — UI 練り直し（✅ 完了）
 --------------------------------------------------------------------------------
 
   背景:
-    Phase 7〜8 で機能は揃ったが、サイドバー過密・空状態の散らかり・操作階層の
-    フラットさが使い心地を下げている。Phase 9（タブ・Split）はシェル構造を
-    変えるため、先に「1 プロジェクト + 1 コレクション」前提の UI を固める。
+    Phase 7〜8 で機能は揃ったが、サイドバー過密・Explorer/Query の二重シェル・
+    ヘッダー情報の重複があり、FireFoo/Firestudio 寄りの骨格に寄せる必要があった。
+    Phase 9（タブ・Split）の前に、左ツリー固定 + 右メインの Simple/Query モードを固める。
+    目標 UI の要約は 001_006_UI.txt。
 
   方針:
-    - 機能追加・IPC 変更は最小（見た目と配置が主）
-    - 部品は 001_004 どおり shared/ui/、ページ枠は shared/shell/
-    - Explorer / Query で同じトーン・同じ空状態パターン
-    - ワークスペース編集は常時表示しない（一覧 + フォーカスを主役に）
+    - 機能追加・IPC 変更は最小（見た目と配置が主）。必要なら window/app 系 IPC のみ追加
+    - 部品は 001_004 どおり shared/ui/、ページ枠は shared/shell/ + renderer/app の組み立て
+    - 左は常に ProjectTree（explorer の ExplorerSidebar）。右は Simple / Query モード
+    - ワークスペース編集は常時表示しない（一覧 + フォーカスを主役、歯車で折りたたみ）
 
-  作るもの:
-    shared/shell/             … ヘッダー整理、空状態コンポーネント、サイドバー幅
-    renderer/app/assets/      … 背景・余白・セクション区切りの見直し
-    features/workspace/       … プロジェクト編集の折りたたみ or 別パネル化
-    features/explorer/        … 未選択時メインの簡素化
-    features/query/           … Explorer と揃えたレイアウト
-    features/connection/      … ランディング画面のトーン統一
+  作るもの / できたもの:
+    shared/shell/
+      AppMenuBar / build_app_menus / AppMenuContext … File Edit View Window Help
+      AppTitleBar / AppChrome / WindowControls       … VS Code 寄りカスタムタイトルバー
+      AppHeader                                     … 接続状態の薄い表示 + 切断（ナビは撤去）
+      AppNav                                        … Simple / Query（表示ラベル）
+    renderer/app/
+      FirestorePage                                 … AppShell 一元化・左ツリー固定・モード切替
+    features/workspace/
+      WorkspaceProjectList                          … コンパクト一覧 + 歯車で編集折りたたみ
+    features/explorer/
+      ExplorerSidebar / CollectionTree / SimpleView … Tree 合成・Simple モード中身
+    features/query/
+      QueryView                                     … Query モード中身（旧 QueryPage）
+    shared/ui/DocumentTable                         … FireFoo 風フィルタ
+                                                    （== / < / > / 部分一致 / in / array contains）
 
-  実装順:
-    8.5-a  シェル基盤 … サイドバー幅、背景ノイズ低減、セクション余白
-    8.5-b  ワークスペース UI … 編集 UI の折りたたみ、プロジェクト一覧の圧縮
-    8.5-c  空状態 … コレクション未選択・ドキュメント未選択の一本化
-    8.5-d  操作階層 … ヘッダー（切断・ナビ）、ツールバー（エクスポート・複製等）の整理
-    8.5-e  横断調整 … Explorer / Query / Connection の見た目統一
+  実装順（実績ベース。当初案の a〜e 余白中心から変更）:
+    8.5-menu-a  AppMenuBar UI（ドロップダウン）                          ✅
+    8.5-menu-b  グローバル配線（View 切替・切断・終了・About）          ✅
+    8.5-menu-c  AppMenuContext + Explorer の Edit / File 系               ✅
+    8.5-menu-d  AppHeader 共通化（Explorer / Query ヘッダー重複解消）    ✅
+                ※ カスタムタイトルバー（titleBarOverlay 等）もこの流れで実施
+    8.5-ui-a    左ペイン ProjectTree 化（WorkspacePanel 撤去）            ✅
+    8.5-ui-b    ProjectTree 見た目統合（project → FIRESTORE → collection）✅
+    8.5-ui-c    AppHeader 整理（projectId 重複撤去、切断を低主張に）      ✅
+    8.5-ui-d    Simple / Query モード化                                   ✅
+                FirestorePage 親・左ツリー固定・ナビを右メイン最上段へ
+                旧 ExplorerPage / QueryPage は SimpleView / QueryView に格下げ
+    （付帯）    DocumentTable の FireFoo 風フィルタ強化 / 文字選択可       ✅
+    8.5-toolbar Simple 上段整理（Export/複製カード撤去、薄いツールバー、
+                JSON 下固定、コレクション複製を Edit メニューへ）         ✅
+    8.5-empty   コレクション未選択時、メインは案内のみ（Export / JSON を出さない） ✅
+    8.5-polish  Query で左ツリー選択 → QueryForm へ path 反映              ✅
+    8.5-polish  余白・空状態・ランディングの細部トーン揃え                  ✅
+
 
   Done:
-    □ サイドバーでコレクション Tree が主役になり、プロジェクト編集は必要時だけ開ける
-    □ コレクション未選択時、メインは案内のみ（エクスポート・JSON は出さない）
-    □ ヘッダーと作業エリアの役割が分かれる（接続/ナビ vs データ操作）
-    □ Explorer と Query のレイアウト・余白・パネル見た目が揃っている
-    □ 背景・コントラストがデータ作業向けに落ち着いている
-    □ 既存機能（Phase 7〜8）に退行がない
+    ■ サイドバーでコレクション Tree が主役になり、プロジェクト編集は必要時だけ開ける
+    ■ ヘッダーと作業エリアの役割が分かれる（接続/切断 vs Simple·Query モード）
+    ■ 左ツリーは Simple / Query 切替でリセットされない（FirestorePage で固定）
+    ■ Explorer（Simple）と Query が同じシェル・同じ左ツリーを共有する
+    ■ メニュー（File/Edit/View/Window/Help）が使える
+    ■ コレクション未選択時、メインは案内のみ（エクスポート・JSON は出さない）
+    ■ 背景・余白・空状態の細部がデータ作業向けに落ち着いている
+    ■ 既存機能（Phase 7〜8）に退行がない
 
 
 --------------------------------------------------------------------------------
@@ -476,11 +507,10 @@ Phase 16 — shared/i18n, settings 【保留】
 MVP 完了の定義（001_002 D 節と同一）
 ================================================================================
 
-  □ サービスアカウントで Firestore に接続できる          … Phase 1
-  □ コレクション一覧 → テーブル表示 → JSON 編集        … Phase 2
-  □ where 条件付きクエリが実行できる                    … Phase 3
-  □ クエリ結果を選択して一括削除できる                  … Phase 4
-  □ クエリ結果のフィールドを一括更新でき、プレビュー    … Phase 4
-  □ JSON / CSV エクスポートができる                     … Phase 5
-  □ 破壊的操作に確認が入る                              … Phase 4（safety）
-
+  ■ サービスアカウントで Firestore に接続できる          … Phase 1
+  ■ コレクション一覧 → テーブル表示 → JSON 編集        … Phase 2
+  ■ where 条件付きクエリが実行できる                    … Phase 3
+  ■ クエリ結果を選択して一括削除できる                  … Phase 4
+  ■ クエリ結果のフィールドを一括更新でき、プレビュー    … Phase 4
+  ■ JSON / CSV エクスポートができる                     … Phase 5
+  ■ 破壊的操作に確認が入る                              … Phase 4（safety）

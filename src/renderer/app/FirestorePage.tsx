@@ -89,7 +89,7 @@ function FirestorePage({
             <AppNav active={view} onChange={onNavigate} />
           </div>
           {view === 'query' ? (
-            <QueryView status={status} />
+            <QueryView status={status} activeCollectionPath={activeCollectionPath} />
           ) : (
             <SimpleView
               status={status}

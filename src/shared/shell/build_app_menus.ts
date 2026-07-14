@@ -13,11 +13,13 @@ export type AppMenuContextActions = {
   canDuplicate: boolean
   canDelete: boolean
   canExport: boolean
+  canDuplicateCollection: boolean
   onCreate?: () => void
   onSave?: () => void
   onDuplicate?: () => void
   onDelete?: () => void
   onExport?: () => void
+  onDuplicateCollection?: () => void
 }
 
 export type AppMenuHandlers = {
@@ -105,6 +107,15 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
           indent: true,
           disabled: !context?.canDelete,
           onClick: context?.onDelete
+        },
+        { type: 'header', label: 'コレクション' },
+        {
+          type: 'item',
+          id: 'edit-duplicate-collection',
+          label: '複製',
+          indent: true,
+          disabled: !context?.canDuplicateCollection,
+          onClick: context?.onDuplicateCollection
         }
       ]
     },

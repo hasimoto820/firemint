@@ -73,7 +73,7 @@ function ConnectionPanel({ onConnected }: ConnectionPanelProps): React.JSX.Eleme
 
   return (
     <section className="connection-panel">
-      <h1>FireMint</h1>
+      <h1 className="connection-panel__brand">FireMint</h1>
       <p className="connection-panel__lead">サービスアカウント JSON で Firestore に接続</p>
 
       <div className="connection-panel__actions">

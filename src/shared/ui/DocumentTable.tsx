@@ -2,12 +2,16 @@ import { useEffect, useMemo, useState } from 'react'
 import type { DocumentSummary } from '@features/explorer/shared/types'
 import Button from '@shared/ui/Button'
 import {
+  createEmptyFilterClause,
   filterDocuments,
   getCellText,
   mergeColumnOrder,
   moveColumn,
   sortDocuments,
-  type SortState
+  TABLE_FILTER_OPERATORS,
+  type SortState,
+  type TableFilterClause,
+  type TableFilterOperator
 } from './document_table_utils'
 
 type DocumentTableProps = {
@@ -20,7 +24,24 @@ type DocumentTableProps = {
   onBulkToggle?: (documentPath: string, checked: boolean) => void
   onBulkToggleAll?: (checked: boolean) => void
   tableKey?: string
+  /** ツールバー左に表示する path（例: company/.../user） */
+  pathLabel?: string | null
 }
+
+function filterValuePlaceholder(operator: TableFilterOperator): string {
+  switch (operator) {
+    case 'in':
+      return '例: ["a","b"] または a, b'
+    case 'array-contains':
+      return '配列内の1値（例: beta）'
+    case 'contains':
+      return '部分一致する文字列'
+    default:
+      return '値を入力'
+  }
+}
+
+const MAX_FILTER_CLAUSES = 5
 
 function nextSortState(current: SortState, column: string): SortState {
   if (!current || current.column !== column) {
@@ -51,19 +72,20 @@ function DocumentTable({
   bulkSelectedPaths,
   onBulkToggle,
   onBulkToggleAll,
-  tableKey
+  tableKey,
+  pathLabel = null
 }: DocumentTableProps): React.JSX.Element {
   const [columnOrder, setColumnOrder] = useState<string[]>([])
   const [hiddenColumns, setHiddenColumns] = useState<Set<string>>(new Set())
   const [sort, setSort] = useState<SortState>(null)
-  const [filters, setFilters] = useState<Record<string, string>>({})
+  const [filterClauses, setFilterClauses] = useState<TableFilterClause[]>([])
   const [showColumnPanel, setShowColumnPanel] = useState(false)
 
   useEffect(() => {
     setColumnOrder((current) => mergeColumnOrder(current, documents, showPath))
     setHiddenColumns(new Set())
     setSort(null)
-    setFilters({})
+    setFilterClauses([])
   }, [tableKey, showPath])
 
   useEffect(() => {
@@ -76,17 +98,13 @@ function DocumentTable({
   )
 
   const displayedDocuments = useMemo(() => {
-    const filtered = filterDocuments(documents, filters)
+    const filtered = filterDocuments(documents, filterClauses)
     return sortDocuments(filtered, sort)
-  }, [documents, filters, sort])
+  }, [documents, filterClauses, sort])
 
   const selectedCount = bulkSelectedPaths?.size ?? 0
   const allSelected =
     selectable && displayedDocuments.length > 0 && selectedCount === displayedDocuments.length
-
-  const handleFilterChange = (column: string, value: string): void => {
-    setFilters((current) => ({ ...current, [column]: value }))
-  }
 
   const toggleColumnVisibility = (column: string): void => {
     setHiddenColumns((current) => {
@@ -102,19 +120,114 @@ function DocumentTable({
     })
   }
 
+  const addFilterClause = (): void => {
+    if (filterClauses.length >= MAX_FILTER_CLAUSES) {
+      return
+    }
+
+    const next = createEmptyFilterClause()
+
+    if (columnOrder.length > 0 && !next.field) {
+      next.field = columnOrder.includes('createTime') ? 'createTime' : columnOrder[0]
+    }
+
+    setFilterClauses((current) => [...current, next])
+  }
+
+  const updateFilterClause = (
+    id: string,
+    patch: Partial<Pick<TableFilterClause, 'field' | 'operator' | 'value'>>
+  ): void => {
+    setFilterClauses((current) =>
+      current.map((clause) => (clause.id === id ? { ...clause, ...patch } : clause))
+    )
+  }
+
+  const removeFilterClause = (id: string): void => {
+    setFilterClauses((current) => current.filter((clause) => clause.id !== id))
+  }
+
   if (documents.length === 0) {
-    return <p className="document-table__empty">ドキュメントがありません</p>
+    return (
+      <div className="document-table-panel">
+        <div className="document-table-panel__toolbar">
+          {pathLabel && <span className="document-table-panel__path">{pathLabel}</span>}
+          <span className="document-table-panel__count">0 件</span>
+        </div>
+        <p className="document-table__empty">ドキュメントがありません</p>
+      </div>
+    )
   }
 
   return (
     <div className="document-table-panel">
       <div className="document-table-panel__toolbar">
+        {pathLabel && <span className="document-table-panel__path">{pathLabel}</span>}
         <Button onClick={() => setShowColumnPanel((current) => !current)}>
           {showColumnPanel ? '列設定を閉じる' : '列設定'}
         </Button>
+        <button
+          type="button"
+          className="document-filter-bar__add"
+          onClick={addFilterClause}
+          disabled={filterClauses.length >= MAX_FILTER_CLAUSES}
+        >
+          + フィルタ
+        </button>
         <span className="document-table-panel__count">
           {displayedDocuments.length} / {documents.length} 件
         </span>
+      </div>
+
+      <div className="document-filter-bar">
+        {filterClauses.map((clause) => (
+          <div key={clause.id} className="document-filter-bar__row">
+            <select
+              className="document-filter-bar__field"
+              value={clause.field}
+              onChange={(event) => updateFilterClause(clause.id, { field: event.target.value })}
+              aria-label="フィルタ対象フィールド"
+            >
+              <option value="">field</option>
+              {columnOrder.map((column) => (
+                <option key={column} value={column}>
+                  {column}
+                </option>
+              ))}
+            </select>
+            <select
+              className="document-filter-bar__operator"
+              value={clause.operator}
+              onChange={(event) =>
+                updateFilterClause(clause.id, {
+                  operator: event.target.value as TableFilterOperator
+                })
+              }
+              aria-label="フィルタ演算子"
+            >
+              {TABLE_FILTER_OPERATORS.map((operator) => (
+                <option key={operator.value} value={operator.value}>
+                  {operator.label}
+                </option>
+              ))}
+            </select>
+            <input
+              className="document-filter-bar__value"
+              value={clause.value}
+              onChange={(event) => updateFilterClause(clause.id, { value: event.target.value })}
+              placeholder={filterValuePlaceholder(clause.operator)}
+              aria-label="フィルタ値"
+            />
+            <button
+              type="button"
+              className="document-filter-bar__remove"
+              onClick={() => removeFilterClause(clause.id)}
+              aria-label="フィルタを削除"
+            >
+              ×
+            </button>
+          </div>
+        ))}
       </div>
 
       {showColumnPanel && (
@@ -157,7 +270,7 @@ function DocumentTable({
           <thead>
             <tr>
               {selectable && (
-                <th className="document-table__checkbox-col" rowSpan={2}>
+                <th className="document-table__checkbox-col">
                   <input
                     type="checkbox"
                     checked={allSelected}
@@ -176,19 +289,6 @@ function DocumentTable({
                     {column}
                     {sortIndicator(sort, column)}
                   </button>
-                </th>
-              ))}
-            </tr>
-            <tr>
-              {visibleColumns.map((column) => (
-                <th key={`${column}-filter`} className="document-table__filter-head">
-                  <input
-                    className="document-table__filter"
-                    value={filters[column] ?? ''}
-                    onChange={(event) => handleFilterChange(column, event.target.value)}
-                    placeholder="フィルタ"
-                    onClick={(event) => event.stopPropagation()}
-                  />
                 </th>
               ))}
             </tr>

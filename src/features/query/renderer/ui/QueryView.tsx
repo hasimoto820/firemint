@@ -10,13 +10,18 @@ import QueryForm from './QueryForm'
 
 type QueryViewProps = {
   status: ConnectionStatus
+  /** 左ツリーで選択中のコレクション path（QueryForm に反映） */
+  activeCollectionPath?: string | null
 }
 
 /**
  * Firestore 作業エリアの「Query」モード。Simple クエリ / Collection Group を
  * 実行し、結果を一覧・JSON 表示する。自前の state を持つ。
  */
-function QueryView({ status }: QueryViewProps): React.JSX.Element {
+function QueryView({
+  status,
+  activeCollectionPath = null
+}: QueryViewProps): React.JSX.Element {
   const projectId = status.projectId
   const readOnly = status.readOnly
   const [documents, setDocuments] = useState<DocumentSummary[]>([])
@@ -124,59 +129,71 @@ function QueryView({ status }: QueryViewProps): React.JSX.Element {
 
   return (
     <div className="query-main">
-      <QueryForm projectId={projectId} loading={loading} onRun={(input) => void handleRun(input)} />
+      <QueryForm
+        projectId={projectId}
+        loading={loading}
+        collectionPathFromTree={activeCollectionPath}
+        onRun={(input) => void handleRun(input)}
+      />
       {error && <p className="query-main__error">{error}</p>}
       {successMessage && <p className="query-main__success">{successMessage}</p>}
       {loading && <p className="query-main__loading">実行中...</p>}
+      {!lastQueryLabel && !loading && (
+        <p className="query-main__empty-hint">
+          左ツリーでコレクションを選ぶか path を入力し、Run で結果を表示します。
+        </p>
+      )}
       {lastQueryLabel && (
-        <div className="query-main__result-label">
-          {lastQueryLabel} — {documents.length} 件
-        </div>
+        <>
+          <div className="query-main__result-label">
+            {lastQueryLabel} — {documents.length} 件
+          </div>
+          <ExportPanel
+            mode="documents"
+            documents={documents}
+            defaultFileName={lastQueryLabel}
+            disabled={loading}
+            onSuccess={setSuccessMessage}
+            onError={setError}
+          />
+          {!readOnly && (
+            <BulkActionsPanel
+              projectId={projectId}
+              environment={status.environment}
+              selectedPaths={Array.from(bulkSelectedPaths)}
+              loading={loading}
+              onLoadingChange={setLoading}
+              onClearSelection={() => setBulkSelectedPaths(new Set())}
+              onOperationComplete={() => void handleBulkOperationComplete()}
+              onError={setError}
+            />
+          )}
+          <DocumentTable
+            documents={documents}
+            selectedDocumentPath={selectedDocumentPath}
+            showPath={collectionGroup}
+            tableKey={lastQueryLabel}
+            selectable={!readOnly}
+            bulkSelectedPaths={bulkSelectedPaths}
+            onBulkToggle={handleBulkToggle}
+            onBulkToggleAll={handleBulkToggleAll}
+            onSelectDocument={(path) => void handleSelectDocument(path)}
+          />
+          <DocumentJsonPanel
+            documentPath={selectedDocumentPath}
+            jsonText={jsonText}
+            createTime={selectedCreateTime}
+            updateTime={selectedUpdateTime}
+            documentData={selectedDocumentData}
+            loading={loading}
+            onChange={setJsonText}
+            onSave={() => undefined}
+            onDelete={() => undefined}
+            onCreate={() => undefined}
+            readOnly
+          />
+        </>
       )}
-      <ExportPanel
-        mode="documents"
-        documents={documents}
-        defaultFileName={lastQueryLabel ?? 'query-result'}
-        disabled={loading}
-        onSuccess={setSuccessMessage}
-        onError={setError}
-      />
-      {!readOnly && (
-        <BulkActionsPanel
-          projectId={projectId}
-          environment={status.environment}
-          selectedPaths={Array.from(bulkSelectedPaths)}
-          loading={loading}
-          onLoadingChange={setLoading}
-          onClearSelection={() => setBulkSelectedPaths(new Set())}
-          onOperationComplete={() => void handleBulkOperationComplete()}
-          onError={setError}
-        />
-      )}
-      <DocumentTable
-        documents={documents}
-        selectedDocumentPath={selectedDocumentPath}
-        showPath={collectionGroup}
-        tableKey={lastQueryLabel ?? undefined}
-        selectable={!readOnly}
-        bulkSelectedPaths={bulkSelectedPaths}
-        onBulkToggle={handleBulkToggle}
-        onBulkToggleAll={handleBulkToggleAll}
-        onSelectDocument={(path) => void handleSelectDocument(path)}
-      />
-      <DocumentJsonPanel
-        documentPath={selectedDocumentPath}
-        jsonText={jsonText}
-        createTime={selectedCreateTime}
-        updateTime={selectedUpdateTime}
-        documentData={selectedDocumentData}
-        loading={loading}
-        onChange={setJsonText}
-        onSave={() => undefined}
-        onDelete={() => undefined}
-        onCreate={() => undefined}
-        readOnly
-      />
     </div>
   )
 }

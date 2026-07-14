@@ -93,7 +93,7 @@ function App(): React.JSX.Element {
   let content: React.JSX.Element
 
   if (connectionStatus === undefined) {
-    content = <main className="app-shell">読み込み中...</main>
+    content = <main className="app-shell app-shell--loading">読み込み中...</main>
   } else if (!connectionStatus) {
     content = (
       <main className="app-shell app-shell--landing">

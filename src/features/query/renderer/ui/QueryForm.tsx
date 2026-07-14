@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Button from '@shared/ui/Button'
 import type {
   QueryOrderByClause,
@@ -30,15 +30,28 @@ type QueryFormProps = {
   projectId: string
   loading: boolean
   onRun: (input: SimpleQueryInput) => void
+  /** 左ツリーで選んだコレクション path。変わるとフォームに反映する */
+  collectionPathFromTree?: string | null
 }
 
-function QueryForm({ projectId, loading, onRun }: QueryFormProps): React.JSX.Element {
-  const [collectionPath, setCollectionPath] = useState('company')
+function QueryForm({
+  projectId,
+  loading,
+  onRun,
+  collectionPathFromTree = null
+}: QueryFormProps): React.JSX.Element {
+  const [collectionPath, setCollectionPath] = useState(collectionPathFromTree ?? '')
   const [collectionGroup, setCollectionGroup] = useState(false)
   const [wheres, setWheres] = useState<QueryWhereClause[]>([])
   const [orderByEnabled, setOrderByEnabled] = useState(false)
   const [orderBy, setOrderBy] = useState<QueryOrderByClause>({ field: '', direction: 'asc' })
   const [limit, setLimit] = useState('200')
+
+  useEffect(() => {
+    if (collectionPathFromTree) {
+      setCollectionPath(collectionPathFromTree)
+    }
+  }, [collectionPathFromTree])
 
   const addWhere = (): void => {
     if (wheres.length >= 3) {

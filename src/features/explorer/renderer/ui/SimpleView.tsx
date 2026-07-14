@@ -2,11 +2,9 @@ import { useCallback, useEffect, useState } from 'react'
 import type { ConnectionStatus } from '@features/connection/shared/types'
 import type { DocumentSummary } from '@features/explorer/shared/types'
 import { useRegisterAppMenu } from '@shared/shell/AppMenuContext'
-import Button from '@shared/ui/Button'
 import DocumentJsonPanel from '@shared/ui/DocumentJsonPanel'
 import DocumentTable from '@shared/ui/DocumentTable'
 import BulkActionsPanel from '@shared/ui/BulkActionsPanel'
-import ExportPanel from '@shared/ui/ExportPanel'
 
 type SimpleViewProps = {
   status: ConnectionStatus
@@ -341,74 +339,80 @@ function SimpleView({
       canDuplicate: !readOnly && Boolean(selectedDocumentPath),
       canDelete: !readOnly && Boolean(selectedDocumentPath),
       canExport: Boolean(activeCollectionPath),
+      canDuplicateCollection: !readOnly && Boolean(activeCollectionPath),
       onCreate: () => void handleCreate(),
       onSave: () => void handleSave(),
       onDuplicate: () => void handleDuplicateDocument(),
       onDelete: () => void handleDelete(),
-      onExport: () => void handleExportCollection()
+      onExport: () => void handleExportCollection(),
+      onDuplicateCollection: () => void handleDuplicateCollection()
     },
     [readOnly, activeCollectionPath, selectedDocumentPath, jsonText]
   )
 
+  if (!activeCollectionPath) {
+    return (
+      <div className="explorer-main explorer-main--empty">
+        <p className="explorer-main__empty-title">コレクションを選択してください</p>
+        <p className="explorer-main__empty-hint">
+          左のツリーからコレクションを選ぶと、ドキュメント一覧と JSON 編集が表示されます。
+        </p>
+      </div>
+    )
+  }
+
   return (
     <div className="explorer-main">
-      {error && <p className="explorer-main__error">{error}</p>}
-      {successMessage && <p className="explorer-main__success">{successMessage}</p>}
-      {loading && <p className="explorer-main__loading">読み込み中...</p>}
-      <div className="explorer-main__path">
-        {activeCollectionPath ? `コレクション: ${activeCollectionPath}` : 'コレクションを選択してください'}
-      </div>
-      <ExportPanel
-        mode="collection"
-        projectId={projectId}
-        collectionPath={activeCollectionPath}
-        disabled={loading}
-        onSuccess={setSuccessMessage}
-        onError={setError}
-      />
-      {!readOnly && activeCollectionPath && (
-        <div className="explorer-main__duplicate">
-          <Button onClick={() => void handleDuplicateCollection()} disabled={loading}>
-            コレクション複製
-          </Button>
+      {(error || successMessage || loading) && (
+        <div className="explorer-main__status">
+          {error && <p className="explorer-main__error">{error}</p>}
+          {successMessage && <p className="explorer-main__success">{successMessage}</p>}
+          {loading && <p className="explorer-main__loading">読み込み中...</p>}
         </div>
       )}
-      {!readOnly && (
-        <BulkActionsPanel
-          projectId={projectId}
-          environment={status.environment}
-          selectedPaths={Array.from(bulkSelectedPaths)}
-          loading={loading}
-          onLoadingChange={setLoading}
-          onClearSelection={() => setBulkSelectedPaths(new Set())}
-          onOperationComplete={() => void handleBulkOperationComplete()}
-          onError={setError}
+
+      <div className="explorer-main__workspace">
+        <DocumentTable
+          documents={documents}
+          selectedDocumentPath={selectedDocumentPath}
+          tableKey={activeCollectionPath}
+          pathLabel={activeCollectionPath}
+          selectable={!readOnly}
+          bulkSelectedPaths={bulkSelectedPaths}
+          onBulkToggle={handleBulkToggle}
+          onBulkToggleAll={handleBulkToggleAll}
+          onSelectDocument={(path) => onSelectDocument(path)}
         />
-      )}
-      <DocumentTable
-        documents={documents}
-        selectedDocumentPath={selectedDocumentPath}
-        tableKey={activeCollectionPath ?? undefined}
-        selectable={!readOnly}
-        bulkSelectedPaths={bulkSelectedPaths}
-        onBulkToggle={handleBulkToggle}
-        onBulkToggleAll={handleBulkToggleAll}
-        onSelectDocument={(path) => onSelectDocument(path)}
-      />
-      <DocumentJsonPanel
-        documentPath={selectedDocumentPath}
-        jsonText={jsonText}
-        createTime={selectedCreateTime}
-        updateTime={selectedUpdateTime}
-        documentData={selectedDocumentData}
-        loading={loading}
-        onChange={setJsonText}
-        onSave={() => void handleSave()}
-        onDelete={() => void handleDelete()}
-        onCreate={() => void handleCreate()}
-        onDuplicate={() => void handleDuplicateDocument()}
-        readOnly={readOnly}
-      />
+        {!readOnly && (
+          <BulkActionsPanel
+            projectId={projectId}
+            environment={status.environment}
+            selectedPaths={Array.from(bulkSelectedPaths)}
+            loading={loading}
+            onLoadingChange={setLoading}
+            onClearSelection={() => setBulkSelectedPaths(new Set())}
+            onOperationComplete={() => void handleBulkOperationComplete()}
+            onError={setError}
+          />
+        )}
+      </div>
+
+      <div className="explorer-main__json">
+        <DocumentJsonPanel
+          documentPath={selectedDocumentPath}
+          jsonText={jsonText}
+          createTime={selectedCreateTime}
+          updateTime={selectedUpdateTime}
+          documentData={selectedDocumentData}
+          loading={loading}
+          onChange={setJsonText}
+          onSave={() => void handleSave()}
+          onDelete={() => void handleDelete()}
+          onCreate={() => void handleCreate()}
+          onDuplicate={() => void handleDuplicateDocument()}
+          readOnly={readOnly}
+        />
+      </div>
     </div>
   )
 }
