@@ -197,12 +197,13 @@ Phase 6〜16：v1（MVP 後）
   9       shared/shell 拡張      … タブ、Split View、Command Palette ✅
   10-0    JS Query 基本          … コード入力 → Run → テーブル     ✅
   10      query 拡張             … Saved Queries ✅ / オートコンプリート保留 ★次候補可
-  11      data_transfer 拡張     … 【保留】import、バックアップ、転送
-  12      connection 拡張        … 【保留】Google サインイン、Emulator
+  11      data_transfer 拡張     … 【保留】import、バックアップ（11-0 Export サブコレ選択 ✅）
+  12      connection 拡張        … 【保留】Google サインイン
   13      script_runner          … 【保留】長時間 Tasks 等（JS Query 本体は 10-0）
   14      auth                   … 【保留】Firebase Auth ユーザー管理
   15      onboarding             … 【保留】初回オンボーディング
   16      shared/i18n, settings  … 【保留】日本語 UI、テーマ、ショートカット
+  17      Emulator / 転送        … 【後回し】Emulator 接続・プロジェクト間転送・同期
 
 
 --------------------------------------------------------------------------------
@@ -423,21 +424,21 @@ Phase 10 — query 拡張
 
 
 --------------------------------------------------------------------------------
-Phase 11 — data_transfer 拡張 【保留】
+Phase 11 — data_transfer 拡張 【保留】（詳細: 001_008_data_transfer.txt）
 --------------------------------------------------------------------------------
 
   作るもの:
     features/data_transfer/
+      11-0 Export サブコレ選択 … 除外 / 含む（確認ダイアログ）           ✅
       import                  … CSV / JSON（型変換・ID 指定）
-      全 DB バックアップ      … 圧縮アーカイブ
-      プロジェクト間転送      … dev ↔ prod
-      Emulator 同期           … Emulator とのデータ import/export
+      全 DB バックアップ      … 圧縮アーカイブ（zip）
+
+  ※ プロジェクト間転送・Emulator 同期は Phase 17 へ移した（必須ではない／後回し）
 
   Done:
+    ■ Export 時にサブコレクションの除外 / 含むを選べる（11-0）
     □ CSV / JSON からコレクションへ import できる
     □ 全 DB を圧縮バックアップとして export できる
-    □ 別プロジェクトへコレクション単位で転送できる
-    □ Emulator 向けの import / export ができる
 
 
 --------------------------------------------------------------------------------
@@ -447,13 +448,12 @@ Phase 12 — connection 拡張 【保留】
   作るもの:
     features/connection/
       Google サインイン       … OAuth 経由の接続（サービスアカウント以外）
-      Emulator 接続           … Firebase Local Emulator Suite 対応
-    shared/firestore/         … Emulator ホスト設定
+
+  ※ Emulator 接続は Phase 17 へ移した（転送・同期の前提として後回し）
 
   Done:
     □ Google アカウントで Firebase プロジェクトに接続できる
-    □ Emulator ホストを指定して Firestore Emulator に接続できる
-    □ 接続方式（JSON / Google / Emulator）が UI で選べる
+    □ 接続方式（JSON / Google）が UI で選べる
 
 
 --------------------------------------------------------------------------------
@@ -523,6 +523,35 @@ Phase 16 — shared/i18n, settings 【保留】
     □ 主要操作にキーボードショートカットがある
     □ 保存時にコンフリクト（他者更新）を検出できる
     □ Mac / Linux でビルド・起動できる
+
+
+--------------------------------------------------------------------------------
+Phase 17 — Emulator 接続 / プロジェクト間転送 【後回し】
+--------------------------------------------------------------------------------
+
+  方針:
+    - Phase 11 の「つながったあとのファイル入出力」より後でよい
+    - 当面は Export → Import（ファイル経由）でプロジェクト間も代用できる
+    - Emulator のデータ移動は、先に「認識・接続」がないと空振りする
+
+  作るもの（依存順）:
+    17-a  Emulator 接続
+          features/connection/ + shared/firestore/
+            … Firebase Local Emulator Suite（ホスト指定・認識）
+            … ワークスペースに Emulator を載せる
+    17-b  プロジェクト間転送
+          features/data_transfer/
+            … ロード済み project 同士でコレクション単位コピー（dev ↔ prod 等）
+    17-c  Emulator 同期
+          … 17-a のあと。実質 17-b のソース/宛先の一方が Emulator のケースでもよい
+
+  Done:
+    □ Emulator ホストを指定して Firestore Emulator に接続できる
+    □ 接続方式に Emulator が含まれる（JSON / Google / Emulator）
+    □ 別プロジェクトへコレクション単位で転送できる
+    □ Emulator 向けのデータの出し入れ（同期）ができる
+
+  参照: 001_017_data_transfer_emulator.txt
 
 
 ================================================================================
