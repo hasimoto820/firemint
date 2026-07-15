@@ -248,7 +248,7 @@ data_transfer 拡張 設計（Phase 11）
         … flat + path（manifest.json + documents.json）
         … 500 件ページで追記／分割、RAM に溜めない
         … 進捗（件数 / コレクション名 / 進捗率）
-        … restore は含めない（作成のみ）a
+        … restore は含めない（作成のみ）
 
   ※ 転送・Emulator は Phase 17（001_017）。001_005 Phase 11 Done は
      import / バックアップ作成に対応（転送・Emulator の □ は 17 側）。
