@@ -5,6 +5,7 @@ import {
   buildDefaultJsQuerySource,
   type SavedQuery
 } from '@features/query/shared/types'
+import type { WorkspaceTabQueryDraftPatch } from '@shared/shell/workspace_tab'
 import DocumentJsonPanel from '@shared/ui/DocumentJsonPanel'
 import DocumentTable from '@shared/ui/DocumentTable'
 import BulkActionsPanel from '@shared/ui/BulkActionsPanel'
@@ -15,37 +16,55 @@ type QueryViewProps = {
   status: ConnectionStatus
   /** 左ツリーで選択中のコレクション path（初期コードの seed に使う） */
   activeCollectionPath?: string | null
+  querySource: string | null
+  querySeededPath: string | null
+  querySelectedSavedId: string | null
+  querySavedName: string
+  queryDocuments: DocumentSummary[]
+  queryResultCount: number | null
+  queryLastSource: string | null
+  queryResultSelectedPath: string | null
+  onQueryDraftChange: (patch: WorkspaceTabQueryDraftPatch) => void
+}
+
+const EMPTY_RESULTS_PATCH: WorkspaceTabQueryDraftPatch = {
+  queryDocuments: [],
+  queryResultCount: null,
+  queryLastSource: null,
+  queryResultSelectedPath: null
 }
 
 /**
  * Firestore 作業エリアの「Query」モード。ユーザーが書いた JS（run）を実行し、
  * 結果を一覧・JSON 表示する。Saved Queries でコードを保存・復元できる。
+ * エディタ下書きと直近 Run 結果は WorkspaceTab 側に保持する（モード切替で消えない）。
  */
 function QueryView({
   status,
-  activeCollectionPath = null
+  activeCollectionPath = null,
+  querySource,
+  querySeededPath,
+  querySelectedSavedId,
+  querySavedName,
+  queryDocuments,
+  queryResultCount,
+  queryLastSource,
+  queryResultSelectedPath,
+  onQueryDraftChange
 }: QueryViewProps): React.JSX.Element {
   const projectId = status.projectId
   const readOnly = status.readOnly
-  const [source, setSource] = useState(() => buildDefaultJsQuerySource(activeCollectionPath))
-  const [seededPath, setSeededPath] = useState<string | null>(activeCollectionPath)
-  const [documents, setDocuments] = useState<DocumentSummary[]>([])
-  const [selectedDocumentPath, setSelectedDocumentPath] = useState<string | null>(null)
-  const [selectedCreateTime, setSelectedCreateTime] = useState<string | null>(null)
-  const [selectedUpdateTime, setSelectedUpdateTime] = useState<string | null>(null)
-  const [selectedDocumentData, setSelectedDocumentData] = useState<Record<string, unknown> | null>(
-    null
-  )
-  const [jsonText, setJsonText] = useState('{\n  \n}')
-  const [lastSource, setLastSource] = useState<string | null>(null)
-  const [resultCount, setResultCount] = useState<number | null>(null)
+  const source = querySource ?? buildDefaultJsQuerySource(activeCollectionPath)
+  const selectedDocument =
+    queryDocuments.find((document) => document.path === queryResultSelectedPath) ?? null
+  const jsonText = selectedDocument
+    ? JSON.stringify(selectedDocument.data, null, 2)
+    : '{\n  \n}'
   const [error, setError] = useState<string | null>(null)
   const [statusMessage, setStatusMessage] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [bulkSelectedPaths, setBulkSelectedPaths] = useState<Set<string>>(new Set())
   const [savedQueries, setSavedQueries] = useState<SavedQuery[]>([])
-  const [selectedSavedId, setSelectedSavedId] = useState<string | null>(null)
-  const [savedName, setSavedName] = useState('')
 
   const refreshSavedQueries = useCallback(async (): Promise<void> => {
     try {
@@ -74,15 +93,39 @@ function QueryView({
     void refreshSavedQueries()
   }, [refreshSavedQueries])
 
+  // タブに未保存の下書きが無いとき、コレクション向け default を一度だけ書き込む
   useEffect(() => {
-    const nextPath = activeCollectionPath ?? null
-    const previousSeed = buildDefaultJsQuerySource(seededPath)
-
-    if (source.trim() === previousSeed.trim()) {
-      setSource(buildDefaultJsQuerySource(nextPath))
+    if (querySource !== null) {
+      return
     }
 
-    setSeededPath(nextPath)
+    const nextPath = activeCollectionPath ?? null
+    onQueryDraftChange({
+      querySource: buildDefaultJsQuerySource(nextPath),
+      querySeededPath: nextPath
+    })
+  }, [querySource, activeCollectionPath, onQueryDraftChange])
+
+  useEffect(() => {
+    const nextPath = activeCollectionPath ?? null
+    if (querySource === null) {
+      return
+    }
+
+    const previousSeed = buildDefaultJsQuerySource(querySeededPath)
+
+    if (querySource.trim() === previousSeed.trim()) {
+      onQueryDraftChange({
+        querySource: buildDefaultJsQuerySource(nextPath),
+        querySeededPath: nextPath,
+        ...EMPTY_RESULTS_PATCH
+      })
+      return
+    }
+
+    if (querySeededPath !== nextPath) {
+      onQueryDraftChange({ querySeededPath: nextPath })
+    }
     // パス変更時のみ。source を依存に入れると入力中に seed 比較がずれる
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeCollectionPath])
@@ -91,6 +134,7 @@ function QueryView({
     setLoading(true)
     setError(null)
     setStatusMessage(null)
+    setBulkSelectedPaths(new Set())
 
     try {
       const result = await window.api.query.execute({
@@ -100,35 +144,27 @@ function QueryView({
 
       if (!result.ok) {
         setError(result.error)
-        setDocuments([])
-        setSelectedDocumentPath(null)
-        setJsonText('{\n  \n}')
-        setResultCount(null)
-        setLastSource(null)
+        onQueryDraftChange({ ...EMPTY_RESULTS_PATCH })
         return
       }
 
       const nextDocuments = Array.isArray(result.data) ? result.data : []
-      setDocuments(nextDocuments)
-      setSelectedDocumentPath(null)
-      setSelectedCreateTime(null)
-      setSelectedUpdateTime(null)
-      setSelectedDocumentData(null)
-      setJsonText('{\n  \n}')
-      setBulkSelectedPaths(new Set())
-      setLastSource(source)
-      setResultCount(nextDocuments.length)
+      onQueryDraftChange({
+        queryDocuments: nextDocuments,
+        queryResultCount: nextDocuments.length,
+        queryLastSource: source,
+        queryResultSelectedPath: null
+      })
     } catch (runError) {
       setError(runError instanceof Error ? runError.message : 'Query の実行に失敗しました')
-      setDocuments([])
-      setResultCount(null)
-      setLastSource(null)
+      onQueryDraftChange({ ...EMPTY_RESULTS_PATCH })
     } finally {
       setLoading(false)
     }
   }
 
   const handleSelectDocument = async (documentPath: string): Promise<void> => {
+    onQueryDraftChange({ queryResultSelectedPath: documentPath })
     setLoading(true)
     setError(null)
 
@@ -140,11 +176,19 @@ function QueryView({
         return
       }
 
-      setSelectedDocumentPath(documentPath)
-      setSelectedCreateTime(result.data.createTime)
-      setSelectedUpdateTime(result.data.updateTime)
-      setSelectedDocumentData(result.data.data)
-      setJsonText(JSON.stringify(result.data.data, null, 2))
+      onQueryDraftChange({
+        queryResultSelectedPath: documentPath,
+        queryDocuments: queryDocuments.map((document) =>
+          document.path === documentPath
+            ? {
+                ...document,
+                data: result.data.data,
+                createTime: result.data.createTime,
+                updateTime: result.data.updateTime
+              }
+            : document
+        )
+      })
     } finally {
       setLoading(false)
     }
@@ -166,7 +210,7 @@ function QueryView({
 
   const handleBulkToggleAll = (checked: boolean): void => {
     if (checked) {
-      setBulkSelectedPaths(new Set(documents.map((document) => document.path)))
+      setBulkSelectedPaths(new Set(queryDocuments.map((document) => document.path)))
       return
     }
 
@@ -174,17 +218,18 @@ function QueryView({
   }
 
   const handleBulkOperationComplete = async (): Promise<void> => {
-    if (!lastSource) {
+    if (!queryLastSource) {
       return
     }
 
     setLoading(true)
     setError(null)
+    setBulkSelectedPaths(new Set())
 
     try {
       const result = await window.api.query.execute({
         projectId,
-        source: lastSource
+        source: queryLastSource
       })
 
       if (!result.ok) {
@@ -193,35 +238,41 @@ function QueryView({
       }
 
       const nextDocuments = Array.isArray(result.data) ? result.data : []
-      setDocuments(nextDocuments)
-      setResultCount(nextDocuments.length)
-      setBulkSelectedPaths(new Set())
+      onQueryDraftChange({
+        queryDocuments: nextDocuments,
+        queryResultCount: nextDocuments.length,
+        queryResultSelectedPath: null
+      })
     } finally {
       setLoading(false)
     }
   }
 
   const handleSelectSaved = (id: string | null): void => {
-    setSelectedSavedId(id)
     const selected = savedQueries.find((query) => query.id === id)
-    setSavedName(selected?.name ?? '')
+    onQueryDraftChange({
+      querySelectedSavedId: id,
+      querySavedName: selected?.name ?? ''
+    })
   }
 
   const handleLoadSaved = (): void => {
-    const selected = savedQueries.find((query) => query.id === selectedSavedId)
+    const selected = savedQueries.find((query) => query.id === querySelectedSavedId)
     if (!selected) {
       return
     }
 
-    setSource(selected.source)
-    setSeededPath(null)
-    setSavedName(selected.name)
+    onQueryDraftChange({
+      querySource: selected.source,
+      querySeededPath: null,
+      querySavedName: selected.name
+    })
     setStatusMessage(`読込: ${selected.name}`)
     setError(null)
   }
 
   const handleSaveSaved = async (): Promise<void> => {
-    const name = savedName.trim() || activeCollectionPath || 'untitled query'
+    const name = querySavedName.trim() || activeCollectionPath || 'untitled query'
 
     if (!name.trim()) {
       setError('名前を入力してください')
@@ -239,7 +290,7 @@ function QueryView({
       }
 
       const result = await window.api.query.saveSaved({
-        id: selectedSavedId ?? undefined,
+        id: querySelectedSavedId ?? undefined,
         name,
         projectId,
         source,
@@ -251,8 +302,10 @@ function QueryView({
         return
       }
 
-      setSelectedSavedId(result.data.id)
-      setSavedName(result.data.name)
+      onQueryDraftChange({
+        querySelectedSavedId: result.data.id,
+        querySavedName: result.data.name
+      })
       await refreshSavedQueries()
       setStatusMessage(`保存しました: ${result.data.name}`)
     } catch (saveError) {
@@ -263,12 +316,12 @@ function QueryView({
   }
 
   const handleDeleteSaved = async (): Promise<void> => {
-    if (!selectedSavedId) {
+    if (!querySelectedSavedId) {
       return
     }
 
-    const selected = savedQueries.find((query) => query.id === selectedSavedId)
-    if (!window.confirm(`「${selected?.name ?? selectedSavedId}」を削除しますか？`)) {
+    const selected = savedQueries.find((query) => query.id === querySelectedSavedId)
+    if (!window.confirm(`「${selected?.name ?? querySelectedSavedId}」を削除しますか？`)) {
       return
     }
 
@@ -282,14 +335,16 @@ function QueryView({
         return
       }
 
-      const result = await window.api.query.deleteSaved(selectedSavedId)
+      const result = await window.api.query.deleteSaved(querySelectedSavedId)
       if (!result.ok) {
         setError(result.error)
         return
       }
 
-      setSelectedSavedId(null)
-      setSavedName('')
+      onQueryDraftChange({
+        querySelectedSavedId: null,
+        querySavedName: ''
+      })
       await refreshSavedQueries()
       setStatusMessage('削除しました')
     } catch (deleteError) {
@@ -304,16 +359,16 @@ function QueryView({
       <QueryEditor
         source={source}
         loading={loading}
-        onChange={setSource}
+        onChange={(next) => onQueryDraftChange({ querySource: next })}
         onRun={() => void handleRun()}
       />
       <SavedQueriesBar
         queries={savedQueries}
-        selectedId={selectedSavedId}
-        name={savedName}
+        selectedId={querySelectedSavedId}
+        name={querySavedName}
         loading={loading}
         onSelect={handleSelectSaved}
-        onNameChange={setSavedName}
+        onNameChange={(name) => onQueryDraftChange({ querySavedName: name })}
         onLoad={handleLoadSaved}
         onSave={() => void handleSaveSaved()}
         onDelete={() => void handleDeleteSaved()}
@@ -321,20 +376,20 @@ function QueryView({
       {error && <p className="query-main__error">{error}</p>}
       {statusMessage && <p className="query-main__status">{statusMessage}</p>}
       {loading && <p className="query-main__loading">実行中...</p>}
-      {resultCount === null && !loading && (
+      {queryResultCount === null && !loading && (
         <p className="query-main__empty-hint">
           JS を書いて Run（Ctrl+Enter）で結果を表示します。db / admin が使えます。
         </p>
       )}
-      {resultCount !== null && (
+      {queryResultCount !== null && (
         <>
           <div className="query-main__workspace">
-            <div className="query-main__result-label">{resultCount} docs</div>
+            <div className="query-main__result-label">{queryResultCount} docs</div>
             <DocumentTable
-              documents={documents}
-              selectedDocumentPath={selectedDocumentPath}
+              documents={queryDocuments}
+              selectedDocumentPath={queryResultSelectedPath}
               showPath={false}
-              tableKey={`js-query:${resultCount}:${documents[0]?.path ?? 'empty'}`}
+              tableKey={`js-query:${queryResultCount}:${queryDocuments[0]?.path ?? 'empty'}`}
               pathLabel={activeCollectionPath}
               selectable={!readOnly}
               bulkSelectedPaths={bulkSelectedPaths}
@@ -357,13 +412,13 @@ function QueryView({
           </div>
           <div className="query-main__json">
             <DocumentJsonPanel
-              documentPath={selectedDocumentPath}
+              documentPath={queryResultSelectedPath}
               jsonText={jsonText}
-              createTime={selectedCreateTime}
-              updateTime={selectedUpdateTime}
-              documentData={selectedDocumentData}
+              createTime={selectedDocument?.createTime ?? null}
+              updateTime={selectedDocument?.updateTime ?? null}
+              documentData={selectedDocument?.data ?? null}
               loading={loading}
-              onChange={setJsonText}
+              onChange={() => undefined}
               onSave={() => undefined}
               onDelete={() => undefined}
               onCreate={() => undefined}

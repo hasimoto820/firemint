@@ -495,6 +495,7 @@ function FirestorePage({
           onSelectCollection={(path) => handlePaneCollectionChange(active.id, path)}
           onSelectDocument={(path) => handlePaneDocumentChange(active.id, path)}
           onRootCollectionsChanged={() => void loadRootCollections()}
+          onQueryDraftChange={(patch) => updateTab(active.id, patch)}
         />
       ) : (
         <div className="firestore-split__pane-empty">

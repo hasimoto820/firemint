@@ -2,7 +2,7 @@ import type { ConnectionStatus } from '@features/connection/shared/types'
 import SimpleView from '@features/explorer/renderer/ui/SimpleView'
 import QueryView from '@features/query/renderer/ui/QueryView'
 import type { AppView } from '@shared/shell/AppNav'
-import type { WorkspaceTab } from '@shared/shell/workspace_tab'
+import type { WorkspaceTab, WorkspaceTabQueryDraftPatch } from '@shared/shell/workspace_tab'
 
 type WorkspacePaneProps = {
   status: ConnectionStatus
@@ -12,6 +12,7 @@ type WorkspacePaneProps = {
   onSelectCollection: (collectionPath: string) => void
   onSelectDocument: (documentPath: string | null) => void
   onRootCollectionsChanged: () => void
+  onQueryDraftChange: (patch: WorkspaceTabQueryDraftPatch) => void
 }
 
 /**
@@ -25,7 +26,8 @@ function WorkspacePane({
   onChangeView,
   onSelectCollection,
   onSelectDocument,
-  onRootCollectionsChanged
+  onRootCollectionsChanged,
+  onQueryDraftChange
 }: WorkspacePaneProps): React.JSX.Element {
   return (
     <div className="workspace-pane">
@@ -54,7 +56,19 @@ function WorkspacePane({
       </div>
 
       {tab.view === 'query' ? (
-        <QueryView status={status} activeCollectionPath={tab.collectionPath} />
+        <QueryView
+          status={status}
+          activeCollectionPath={tab.collectionPath}
+          querySource={tab.querySource}
+          querySeededPath={tab.querySeededPath}
+          querySelectedSavedId={tab.querySelectedSavedId}
+          querySavedName={tab.querySavedName}
+          queryDocuments={tab.queryDocuments}
+          queryResultCount={tab.queryResultCount}
+          queryLastSource={tab.queryLastSource}
+          queryResultSelectedPath={tab.queryResultSelectedPath}
+          onQueryDraftChange={onQueryDraftChange}
+        />
       ) : (
         <SimpleView
           status={status}
