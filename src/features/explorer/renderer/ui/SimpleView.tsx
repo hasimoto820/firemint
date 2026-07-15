@@ -283,7 +283,12 @@ function SimpleView({
       })
 
       if (result.ok) {
-        setSuccessMessage(`${result.data.documentCount} 件を ${result.data.filePath} に保存しました`)
+        const scope = result.data.includeSubcollections
+          ? '（サブコレクション含む）'
+          : '（コレクション一段）'
+        setSuccessMessage(
+          `${result.data.documentCount} 件${scope}を ${result.data.filePath} に保存しました`
+        )
         return
       }
 

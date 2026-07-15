@@ -2,7 +2,12 @@ import type { QueryDocumentSnapshot } from 'firebase-admin/firestore'
 import { writeFile } from 'fs/promises'
 import type { BrowserWindow } from 'electron'
 import { dialog } from 'electron'
-import { getCollectionRef, joinDocumentPath } from '@shared/firestore/paths'
+import {
+  getCollectionRef,
+  getDocumentRef,
+  joinCollectionPath,
+  joinDocumentPath
+} from '@shared/firestore/paths'
 import { serializeFirestoreValue } from '@shared/firestore/serialize'
 import { isFirestoreConnected } from '@shared/firestore/client'
 import { logError, logInfo } from '@shared/logging/logger'
@@ -82,6 +87,65 @@ async function fetchAllDocuments(
   return documents
 }
 
+/**
+ * コレクション一段、またはサブコレクション込みでドキュメントを収集する。
+ * 含む場合は flat な ExportDocument[]（path がフルパス）。
+ */
+async function fetchExportDocuments(
+  projectId: string,
+  collectionPath: string,
+  includeSubcollections: boolean
+): Promise<ExportDocument[]> {
+  const documents = await fetchAllDocuments(projectId, collectionPath)
+
+  if (!includeSubcollections) {
+    return documents
+  }
+
+  const collected: ExportDocument[] = []
+
+  for (const document of documents) {
+    collected.push(document)
+
+    const subcollections = await getDocumentRef(document.path, projectId).listCollections()
+    for (const subcollection of subcollections) {
+      const nestedPath = joinCollectionPath(document.path, subcollection.id)
+      const nestedDocuments = await fetchExportDocuments(projectId, nestedPath, true)
+      collected.push(...nestedDocuments)
+    }
+  }
+
+  return collected
+}
+
+async function promptIncludeSubcollections(
+  window: BrowserWindow | null,
+  collectionPath: string
+): Promise<{ canceled: boolean; includeSubcollections: boolean }> {
+  const options = {
+    type: 'question' as const,
+    title: 'コレクションをエクスポート',
+    message: `「${collectionPath}」を JSON エクスポートします。`,
+    detail: 'サブコレクションを含めると、配下のドキュメントもすべて書き出します（件数・時間が増えます）。',
+    checkboxLabel: 'サブコレクションを含む',
+    checkboxChecked: false,
+    buttons: ['エクスポート', 'キャンセル'],
+    defaultId: 0,
+    cancelId: 1,
+    noLink: true
+  }
+
+  const result = window
+    ? await dialog.showMessageBox(window, options)
+    : await dialog.showMessageBox(options)
+
+  if (result.response === 1) {
+    return { canceled: true, includeSubcollections: false }
+  }
+
+  return { canceled: false, includeSubcollections: result.checkboxChecked }
+}
+
 async function saveTextFile(
   window: BrowserWindow | null,
   content: string,
@@ -125,16 +189,34 @@ export async function exportCollectionJson(
       throw new Error('コレクション path を指定してください')
     }
 
-    logInfo('data_transfer', `exportCollectionJson projectId=${input.projectId} path=${collectionPath}`)
+    let includeSubcollections = input.includeSubcollections ?? false
 
-    const documents = await fetchAllDocuments(input.projectId, collectionPath)
+    if (input.includeSubcollections === undefined) {
+      const prompt = await promptIncludeSubcollections(window, collectionPath)
+      if (prompt.canceled) {
+        return toExportError(new Error('canceled'), true)
+      }
+      includeSubcollections = prompt.includeSubcollections
+    }
+
+    logInfo(
+      'data_transfer',
+      `exportCollectionJson projectId=${input.projectId} path=${collectionPath} includeSubcollections=${includeSubcollections}`
+    )
+
+    const documents = await fetchExportDocuments(
+      input.projectId,
+      collectionPath,
+      includeSubcollections
+    )
 
     if (documents.length === 0) {
       throw new Error('エクスポート対象のドキュメントがありません')
     }
 
     const content = documentsToJson(documents)
-    const defaultPath = `${sanitizeFileName(collectionPath)}.json`
+    const suffix = includeSubcollections ? '-with-subcollections' : ''
+    const defaultPath = `${sanitizeFileName(collectionPath)}${suffix}.json`
     const filePath = await saveTextFile(window, content, defaultPath, 'json')
 
     if (!filePath) {
@@ -145,7 +227,8 @@ export async function exportCollectionJson(
       ok: true,
       data: {
         filePath,
-        documentCount: documents.length
+        documentCount: documents.length,
+        includeSubcollections
       }
     }
   } catch (error) {
@@ -176,7 +259,8 @@ export async function exportDocumentsJson(
       ok: true,
       data: {
         filePath,
-        documentCount: input.documents.length
+        documentCount: input.documents.length,
+        includeSubcollections: false
       }
     }
   } catch (error) {
@@ -207,7 +291,8 @@ export async function exportDocumentsCsv(
       ok: true,
       data: {
         filePath,
-        documentCount: input.documents.length
+        documentCount: input.documents.length,
+        includeSubcollections: false
       }
     }
   } catch (error) {

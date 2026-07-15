@@ -7,6 +7,11 @@ export type ExportDocument = {
 export type ExportCollectionJsonInput = {
   projectId: string
   collectionPath: string
+  /**
+   * true = 配下サブコレクションも再帰 export。
+   * undefined = 実行前に確認ダイアログで選ぶ（デフォルトは除外）。
+   */
+  includeSubcollections?: boolean
 }
 
 export type ExportDocumentsInput = {
@@ -17,6 +22,7 @@ export type ExportDocumentsInput = {
 export type ExportSummary = {
   filePath: string
   documentCount: number
+  includeSubcollections: boolean
 }
 
 export type ExportResult =

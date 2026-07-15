@@ -36,7 +36,10 @@ function ExportPanel(props: ExportPanelProps): React.JSX.Element {
 
   const handleResult = (result: Awaited<ReturnType<typeof window.api.dataTransfer.exportCollectionJson>>): void => {
     if (result.ok) {
-      props.onSuccess(`${result.data.documentCount} 件を ${result.data.filePath} に保存しました`)
+      const scope = result.data.includeSubcollections
+        ? '（サブコレクション含む）'
+        : ''
+      props.onSuccess(`${result.data.documentCount} 件${scope}を ${result.data.filePath} に保存しました`)
       props.onError(null)
       return
     }
