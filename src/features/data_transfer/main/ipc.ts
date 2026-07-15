@@ -3,8 +3,10 @@ import { IPC_CHANNELS } from '@shared/ipc/channels'
 import { logInfo } from '@shared/logging/logger'
 import type {
   ExportCollectionJsonInput,
-  ExportDocumentsInput
+  ExportDocumentsInput,
+  ImportCollectionJsonInput
 } from '@features/data_transfer/shared/types'
+import { importCollectionJson } from './import_service'
 import {
   exportCollectionJson,
   exportDocumentsCsv,
@@ -36,6 +38,15 @@ export function registerDataTransferHandlers(): void {
       logInfo('ipc:data_transfer', `exportDocumentsCsv count=${input.documents.length}`)
       const window = BrowserWindow.fromWebContents(event.sender)
       return exportDocumentsCsv(input, window)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.DATA_TRANSFER_IMPORT_COLLECTION_JSON,
+    async (event, input: ImportCollectionJsonInput) => {
+      logInfo('ipc:data_transfer', `importCollectionJson path=${input.collectionPath}`)
+      const window = BrowserWindow.fromWebContents(event.sender)
+      return importCollectionJson(input, window)
     }
   )
 }

@@ -30,6 +30,7 @@ export const IPC_CHANNELS = {
   DATA_TRANSFER_EXPORT_COLLECTION_JSON: 'data_transfer:export_collection_json',
   DATA_TRANSFER_EXPORT_DOCUMENTS_JSON: 'data_transfer:export_documents_json',
   DATA_TRANSFER_EXPORT_DOCUMENTS_CSV: 'data_transfer:export_documents_csv',
+  DATA_TRANSFER_IMPORT_COLLECTION_JSON: 'data_transfer:import_collection_json',
   WORKSPACE_GET_STATE: 'workspace:get_state',
   WORKSPACE_ADD_ENTRY: 'workspace:add_entry',
   WORKSPACE_REMOVE_ENTRY: 'workspace:remove_entry',

@@ -437,7 +437,7 @@ Phase 11 — data_transfer 拡張 【保留】（詳細: 001_008_data_transfer.t
 
   Done:
     ■ Export 時にサブコレクションの除外 / 含むを選べる（11-0）
-    □ CSV / JSON からコレクションへ import できる
+    ■ JSON からコレクションへ import できる（11-a1/a2。CSV は対象外）
     □ 全 DB を圧縮バックアップとして export できる
 
 

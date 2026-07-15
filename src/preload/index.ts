@@ -72,7 +72,9 @@ const api: IpcApi = {
     exportDocumentsJson: (input) =>
       ipcRenderer.invoke(IPC_CHANNELS.DATA_TRANSFER_EXPORT_DOCUMENTS_JSON, input),
     exportDocumentsCsv: (input) =>
-      ipcRenderer.invoke(IPC_CHANNELS.DATA_TRANSFER_EXPORT_DOCUMENTS_CSV, input)
+      ipcRenderer.invoke(IPC_CHANNELS.DATA_TRANSFER_EXPORT_DOCUMENTS_CSV, input),
+    importCollectionJson: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.DATA_TRANSFER_IMPORT_COLLECTION_JSON, input)
   }
 }
 

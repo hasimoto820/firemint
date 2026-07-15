@@ -300,6 +300,45 @@ function SimpleView({
     }
   }
 
+  const handleImportCollection = async (): Promise<void> => {
+    if (!activeCollectionPath) {
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+    setSuccessMessage(null)
+
+    try {
+      const result = await window.api.dataTransfer.importCollectionJson({
+        projectId,
+        collectionPath: activeCollectionPath
+      })
+
+      if (result.ok) {
+        const scope = result.data.includeSubcollections
+          ? '（サブコレクション含む）'
+          : '（コレクション一段）'
+        const skipped =
+          result.data.skippedOutsideCount > 0
+            ? ` / 宛先外除外 ${result.data.skippedOutsideCount} 件`
+            : ''
+        setSuccessMessage(
+          `${result.data.writtenCount} 件${scope}をインポートしました${skipped}`
+        )
+        await loadDocuments(activeCollectionPath)
+        onRootCollectionsChanged()
+        return
+      }
+
+      if (!result.canceled) {
+        setError(result.error)
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleDuplicateCollection = async (): Promise<void> => {
     if (!activeCollectionPath) {
       setError('コレクションを選択してください')
@@ -348,12 +387,14 @@ function SimpleView({
           canDuplicate: !readOnly && Boolean(selectedDocumentPath),
           canDelete: !readOnly && Boolean(selectedDocumentPath),
           canExport: Boolean(activeCollectionPath),
+          canImport: !readOnly && Boolean(activeCollectionPath),
           canDuplicateCollection: !readOnly && Boolean(activeCollectionPath),
           onCreate: () => void handleCreate(),
           onSave: () => void handleSave(),
           onDuplicate: () => void handleDuplicateDocument(),
           onDelete: () => void handleDelete(),
           onExport: () => void handleExportCollection(),
+          onImport: () => void handleImportCollection(),
           onDuplicateCollection: () => void handleDuplicateCollection()
         }
       : {
@@ -362,6 +403,7 @@ function SimpleView({
           canDuplicate: false,
           canDelete: false,
           canExport: false,
+          canImport: false,
           canDuplicateCollection: false
         },
     [menuEnabled, readOnly, activeCollectionPath, selectedDocumentPath, jsonText]

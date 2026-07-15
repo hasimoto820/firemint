@@ -13,12 +13,14 @@ export type AppMenuContextActions = {
   canDuplicate: boolean
   canDelete: boolean
   canExport: boolean
+  canImport: boolean
   canDuplicateCollection: boolean
   onCreate?: () => void
   onSave?: () => void
   onDuplicate?: () => void
   onDelete?: () => void
   onExport?: () => void
+  onImport?: () => void
   onDuplicateCollection?: () => void
 }
 
@@ -69,6 +71,13 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
           label: 'エクスポート…',
           disabled: !context?.canExport,
           onClick: context?.onExport
+        },
+        {
+          type: 'item',
+          id: 'file-import',
+          label: 'インポート…',
+          disabled: !context?.canImport,
+          onClick: context?.onImport
         },
         { type: 'separator' },
         {

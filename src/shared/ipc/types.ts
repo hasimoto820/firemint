@@ -32,7 +32,9 @@ import type {
 import type {
   ExportCollectionJsonInput,
   ExportDocumentsInput,
-  ExportResult
+  ExportResult,
+  ImportCollectionJsonInput,
+  ImportResult
 } from '@features/data_transfer/shared/types'
 
 import type {
@@ -107,6 +109,7 @@ export type DataTransferIpcApi = {
   exportCollectionJson: (input: ExportCollectionJsonInput) => Promise<ExportResult>
   exportDocumentsJson: (input: ExportDocumentsInput) => Promise<ExportResult>
   exportDocumentsCsv: (input: ExportDocumentsInput) => Promise<ExportResult>
+  importCollectionJson: (input: ImportCollectionJsonInput) => Promise<ImportResult>
 }
 
 export type WorkspaceIpcApi = {
