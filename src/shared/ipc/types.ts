@@ -32,8 +32,17 @@ import type {
 import type {
   ExportCollectionJsonInput,
   ExportDocumentsInput,
+  ExportProjectInput,
+  ExportProjectProgress,
+  ExportProjectResult,
   ExportResult,
   ImportCollectionJsonInput,
+  ImportCollectionProgress,
+  ImportCollectionValidationResult,
+  ImportProjectInput,
+  ImportProjectProgress,
+  ImportProjectResult,
+  ImportProjectValidationResult,
   ImportResult
 } from '@features/data_transfer/shared/types'
 
@@ -109,7 +118,26 @@ export type DataTransferIpcApi = {
   exportCollectionJson: (input: ExportCollectionJsonInput) => Promise<ExportResult>
   exportDocumentsJson: (input: ExportDocumentsInput) => Promise<ExportResult>
   exportDocumentsCsv: (input: ExportDocumentsInput) => Promise<ExportResult>
+  selectCollectionImportJson: () => Promise<{ canceled: boolean; filePath: string | null }>
+  validateCollectionImport: (
+    input: ImportCollectionJsonInput
+  ) => Promise<ImportCollectionValidationResult>
   importCollectionJson: (input: ImportCollectionJsonInput) => Promise<ImportResult>
+  onImportCollectionProgress: (
+    listener: (progress: ImportCollectionProgress) => void
+  ) => () => void
+  exportProject: (input: ExportProjectInput) => Promise<ExportProjectResult>
+  onExportProjectProgress: (
+    listener: (progress: ExportProjectProgress) => void
+  ) => () => void
+  selectProjectImportZip: () => Promise<{ canceled: boolean; filePath: string | null }>
+  validateProjectImport: (
+    input: ImportProjectInput
+  ) => Promise<ImportProjectValidationResult>
+  importProject: (input: ImportProjectInput) => Promise<ImportProjectResult>
+  onImportProjectProgress: (
+    listener: (progress: ImportProjectProgress) => void
+  ) => () => void
 }
 
 export type WorkspaceIpcApi = {

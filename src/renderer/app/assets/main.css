@@ -2065,6 +2065,136 @@ code {
   }
 }
 
+.project-export-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.project-export-dialog__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(12, 14, 18, 0.45);
+}
+
+.project-export-dialog__panel {
+  position: relative;
+  z-index: 1;
+  width: min(440px, calc(100vw - 32px));
+  max-height: min(80vh, 640px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-background);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.28);
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.project-export-dialog__header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.project-export-dialog__title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 650;
+}
+
+.project-export-dialog__lead {
+  margin: 0;
+  color: var(--color-text-soft, #6b7280);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.project-export-dialog__roots {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+
+.project-export-dialog__roots-toolbar {
+  display: flex;
+  align-items: center;
+}
+
+.project-export-dialog__list {
+  margin: 0;
+  padding: 8px 10px;
+  list-style: none;
+  overflow: auto;
+  max-height: 220px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-background-soft, var(--color-background-mute));
+}
+
+.project-export-dialog__list li + li {
+  margin-top: 4px;
+}
+
+.project-export-dialog__check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  user-select: text;
+}
+
+.project-export-dialog__option {
+  margin-top: 2px;
+}
+
+.project-export-dialog__hint,
+.project-export-dialog__progress-label {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-soft, #6b7280);
+}
+
+.project-export-dialog__progress {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.project-export-dialog__progress-bar {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--ev-c-brand, #3b82f6);
+  transition: width 120ms ease-out;
+}
+
+.project-export-dialog__error {
+  margin: 0;
+  color: #b91c1c;
+  font-size: 13px;
+}
+
+.project-export-dialog__success {
+  margin: 0;
+  color: #047857;
+  font-size: 13px;
+  word-break: break-all;
+}
+
+.project-export-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
 @media (max-width: 350px) {
   .tip,
   .actions {

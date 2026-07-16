@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ConnectionStatus } from '@features/connection/shared/types'
 import ConnectionPanel from '@features/connection/renderer/ui/ConnectionPanel'
+import ProjectExportDialog from '@features/data_transfer/renderer/ui/ProjectExportDialog'
+import ProjectImportDialog from '@features/data_transfer/renderer/ui/ProjectImportDialog'
 import WorkspacePanel from '@features/workspace/renderer/ui/WorkspacePanel'
 import FirestorePage, { type ShellCommands } from './FirestorePage'
 import type { AppView } from '@shared/shell/AppNav'
@@ -20,6 +22,9 @@ function App(): React.JSX.Element {
   const [refreshKey, setRefreshKey] = useState(0)
   const [menuContext, setMenuContext] = useState<AppMenuContextActions | null>(null)
   const [shellCommands, setShellCommands] = useState<ShellCommands | null>(null)
+  const [projectExportOpen, setProjectExportOpen] = useState(false)
+  const [projectImportOpen, setProjectImportOpen] = useState(false)
+  const [rootsReloadToken, setRootsReloadToken] = useState(0)
 
   const refreshStatus = useCallback(async (): Promise<void> => {
     setConnectionStatus(await window.api.connection.getStatus())
@@ -59,6 +64,18 @@ function App(): React.JSX.Element {
   const platform = window.electron.process.platform
   const useWindowMenuActions = platform === 'linux'
 
+  const handleExportProject = useCallback((): void => {
+    setProjectExportOpen(true)
+  }, [])
+
+  const handleImportProject = useCallback((): void => {
+    setProjectImportOpen(true)
+  }, [])
+
+  const handleProjectImported = useCallback((): void => {
+    setRootsReloadToken((current) => current + 1)
+  }, [])
+
   const menus = useMemo(
     () =>
       buildAppMenus({
@@ -69,6 +86,8 @@ function App(): React.JSX.Element {
         onQuit: handleQuit,
         onAbout: () => void handleAbout(),
         onOpenDocs: handleOpenDocs,
+        onExportProject: handleExportProject,
+        onImportProject: handleImportProject,
         context: menuContext,
         shell: shellCommands
           ? {
@@ -95,6 +114,8 @@ function App(): React.JSX.Element {
       handleQuit,
       handleAbout,
       handleOpenDocs,
+      handleExportProject,
+      handleImportProject,
       menuContext,
       shellCommands,
       useWindowMenuActions
@@ -124,6 +145,7 @@ function App(): React.JSX.Element {
         onDisconnected={handleWorkspaceChanged}
         onWorkspaceChanged={handleWorkspaceChanged}
         onShellCommandsChange={setShellCommands}
+        rootsReloadToken={rootsReloadToken}
       />
     )
   }
@@ -132,6 +154,22 @@ function App(): React.JSX.Element {
     <AppMenuRegistryProvider value={registerMenu}>
       <AppChrome title={chromeTitle} menus={menus}>
         {content}
+        {connectionStatus && (
+          <>
+            <ProjectExportDialog
+              projectId={connectionStatus.projectId}
+              open={projectExportOpen}
+              onClose={() => setProjectExportOpen(false)}
+            />
+            <ProjectImportDialog
+              projectId={connectionStatus.projectId}
+              readOnly={connectionStatus.readOnly}
+              open={projectImportOpen}
+              onClose={() => setProjectImportOpen(false)}
+              onImported={handleProjectImported}
+            />
+          </>
+        )}
       </AppChrome>
     </AppMenuRegistryProvider>
   )

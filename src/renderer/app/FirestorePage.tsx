@@ -33,6 +33,8 @@ type FirestorePageProps = {
   onDisconnected: () => void
   onWorkspaceChanged: () => void
   onShellCommandsChange?: (commands: ShellCommands | null) => void
+  /** インクリメントするとルートコレクション一覧を再読込 */
+  rootsReloadToken?: number
 }
 
 /**
@@ -46,7 +48,8 @@ function FirestorePage({
   onNavigate,
   onDisconnected,
   onWorkspaceChanged,
-  onShellCommandsChange
+  onShellCommandsChange,
+  rootsReloadToken = 0
 }: FirestorePageProps): React.JSX.Element {
   const projectId = status.projectId
   const [rootCollections, setRootCollections] = useState<string[]>([])
@@ -83,6 +86,14 @@ function FirestorePage({
   useEffect(() => {
     void loadRootCollections()
   }, [loadRootCollections])
+
+  useEffect(() => {
+    if (rootsReloadToken <= 0) {
+      return
+    }
+
+    void loadRootCollections()
+  }, [rootsReloadToken, loadRootCollections])
 
   const updateTab = useCallback((tabId: string, patch: Partial<WorkspaceTab>): void => {
     setTabs((current) => current.map((tab) => (tab.id === tabId ? { ...tab, ...patch } : tab)))

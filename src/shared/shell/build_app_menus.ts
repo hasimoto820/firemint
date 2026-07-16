@@ -42,6 +42,8 @@ export type AppMenuHandlers = {
   onQuit: () => void
   onAbout: () => void
   onOpenDocs: () => void
+  onExportProject?: () => void
+  onImportProject?: () => void
   onMinimize?: () => void
   onMaximizeToggle?: () => void
   context?: AppMenuContextActions | null
@@ -58,6 +60,41 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
       id: 'file',
       label: 'File',
       items: [
+        { type: 'header', label: 'インポート' },
+        {
+          type: 'item',
+          id: 'file-import-project',
+          label: 'プロジェクト',
+          indent: true,
+          disabled: !handlers.connected,
+          onClick: handlers.onImportProject
+        },
+        {
+          type: 'item',
+          id: 'file-import',
+          label: 'コレクション',
+          indent: true,
+          disabled: !context?.canImport,
+          onClick: context?.onImport
+        },
+        { type: 'header', label: 'エクスポート' },
+        {
+          type: 'item',
+          id: 'file-export-project',
+          label: 'プロジェクト',
+          indent: true,
+          disabled: !handlers.connected,
+          onClick: handlers.onExportProject
+        },
+        {
+          type: 'item',
+          id: 'file-export',
+          label: 'コレクション',
+          indent: true,
+          disabled: !context?.canExport,
+          onClick: context?.onExport
+        },
+        { type: 'separator' },
         {
           type: 'item',
           id: 'file-disconnect',
@@ -65,21 +102,6 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
           disabled: !handlers.connected,
           onClick: handlers.onDisconnect
         },
-        {
-          type: 'item',
-          id: 'file-export',
-          label: 'エクスポート…',
-          disabled: !context?.canExport,
-          onClick: context?.onExport
-        },
-        {
-          type: 'item',
-          id: 'file-import',
-          label: 'インポート…',
-          disabled: !context?.canImport,
-          onClick: context?.onImport
-        },
-        { type: 'separator' },
         {
           type: 'item',
           id: 'file-quit',

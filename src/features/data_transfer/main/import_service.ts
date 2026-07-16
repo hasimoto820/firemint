@@ -9,9 +9,14 @@ import { FIRESTORE_BATCH_LIMIT } from '@shared/safety/operations'
 import { logError, logInfo } from '@shared/logging/logger'
 import type {
   ImportCollectionJsonInput,
+  ImportCollectionProgress,
+  ImportCollectionValidation,
+  ImportCollectionValidationResult,
   ImportDocument,
   ImportResult
 } from '@features/data_transfer/shared/types'
+
+type ProgressReporter = (progress: ImportCollectionProgress) => void
 
 type PlannedWrite =
   | {
@@ -31,8 +36,24 @@ function ensureConnected(projectId: string): void {
   }
 }
 
+function toValidationError(
+  error: unknown,
+  canceled = false
+): ImportCollectionValidationResult {
+  logError('data_transfer', 'validateCollectionImport failed', error)
+
+  if (canceled) {
+    return { ok: false, error: '検証をキャンセルしました', canceled: true }
+  }
+
+  return {
+    ok: false,
+    error: error instanceof Error ? error.message : 'Validate collection import failed'
+  }
+}
+
 function toImportError(error: unknown, canceled = false): ImportResult {
-  logError('data_transfer', 'import failed', error)
+  logError('data_transfer', 'importCollectionJson failed', error)
 
   if (canceled) {
     return { ok: false, error: 'インポートをキャンセルしました', canceled: true }
@@ -172,90 +193,62 @@ function planWrites(
   return { planned, skippedOutsideCount }
 }
 
-async function promptIncludeSubcollections(
-  window: BrowserWindow | null,
-  collectionPath: string,
-  fileDocumentCount: number
-): Promise<{ canceled: boolean; includeSubcollections: boolean }> {
-  const options = {
-    type: 'question' as const,
-    title: 'コレクションへインポート',
-    message: `「${collectionPath}」へ JSON をインポートします。`,
-    detail: `ファイル内 ${fileDocumentCount} 件。\nサブコレクションを含めると、path が配下のドキュメントも書き込みます。\n既存ドキュメントと id/path が重なる場合は全体を中止します。`,
-    checkboxLabel: 'サブコレクションを含む',
-    checkboxChecked: false,
-    buttons: ['プレビューへ', 'キャンセル'],
-    defaultId: 0,
-    cancelId: 1,
-    noLink: true
-  }
+async function findCollisions(
+  projectId: string,
+  planned: PlannedWrite[],
+  onProgress?: ProgressReporter
+): Promise<{ hasCollisions: boolean; collisionSamples: string[]; checkedCount: number }> {
+  const existingIdWrites = planned.filter(
+    (write): write is Extract<PlannedWrite, { kind: 'existingId' }> => write.kind === 'existingId'
+  )
+  const collisionSamples: string[] = []
+  let checkedCount = 0
+  const totalCount = existingIdWrites.length
 
-  const result = window
-    ? await dialog.showMessageBox(window, options)
-    : await dialog.showMessageBox(options)
+  for (const write of existingIdWrites) {
+    checkedCount += 1
 
-  if (result.response === 1) {
-    return { canceled: true, includeSubcollections: false }
-  }
-
-  return { canceled: false, includeSubcollections: result.checkboxChecked }
-}
-
-async function confirmImport(
-  window: BrowserWindow | null,
-  collectionPath: string,
-  writeCount: number,
-  skippedOutsideCount: number,
-  includeSubcollections: boolean
-): Promise<boolean> {
-  const skipNote =
-    skippedOutsideCount > 0 ? `\n宛先外として除外: ${skippedOutsideCount} 件` : ''
-  const scope = includeSubcollections ? 'サブコレクション含む' : 'コレクション一段'
-  const options = {
-    type: 'question' as const,
-    title: 'インポートの確認',
-    message: `「${collectionPath}」へ ${writeCount} 件を書き込みます（${scope}）。`,
-    detail: `既存ドキュメントと衝突する場合は書き込みません（全体停止）。${skipNote}`,
-    buttons: ['インポート実行', 'キャンセル'],
-    defaultId: 0,
-    cancelId: 1,
-    noLink: true
-  }
-
-  const result = window
-    ? await dialog.showMessageBox(window, options)
-    : await dialog.showMessageBox(options)
-
-  return result.response === 0
-}
-
-async function assertNoCollisions(projectId: string, planned: PlannedWrite[]): Promise<void> {
-  const collisions: string[] = []
-
-  for (const write of planned) {
-    if (write.kind !== 'existingId') {
-      continue
+    if (checkedCount === 1 || checkedCount % 50 === 0 || checkedCount === totalCount) {
+      onProgress?.({
+        phase: 'validating',
+        processedCount: checkedCount,
+        totalCount,
+        percent: totalCount === 0 ? 90 : Math.min(90, Math.round((checkedCount / totalCount) * 90)),
+        detail: write.documentPath
+      })
     }
 
     const snapshot = await getDocumentRef(write.documentPath, projectId).get()
     if (snapshot.exists) {
-      collisions.push(write.documentPath)
-      if (collisions.length >= 5) {
-        break
+      if (collisionSamples.length < 5) {
+        collisionSamples.push(write.documentPath)
+      }
+
+      if (collisionSamples.length >= 5) {
+        return {
+          hasCollisions: true,
+          collisionSamples,
+          checkedCount
+        }
       }
     }
   }
 
-  if (collisions.length > 0) {
-    throw new Error(
-      `既存ドキュメントと衝突したため中止しました: ${collisions.join(', ')}`
-    )
+  return {
+    hasCollisions: collisionSamples.length > 0,
+    collisionSamples,
+    checkedCount
   }
 }
 
-async function writePlannedDocuments(projectId: string, planned: PlannedWrite[]): Promise<number> {
+async function writePlannedDocuments(
+  projectId: string,
+  planned: PlannedWrite[],
+  onProgress?: ProgressReporter
+): Promise<number> {
   const db = getFirestore(projectId)
   let writtenCount = 0
+  const totalCount = planned.length
 
   for (let offset = 0; offset < planned.length; offset += FIRESTORE_BATCH_LIMIT) {
     const chunk = planned.slice(offset, offset + FIRESTORE_BATCH_LIMIT)
@@ -274,92 +267,180 @@ async function writePlannedDocuments(projectId: string, planned: PlannedWrite[])
     }
 
     await batch.commit()
+
+    const last = chunk[chunk.length - 1]
+    onProgress?.({
+      phase: 'writing',
+      processedCount: writtenCount,
+      totalCount,
+      percent: totalCount === 0 ? 100 : Math.min(99, Math.round((writtenCount / totalCount) * 100)),
+      detail: last.kind === 'existingId' ? last.documentPath : last.collectionPath
+    })
   }
 
   return writtenCount
 }
 
+async function loadAndPlan(
+  input: ImportCollectionJsonInput,
+  onProgress?: ProgressReporter
+): Promise<{
+  filePath: string
+  collectionPath: string
+  planned: PlannedWrite[]
+  skippedOutsideCount: number
+  includeSubcollections: boolean
+}> {
+  const collectionPath = input.collectionPath.trim()
+  if (!collectionPath) {
+    throw new Error('コレクション path を指定してください')
+  }
+
+  const filePath = input.filePath.trim()
+  if (!filePath) {
+    throw new Error('JSON ファイルを指定してください')
+  }
+
+  onProgress?.({
+    phase: 'loading',
+    processedCount: 0,
+    totalCount: 0,
+    percent: 5,
+    detail: 'JSON を読み込み中…'
+  })
+
+  const raw = await readFile(filePath, 'utf8')
+  const documents = parseImportDocuments(raw)
+  const { planned, skippedOutsideCount } = planWrites(
+    documents,
+    collectionPath,
+    input.includeSubcollections
+  )
+
+  if (planned.length === 0) {
+    throw new Error('宛先コレクションに書き込むドキュメントがありません')
+  }
+
+  return {
+    filePath,
+    collectionPath,
+    planned,
+    skippedOutsideCount,
+    includeSubcollections: input.includeSubcollections
+  }
+}
+
+function buildValidation(
+  loaded: Awaited<ReturnType<typeof loadAndPlan>>,
+  collisions: { hasCollisions: boolean; collisionSamples: string[]; checkedCount: number }
+): ImportCollectionValidation {
+  const existingIdCount = loaded.planned.filter((write) => write.kind === 'existingId').length
+  const autoIdCount = loaded.planned.length - existingIdCount
+
+  return {
+    filePath: loaded.filePath,
+    writeCount: loaded.planned.length,
+    skippedOutsideCount: loaded.skippedOutsideCount,
+    includeSubcollections: loaded.includeSubcollections,
+    existingIdCount,
+    autoIdCount,
+    hasCollisions: collisions.hasCollisions,
+    collisionSamples: collisions.collisionSamples,
+    checkedCount: collisions.checkedCount
+  }
+}
+
+export async function selectCollectionImportJson(
+  window: BrowserWindow | null
+): Promise<{ canceled: boolean; filePath: string | null }> {
+  const options = {
+    title: 'インポートする JSON を選択',
+    properties: ['openFile' as const],
+    filters: [{ name: 'JSON', extensions: ['json'] }]
+  }
+
+  const result = window
+    ? await dialog.showOpenDialog(window, options)
+    : await dialog.showOpenDialog(options)
+
+  if (result.canceled || result.filePaths.length === 0) {
+    return { canceled: true, filePath: null }
+  }
+
+  return { canceled: false, filePath: result.filePaths[0] }
+}
+
+export async function validateCollectionImport(
+  input: ImportCollectionJsonInput,
+  onProgress?: ProgressReporter
+): Promise<ImportCollectionValidationResult> {
+  try {
+    ensureConnected(input.projectId)
+
+    logInfo(
+      'data_transfer',
+      `validateCollectionImport projectId=${input.projectId} path=${input.collectionPath} file=${input.filePath}`
+    )
+
+    const loaded = await loadAndPlan(input, onProgress)
+    const collisions = await findCollisions(input.projectId, loaded.planned, onProgress)
+
+    onProgress?.({
+      phase: 'done',
+      processedCount: collisions.checkedCount,
+      totalCount: loaded.planned.filter((write) => write.kind === 'existingId').length,
+      percent: 100,
+      detail: collisions.hasCollisions ? '衝突あり' : '検証 OK'
+    })
+
+    return {
+      ok: true,
+      data: buildValidation(loaded, collisions)
+    }
+  } catch (error) {
+    return toValidationError(error)
+  }
+}
+
 export async function importCollectionJson(
   input: ImportCollectionJsonInput,
-  window: BrowserWindow | null
+  onProgress?: ProgressReporter
 ): Promise<ImportResult> {
   try {
     ensureConnected(input.projectId)
     ensureWritable(input.projectId)
 
-    const collectionPath = input.collectionPath.trim()
-    if (!collectionPath) {
-      throw new Error('コレクション path を指定してください')
-    }
-
-    const openResult = window
-      ? await dialog.showOpenDialog(window, {
-          title: 'インポートする JSON を選択',
-          properties: ['openFile'],
-          filters: [{ name: 'JSON', extensions: ['json'] }]
-        })
-      : await dialog.showOpenDialog({
-          title: 'インポートする JSON を選択',
-          properties: ['openFile'],
-          filters: [{ name: 'JSON', extensions: ['json'] }]
-        })
-
-    if (openResult.canceled || openResult.filePaths.length === 0) {
-      return toImportError(new Error('canceled'), true)
-    }
-
-    const filePath = openResult.filePaths[0]
-    const raw = await readFile(filePath, 'utf8')
-    const documents = parseImportDocuments(raw)
-
-    let includeSubcollections = input.includeSubcollections ?? false
-
-    if (input.includeSubcollections === undefined) {
-      const prompt = await promptIncludeSubcollections(window, collectionPath, documents.length)
-      if (prompt.canceled) {
-        return toImportError(new Error('canceled'), true)
-      }
-      includeSubcollections = prompt.includeSubcollections
-    }
-
-    const { planned, skippedOutsideCount } = planWrites(
-      documents,
-      collectionPath,
-      includeSubcollections
-    )
-
-    if (planned.length === 0) {
-      throw new Error('宛先コレクションに書き込むドキュメントがありません')
-    }
-
     logInfo(
       'data_transfer',
-      `importCollectionJson projectId=${input.projectId} path=${collectionPath} planned=${planned.length} includeSubcollections=${includeSubcollections}`
+      `importCollectionJson projectId=${input.projectId} path=${input.collectionPath} file=${input.filePath}`
     )
 
-    await assertNoCollisions(input.projectId, planned)
+    const loaded = await loadAndPlan(input, onProgress)
+    const collisions = await findCollisions(input.projectId, loaded.planned, onProgress)
 
-    const confirmed = await confirmImport(
-      window,
-      collectionPath,
-      planned.length,
-      skippedOutsideCount,
-      includeSubcollections
-    )
-
-    if (!confirmed) {
-      return toImportError(new Error('canceled'), true)
+    if (collisions.hasCollisions) {
+      throw new Error(
+        `既存ドキュメントと衝突したため中止しました: ${collisions.collisionSamples.join(', ')}`
+      )
     }
 
-    const writtenCount = await writePlannedDocuments(input.projectId, planned)
+    const writtenCount = await writePlannedDocuments(input.projectId, loaded.planned, onProgress)
+
+    onProgress?.({
+      phase: 'done',
+      processedCount: writtenCount,
+      totalCount: loaded.planned.length,
+      percent: 100,
+      detail: '完了'
+    })
 
     return {
       ok: true,
       data: {
         writtenCount,
-        skippedOutsideCount,
-        includeSubcollections,
-        filePath
+        skippedOutsideCount: loaded.skippedOutsideCount,
+        includeSubcollections: loaded.includeSubcollections,
+        filePath: loaded.filePath
       }
     }
   } catch (error) {

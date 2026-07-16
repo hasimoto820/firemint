@@ -73,8 +73,56 @@ const api: IpcApi = {
       ipcRenderer.invoke(IPC_CHANNELS.DATA_TRANSFER_EXPORT_DOCUMENTS_JSON, input),
     exportDocumentsCsv: (input) =>
       ipcRenderer.invoke(IPC_CHANNELS.DATA_TRANSFER_EXPORT_DOCUMENTS_CSV, input),
+    selectCollectionImportJson: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.DATA_TRANSFER_SELECT_COLLECTION_IMPORT_JSON),
+    validateCollectionImport: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.DATA_TRANSFER_VALIDATE_COLLECTION_IMPORT, input),
     importCollectionJson: (input) =>
-      ipcRenderer.invoke(IPC_CHANNELS.DATA_TRANSFER_IMPORT_COLLECTION_JSON, input)
+      ipcRenderer.invoke(IPC_CHANNELS.DATA_TRANSFER_IMPORT_COLLECTION_JSON, input),
+    onImportCollectionProgress: (listener) => {
+      const handler = (
+        _event: Electron.IpcRendererEvent,
+        progress: Parameters<typeof listener>[0]
+      ): void => {
+        listener(progress)
+      }
+      ipcRenderer.on(IPC_CHANNELS.DATA_TRANSFER_IMPORT_COLLECTION_PROGRESS, handler)
+      return () => {
+        ipcRenderer.removeListener(IPC_CHANNELS.DATA_TRANSFER_IMPORT_COLLECTION_PROGRESS, handler)
+      }
+    },
+    exportProject: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.DATA_TRANSFER_EXPORT_PROJECT, input),
+    onExportProjectProgress: (listener) => {
+      const handler = (
+        _event: Electron.IpcRendererEvent,
+        progress: Parameters<typeof listener>[0]
+      ): void => {
+        listener(progress)
+      }
+      ipcRenderer.on(IPC_CHANNELS.DATA_TRANSFER_EXPORT_PROJECT_PROGRESS, handler)
+      return () => {
+        ipcRenderer.removeListener(IPC_CHANNELS.DATA_TRANSFER_EXPORT_PROJECT_PROGRESS, handler)
+      }
+    },
+    selectProjectImportZip: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.DATA_TRANSFER_SELECT_PROJECT_IMPORT_ZIP),
+    validateProjectImport: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.DATA_TRANSFER_VALIDATE_PROJECT_IMPORT, input),
+    importProject: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.DATA_TRANSFER_IMPORT_PROJECT, input),
+    onImportProjectProgress: (listener) => {
+      const handler = (
+        _event: Electron.IpcRendererEvent,
+        progress: Parameters<typeof listener>[0]
+      ): void => {
+        listener(progress)
+      }
+      ipcRenderer.on(IPC_CHANNELS.DATA_TRANSFER_IMPORT_PROJECT_PROGRESS, handler)
+      return () => {
+        ipcRenderer.removeListener(IPC_CHANNELS.DATA_TRANSFER_IMPORT_PROJECT_PROGRESS, handler)
+      }
+    }
   }
 }
 

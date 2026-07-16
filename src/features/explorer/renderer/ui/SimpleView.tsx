@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { ConnectionStatus } from '@features/connection/shared/types'
+import CollectionImportDialog from '@features/data_transfer/renderer/ui/CollectionImportDialog'
 import type { DocumentSummary } from '@features/explorer/shared/types'
 import { useRegisterAppMenu } from '@shared/shell/AppMenuContext'
 import DocumentJsonPanel from '@shared/ui/DocumentJsonPanel'
@@ -44,6 +45,7 @@ function SimpleView({
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [bulkSelectedPaths, setBulkSelectedPaths] = useState<Set<string>>(new Set())
+  const [collectionImportOpen, setCollectionImportOpen] = useState(false)
 
   const loadDocuments = useCallback(
     async (collectionPath: string): Promise<void> => {
@@ -300,43 +302,23 @@ function SimpleView({
     }
   }
 
-  const handleImportCollection = async (): Promise<void> => {
+  const handleImportCollection = (): void => {
+    if (!activeCollectionPath || readOnly) {
+      return
+    }
+
+    setError(null)
+    setSuccessMessage(null)
+    setCollectionImportOpen(true)
+  }
+
+  const handleCollectionImported = async (): Promise<void> => {
     if (!activeCollectionPath) {
       return
     }
 
-    setLoading(true)
-    setError(null)
-    setSuccessMessage(null)
-
-    try {
-      const result = await window.api.dataTransfer.importCollectionJson({
-        projectId,
-        collectionPath: activeCollectionPath
-      })
-
-      if (result.ok) {
-        const scope = result.data.includeSubcollections
-          ? '（サブコレクション含む）'
-          : '（コレクション一段）'
-        const skipped =
-          result.data.skippedOutsideCount > 0
-            ? ` / 宛先外除外 ${result.data.skippedOutsideCount} 件`
-            : ''
-        setSuccessMessage(
-          `${result.data.writtenCount} 件${scope}をインポートしました${skipped}`
-        )
-        await loadDocuments(activeCollectionPath)
-        onRootCollectionsChanged()
-        return
-      }
-
-      if (!result.canceled) {
-        setError(result.error)
-      }
-    } finally {
-      setLoading(false)
-    }
+    await loadDocuments(activeCollectionPath)
+    onRootCollectionsChanged()
   }
 
   const handleDuplicateCollection = async (): Promise<void> => {
@@ -394,7 +376,7 @@ function SimpleView({
           onDuplicate: () => void handleDuplicateDocument(),
           onDelete: () => void handleDelete(),
           onExport: () => void handleExportCollection(),
-          onImport: () => void handleImportCollection(),
+          onImport: () => handleImportCollection(),
           onDuplicateCollection: () => void handleDuplicateCollection()
         }
       : {
@@ -422,6 +404,14 @@ function SimpleView({
 
   return (
     <div className="simple-main">
+      <CollectionImportDialog
+        projectId={projectId}
+        collectionPath={activeCollectionPath}
+        readOnly={readOnly}
+        open={collectionImportOpen}
+        onClose={() => setCollectionImportOpen(false)}
+        onImported={() => void handleCollectionImported()}
+      />
       {(error || successMessage || loading) && (
         <div className="simple-main__status">
           {error && <p className="simple-main__error">{error}</p>}

@@ -5,7 +5,8 @@ data_transfer / Emulator 拡張 設計（Phase 17）
 
 関連:
   001_005 Phase 17（後回し）
-  001_008_data_transfer.txt … Phase 11（import / バックアップ）。転送・Emulator は本ファイルへ移管
+  001_008_data_transfer.txt … Phase 11（コレクション／プロジェクトのエクスポート・インポート）
+                              プロジェクト間でコピー・Emulator は本ファイル（Phase 17）
   001_007 workspace … 複数プロジェクト・read-only
   001_002 FireFoo … Emulator / プロジェクト間転送
 
