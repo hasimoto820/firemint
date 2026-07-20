@@ -14,6 +14,9 @@ type SimpleViewProps = {
   onSelectCollection: (collectionPath: string) => void
   onSelectDocument: (documentPath: string | null) => void
   onRootCollectionsChanged: () => void
+  onRequestRenameCollection: (collectionPath: string) => void
+  onRequestFieldBulkRename: (collectionPath: string) => void
+  collectionDataReloadToken?: number
   /** Split 時など、メニュー登録を行うのはフォーカス側のペインのみ */
   menuEnabled?: boolean
 }
@@ -30,6 +33,9 @@ function SimpleView({
   onSelectCollection,
   onSelectDocument,
   onRootCollectionsChanged,
+  onRequestRenameCollection,
+  onRequestFieldBulkRename,
+  collectionDataReloadToken = 0,
   menuEnabled = true
 }: SimpleViewProps): React.JSX.Element {
   const projectId = status.projectId
@@ -101,7 +107,7 @@ function SimpleView({
     }
 
     void loadDocuments(activeCollectionPath)
-  }, [activeCollectionPath, loadDocuments])
+  }, [activeCollectionPath, collectionDataReloadToken, loadDocuments])
 
   useEffect(() => {
     if (!selectedDocumentPath) {
@@ -361,6 +367,26 @@ function SimpleView({
     }
   }
 
+  const handleRenameCollection = (): void => {
+    if (!activeCollectionPath || readOnly) {
+      return
+    }
+
+    setError(null)
+    setSuccessMessage(null)
+    onRequestRenameCollection(activeCollectionPath)
+  }
+
+  const handleRenameFieldBulk = (): void => {
+    if (!activeCollectionPath || readOnly) {
+      return
+    }
+
+    setError(null)
+    setSuccessMessage(null)
+    onRequestFieldBulkRename(activeCollectionPath)
+  }
+
   useRegisterAppMenu(
     menuEnabled
       ? {
@@ -371,13 +397,17 @@ function SimpleView({
           canExport: Boolean(activeCollectionPath),
           canImport: !readOnly && Boolean(activeCollectionPath),
           canDuplicateCollection: !readOnly && Boolean(activeCollectionPath),
+          canRenameCollection: !readOnly && Boolean(activeCollectionPath),
+          canRenameFieldBulk: !readOnly && Boolean(activeCollectionPath),
           onCreate: () => void handleCreate(),
           onSave: () => void handleSave(),
           onDuplicate: () => void handleDuplicateDocument(),
           onDelete: () => void handleDelete(),
           onExport: () => void handleExportCollection(),
           onImport: () => handleImportCollection(),
-          onDuplicateCollection: () => void handleDuplicateCollection()
+          onDuplicateCollection: () => void handleDuplicateCollection(),
+          onRenameCollection: () => handleRenameCollection(),
+          onRenameFieldBulk: () => handleRenameFieldBulk()
         }
       : {
           canCreate: false,
@@ -386,7 +416,9 @@ function SimpleView({
           canDelete: false,
           canExport: false,
           canImport: false,
-          canDuplicateCollection: false
+          canDuplicateCollection: false,
+          canRenameCollection: false,
+          canRenameFieldBulk: false
         },
     [menuEnabled, readOnly, activeCollectionPath, selectedDocumentPath, jsonText]
   )

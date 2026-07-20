@@ -1,6 +1,7 @@
 import type { DocumentSnapshot, QueryDocumentSnapshot } from 'firebase-admin/firestore'
 import { getFirestore, isFirestoreConnected } from '@shared/firestore/client'
 import {
+  assertCollectionPath,
   getCollectionRef,
   getDocumentRef,
   joinCollectionPath,
@@ -20,6 +21,8 @@ import type {
   DuplicateCollectionResult,
   DuplicateDocumentInput,
   ExplorerResult,
+  RenameCollectionInput,
+  RenameCollectionResult,
   UpdateDocumentInput
 } from '@features/explorer/shared/types'
 
@@ -31,6 +34,7 @@ function ensureConnected(projectId: string): void {
 
 const DUPLICATE_COLLECTION_LIMIT = 500
 const BATCH_LIMIT = 500
+const PAGE_SIZE = 500
 
 function toExplorerError<T>(error: unknown): ExplorerResult<T> {
   logError('explorer', 'operation failed', error)
@@ -288,6 +292,176 @@ export async function duplicateCollection(
       ok: true,
       data: {
         copiedCount,
+        targetCollectionPath
+      }
+    }
+  } catch (error) {
+    return toExplorerError(error)
+  }
+}
+
+async function copyCollectionRecursive(
+  projectId: string,
+  sourceCollectionPath: string,
+  targetCollectionPath: string
+): Promise<number> {
+  const sourceRef = getCollectionRef(sourceCollectionPath, projectId)
+  const targetRef = getCollectionRef(targetCollectionPath, projectId)
+  let movedCount = 0
+  let lastDocument: QueryDocumentSnapshot | undefined
+
+  while (true) {
+    let query = sourceRef.orderBy('__name__').limit(PAGE_SIZE)
+
+    if (lastDocument) {
+      query = query.startAfter(lastDocument)
+    }
+
+    const snapshot = await query.get()
+
+    if (snapshot.empty) {
+      break
+    }
+
+    for (let index = 0; index < snapshot.docs.length; index += BATCH_LIMIT) {
+      const chunk = snapshot.docs.slice(index, index + BATCH_LIMIT)
+      const batch = getFirestore(projectId).batch()
+
+      for (const doc of chunk) {
+        batch.set(targetRef.doc(doc.id), doc.data())
+        movedCount += 1
+      }
+
+      await batch.commit()
+    }
+
+    for (const doc of snapshot.docs) {
+      const sourceDocumentPath = joinDocumentPath(sourceCollectionPath, doc.id)
+      const targetDocumentPath = joinDocumentPath(targetCollectionPath, doc.id)
+      const subcollections = await getDocumentRef(sourceDocumentPath, projectId).listCollections()
+
+      for (const subcollection of subcollections) {
+        movedCount += await copyCollectionRecursive(
+          projectId,
+          joinCollectionPath(sourceDocumentPath, subcollection.id),
+          joinCollectionPath(targetDocumentPath, subcollection.id)
+        )
+      }
+    }
+
+    lastDocument = snapshot.docs[snapshot.docs.length - 1]
+
+    if (snapshot.size < PAGE_SIZE) {
+      break
+    }
+  }
+
+  return movedCount
+}
+
+async function deleteCollectionRecursive(
+  projectId: string,
+  collectionPath: string
+): Promise<void> {
+  const collectionRef = getCollectionRef(collectionPath, projectId)
+
+  while (true) {
+    const snapshot = await collectionRef.orderBy('__name__').limit(PAGE_SIZE).get()
+
+    if (snapshot.empty) {
+      break
+    }
+
+    for (const doc of snapshot.docs) {
+      const documentPath = joinDocumentPath(collectionPath, doc.id)
+      const subcollections = await getDocumentRef(documentPath, projectId).listCollections()
+
+      for (const subcollection of subcollections) {
+        await deleteCollectionRecursive(
+          projectId,
+          joinCollectionPath(documentPath, subcollection.id)
+        )
+      }
+    }
+
+    for (let index = 0; index < snapshot.docs.length; index += BATCH_LIMIT) {
+      const chunk = snapshot.docs.slice(index, index + BATCH_LIMIT)
+      const batch = getFirestore(projectId).batch()
+
+      for (const doc of chunk) {
+        batch.delete(doc.ref)
+      }
+
+      await batch.commit()
+    }
+  }
+}
+
+export async function renameCollection(
+  input: RenameCollectionInput
+): Promise<ExplorerResult<RenameCollectionResult>> {
+  try {
+    ensureConnected(input.projectId)
+    ensureWritable(input.projectId)
+
+    const sourceCollectionPath = input.sourceCollectionPath.trim()
+    const targetCollectionPath = input.targetCollectionPath.trim()
+
+    if (!sourceCollectionPath || !targetCollectionPath) {
+      throw new Error('コレクション path を指定してください')
+    }
+
+    assertCollectionPath(sourceCollectionPath)
+    assertCollectionPath(targetCollectionPath)
+
+    if (sourceCollectionPath === targetCollectionPath) {
+      throw new Error('リネーム先は別のコレクション path を指定してください')
+    }
+
+    const sourceSegments = sourceCollectionPath.split('/').filter(Boolean)
+    const targetSegments = targetCollectionPath.split('/').filter(Boolean)
+
+    if (sourceSegments.length !== targetSegments.length) {
+      throw new Error('リネームではコレクション階層の深さを変えられません')
+    }
+
+    if (targetCollectionPath.startsWith(`${sourceCollectionPath}/`)) {
+      throw new Error('リネーム先を元コレクションの配下にはできません')
+    }
+
+    logInfo(
+      'explorer',
+      `renameCollection projectId=${input.projectId} from=${sourceCollectionPath} to=${targetCollectionPath}`
+    )
+
+    const sourceSnapshot = await getCollectionRef(sourceCollectionPath, input.projectId)
+      .limit(1)
+      .get()
+
+    if (sourceSnapshot.empty) {
+      throw new Error('リネーム元のコレクションにドキュメントがありません')
+    }
+
+    const targetSnapshot = await getCollectionRef(targetCollectionPath, input.projectId)
+      .limit(1)
+      .get()
+
+    if (!targetSnapshot.empty) {
+      throw new Error('リネーム先コレクションは空である必要があります')
+    }
+
+    const movedCount = await copyCollectionRecursive(
+      input.projectId,
+      sourceCollectionPath,
+      targetCollectionPath
+    )
+
+    await deleteCollectionRecursive(input.projectId, sourceCollectionPath)
+
+    return {
+      ok: true,
+      data: {
+        movedCount,
         targetCollectionPath
       }
     }

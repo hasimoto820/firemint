@@ -1165,6 +1165,53 @@ code {
   flex-shrink: 0;
 }
 
+.collection-tree__context-menu {
+  position: fixed;
+  z-index: 1300;
+  min-width: 160px;
+  padding: 4px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-background);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+}
+
+.collection-tree__context-header {
+  padding: 6px 12px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ev-c-text-2, #9ca3af);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.collection-tree__context-item {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.collection-tree__context-item--indent {
+  padding-left: 24px;
+}
+
+.collection-tree__context-item:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.collection-tree__context-item:hover:not(:disabled) {
+  background: var(--ev-c-gray-2, rgba(255, 255, 255, 0.08));
+}
+
 .collection-tree__error,
 .collection-tree__empty,
 .document-table__empty {
@@ -2097,6 +2144,10 @@ code {
   -webkit-user-select: text;
 }
 
+.project-export-dialog__panel--wide {
+  width: min(560px, calc(100vw - 32px));
+}
+
 .project-export-dialog__header {
   display: flex;
   flex-direction: column;
@@ -2153,6 +2204,14 @@ code {
 
 .project-export-dialog__option {
   margin-top: 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.project-export-dialog__option .bulk-actions__input {
+  width: 100%;
 }
 
 .project-export-dialog__hint,

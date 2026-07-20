@@ -1,7 +1,7 @@
 import { ipcMain } from 'electron'
 import { IPC_CHANNELS } from '@shared/ipc/channels'
 import { logInfo } from '@shared/logging/logger'
-import type { CreateDocumentInput, DuplicateCollectionInput, DuplicateDocumentInput, UpdateDocumentInput } from '@features/explorer/shared/types'
+import type { CreateDocumentInput, DuplicateCollectionInput, DuplicateDocumentInput, RenameCollectionInput, UpdateDocumentInput } from '@features/explorer/shared/types'
 import {
   createDocument,
   deleteDocument,
@@ -11,6 +11,7 @@ import {
   listDocuments,
   listRootCollections,
   listSubcollections,
+  renameCollection,
   updateDocument
 } from './service'
 
@@ -74,4 +75,9 @@ export function registerExplorerHandlers(): void {
       return duplicateCollection(input)
     }
   )
+
+  ipcMain.handle(IPC_CHANNELS.EXPLORER_RENAME_COLLECTION, async (_event, input: RenameCollectionInput) => {
+    logInfo('ipc:explorer', `renameCollection invoked projectId=${input.projectId}`)
+    return renameCollection(input)
+  })
 }

@@ -25,6 +25,21 @@ export type BulkUpdateFieldInput = {
   value: string
 }
 
+/** コレクション一段の全ドキュメントが対象（サブコレは含まない） */
+export type BulkRenameFieldInput = {
+  projectId: string
+  collectionPath: string
+  fromField: string
+  toField: string
+}
+
+/** コレクション一段の全ドキュメントが対象（サブコレは含まない） */
+export type BulkDeleteFieldInput = {
+  projectId: string
+  collectionPath: string
+  field: string
+}
+
 export type DiffPreviewItem = {
   documentPath: string
   field: string

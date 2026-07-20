@@ -143,9 +143,7 @@ function BulkActionsPanel({
         </Button>
       </div>
 
-      <p className="bulk-actions__batch">
-        バッチ: {formatBatchMessage(selectedPaths.length)}
-      </p>
+      <p className="bulk-actions__batch">バッチ: {formatBatchMessage(selectedPaths.length)}</p>
 
       <div className="bulk-actions__delete">
         <Button variant="danger" onClick={() => void handleDelete()} disabled={loading}>

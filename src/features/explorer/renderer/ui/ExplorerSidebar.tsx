@@ -8,7 +8,11 @@ type ExplorerSidebarProps = {
   selectedDocumentPath: string | null
   onSelectCollection: (collectionPath: string) => void
   onSelectDocument: (documentPath: string) => void
+  onRenameCollection?: (collectionPath: string) => void
+  onRenameFieldBulk?: (collectionPath: string) => void
+  canRename?: boolean
   onWorkspaceChanged: () => void
+  treeReloadToken?: number
   disabled?: boolean
 }
 
@@ -23,7 +27,11 @@ function ExplorerSidebar({
   selectedDocumentPath,
   onSelectCollection,
   onSelectDocument,
+  onRenameCollection,
+  onRenameFieldBulk,
+  canRename = false,
   onWorkspaceChanged,
+  treeReloadToken = 0,
   disabled = false
 }: ExplorerSidebarProps): React.JSX.Element {
   return (
@@ -40,6 +48,10 @@ function ExplorerSidebar({
             selectedDocumentPath={selectedDocumentPath}
             onSelectCollection={onSelectCollection}
             onSelectDocument={onSelectDocument}
+            onRenameCollection={onRenameCollection}
+            onRenameFieldBulk={onRenameFieldBulk}
+            canRename={canRename}
+            reloadToken={treeReloadToken}
             disabled={disabled}
           />
         }

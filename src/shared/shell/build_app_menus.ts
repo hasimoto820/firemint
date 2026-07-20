@@ -15,6 +15,8 @@ export type AppMenuContextActions = {
   canExport: boolean
   canImport: boolean
   canDuplicateCollection: boolean
+  canRenameCollection: boolean
+  canRenameFieldBulk: boolean
   onCreate?: () => void
   onSave?: () => void
   onDuplicate?: () => void
@@ -22,6 +24,8 @@ export type AppMenuContextActions = {
   onExport?: () => void
   onImport?: () => void
   onDuplicateCollection?: () => void
+  onRenameCollection?: () => void
+  onRenameFieldBulk?: () => void
 }
 
 export type AppShellMenuActions = {
@@ -159,6 +163,23 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
           indent: true,
           disabled: !context?.canDuplicateCollection,
           onClick: context?.onDuplicateCollection
+        },
+        { type: 'header', label: 'リネーム' },
+        {
+          type: 'item',
+          id: 'edit-rename-collection',
+          label: 'コレクション',
+          indent: true,
+          disabled: !context?.canRenameCollection,
+          onClick: context?.onRenameCollection
+        },
+        {
+          type: 'item',
+          id: 'edit-rename-field-bulk',
+          label: 'フィールド一括',
+          indent: true,
+          disabled: !context?.canRenameFieldBulk,
+          onClick: context?.onRenameFieldBulk
         }
       ]
     },

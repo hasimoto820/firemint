@@ -90,6 +90,28 @@ export function parentCollectionPath(documentPath: string): string {
   return segments.join('/')
 }
 
+/** コレクションリネーム後に path を付け替える（自身と配下）。 */
+export function remapFirestorePath(
+  path: string | null,
+  sourceCollectionPath: string,
+  targetCollectionPath: string
+): string | null {
+  if (!path) {
+    return null
+  }
+
+  if (path === sourceCollectionPath) {
+    return targetCollectionPath
+  }
+
+  const prefix = `${sourceCollectionPath}/`
+  if (path.startsWith(prefix)) {
+    return `${targetCollectionPath}${path.slice(sourceCollectionPath.length)}`
+  }
+
+  return path
+}
+
 export function tabsInPane(tabs: WorkspaceTab[], pane: WorkspacePaneId): WorkspaceTab[] {
   return tabs.filter((tab) => tab.pane === pane)
 }

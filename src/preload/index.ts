@@ -52,7 +52,9 @@ const api: IpcApi = {
     duplicateDocument: (input) =>
       ipcRenderer.invoke(IPC_CHANNELS.EXPLORER_DUPLICATE_DOCUMENT, input),
     duplicateCollection: (input) =>
-      ipcRenderer.invoke(IPC_CHANNELS.EXPLORER_DUPLICATE_COLLECTION, input)
+      ipcRenderer.invoke(IPC_CHANNELS.EXPLORER_DUPLICATE_COLLECTION, input),
+    renameCollection: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.EXPLORER_RENAME_COLLECTION, input)
   },
   query: {
     execute: (input) => ipcRenderer.invoke(IPC_CHANNELS.QUERY_EXECUTE, input),
@@ -64,6 +66,12 @@ const api: IpcApi = {
   bulk: {
     previewUpdate: (input) => ipcRenderer.invoke(IPC_CHANNELS.BULK_PREVIEW_UPDATE, input),
     updateField: (input) => ipcRenderer.invoke(IPC_CHANNELS.BULK_UPDATE_FIELD, input),
+    previewRenameField: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.BULK_PREVIEW_RENAME_FIELD, input),
+    renameField: (input) => ipcRenderer.invoke(IPC_CHANNELS.BULK_RENAME_FIELD, input),
+    previewDeleteField: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.BULK_PREVIEW_DELETE_FIELD, input),
+    deleteField: (input) => ipcRenderer.invoke(IPC_CHANNELS.BULK_DELETE_FIELD, input),
     delete: (input) => ipcRenderer.invoke(IPC_CHANNELS.BULK_DELETE, input)
   },
   dataTransfer: {

@@ -38,6 +38,17 @@ export type DuplicateCollectionResult = {
   targetCollectionPath: string
 }
 
+export type RenameCollectionInput = {
+  projectId: string
+  sourceCollectionPath: string
+  targetCollectionPath: string
+}
+
+export type RenameCollectionResult = {
+  movedCount: number
+  targetCollectionPath: string
+}
+
 export type ExplorerResult<T> =
   | {
       ok: true

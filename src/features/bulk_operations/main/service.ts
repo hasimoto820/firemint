@@ -1,18 +1,24 @@
-import type { WriteBatch } from 'firebase-admin/firestore'
+import type { QueryDocumentSnapshot, WriteBatch } from 'firebase-admin/firestore'
+import { FieldValue } from 'firebase-admin/firestore'
 import { getFirestore, isFirestoreConnected } from '@shared/firestore/client'
-import { getDocumentRef } from '@shared/firestore/paths'
+import { getCollectionRef, getDocumentRef, joinDocumentPath } from '@shared/firestore/paths'
 import { deserializeFirestoreValue } from '@shared/firestore/serialize'
 import { parseQueryLiteral } from '@shared/firestore/value_parse'
 import { calculateBatchCount, FIRESTORE_BATCH_LIMIT } from '@shared/safety/operations'
 import { logError, logInfo } from '@shared/logging/logger'
 import { ensureWritable } from '@features/workspace/main/guard'
 import type {
+  BulkDeleteFieldInput,
   BulkDeleteInput,
   BulkOperationSummary,
+  BulkRenameFieldInput,
   BulkResult,
   BulkUpdateFieldInput,
   DiffPreviewItem
 } from '@features/bulk_operations/shared/types'
+
+const PAGE_SIZE = 500
+const PREVIEW_LIMIT = 50
 
 function ensureConnected(projectId: string): void {
   if (!isFirestoreConnected(projectId)) {
@@ -43,6 +49,16 @@ function validateField(field: string): string {
 
   if (!trimmed) {
     throw new Error('更新フィールド名を入力してください')
+  }
+
+  return trimmed
+}
+
+function validateCollectionPath(collectionPath: string): string {
+  const trimmed = collectionPath.trim()
+
+  if (!trimmed) {
+    throw new Error('コレクション path を指定してください')
   }
 
   return trimmed
@@ -84,6 +100,38 @@ async function commitInBatches(
   return {
     affectedCount: documentPaths.length,
     batchCount: batches.length
+  }
+}
+
+async function* iterateCollectionDocs(
+  projectId: string,
+  collectionPath: string
+): AsyncGenerator<QueryDocumentSnapshot> {
+  const collectionRef = getCollectionRef(collectionPath, projectId)
+  let lastDocument: QueryDocumentSnapshot | undefined
+
+  while (true) {
+    let query = collectionRef.orderBy('__name__').limit(PAGE_SIZE)
+
+    if (lastDocument) {
+      query = query.startAfter(lastDocument)
+    }
+
+    const snapshot = await query.get()
+
+    if (snapshot.empty) {
+      break
+    }
+
+    for (const doc of snapshot.docs) {
+      yield doc
+    }
+
+    lastDocument = snapshot.docs[snapshot.docs.length - 1]
+
+    if (snapshot.size < PAGE_SIZE) {
+      break
+    }
   }
 }
 
@@ -181,6 +229,245 @@ export async function bulkDelete(
     )
 
     return { ok: true, data: summary }
+  } catch (error) {
+    return toBulkError(error)
+  }
+}
+
+export async function previewBulkRenameField(
+  input: BulkRenameFieldInput
+): Promise<BulkResult<DiffPreviewItem[]>> {
+  try {
+    ensureConnected(input.projectId)
+
+    const collectionPath = validateCollectionPath(input.collectionPath)
+    const fromField = validateField(input.fromField)
+    const toField = validateField(input.toField)
+
+    if (fromField === toField) {
+      throw new Error('変更先フィールド名は別の名前を指定してください')
+    }
+
+    const previewItems: DiffPreviewItem[] = []
+
+    logInfo(
+      'bulk_operations',
+      `previewBulkRenameField projectId=${input.projectId} path=${collectionPath} from=${fromField} to=${toField}`
+    )
+
+    for await (const doc of iterateCollectionDocs(input.projectId, collectionPath)) {
+      const data = doc.data() as Record<string, unknown>
+
+      if (!(fromField in data)) {
+        continue
+      }
+
+      previewItems.push({
+        documentPath: joinDocumentPath(collectionPath, doc.id),
+        field: `${fromField} → ${toField}`,
+        before: formatPreviewValue(data[fromField]),
+        after: formatPreviewValue(data[fromField])
+      })
+
+      if (previewItems.length >= PREVIEW_LIMIT) {
+        break
+      }
+    }
+
+    if (previewItems.length === 0) {
+      throw new Error('リネーム対象のフィールドを持つドキュメントがありません')
+    }
+
+    return { ok: true, data: previewItems }
+  } catch (error) {
+    return toBulkError(error)
+  }
+}
+
+export async function bulkRenameField(
+  input: BulkRenameFieldInput
+): Promise<BulkResult<BulkOperationSummary>> {
+  try {
+    ensureConnected(input.projectId)
+    ensureWritable(input.projectId)
+
+    const collectionPath = validateCollectionPath(input.collectionPath)
+    const fromField = validateField(input.fromField)
+    const toField = validateField(input.toField)
+
+    if (fromField === toField) {
+      throw new Error('変更先フィールド名は別の名前を指定してください')
+    }
+
+    logInfo(
+      'bulk_operations',
+      `bulkRenameField projectId=${input.projectId} path=${collectionPath} from=${fromField} to=${toField}`
+    )
+
+    let affectedCount = 0
+    let pending: Array<{ path: string; value: unknown }> = []
+
+    const flush = async (): Promise<void> => {
+      if (pending.length === 0) {
+        return
+      }
+
+      const batch = getFirestore(input.projectId).batch()
+
+      for (const item of pending) {
+        batch.update(getDocumentRef(item.path, input.projectId), {
+          [toField]: item.value,
+          [fromField]: FieldValue.delete()
+        })
+      }
+
+      await batch.commit()
+      affectedCount += pending.length
+      pending = []
+    }
+
+    for await (const doc of iterateCollectionDocs(input.projectId, collectionPath)) {
+      const data = doc.data() as Record<string, unknown>
+
+      if (!(fromField in data)) {
+        continue
+      }
+
+      pending.push({
+        path: joinDocumentPath(collectionPath, doc.id),
+        value: data[fromField]
+      })
+
+      if (pending.length >= FIRESTORE_BATCH_LIMIT) {
+        await flush()
+      }
+    }
+
+    await flush()
+
+    if (affectedCount === 0) {
+      throw new Error('リネーム対象のフィールドを持つドキュメントがありません')
+    }
+
+    return {
+      ok: true,
+      data: {
+        affectedCount,
+        batchCount: calculateBatchCount(affectedCount)
+      }
+    }
+  } catch (error) {
+    return toBulkError(error)
+  }
+}
+
+export async function previewBulkDeleteField(
+  input: BulkDeleteFieldInput
+): Promise<BulkResult<DiffPreviewItem[]>> {
+  try {
+    ensureConnected(input.projectId)
+
+    const collectionPath = validateCollectionPath(input.collectionPath)
+    const field = validateField(input.field)
+    const previewItems: DiffPreviewItem[] = []
+
+    logInfo(
+      'bulk_operations',
+      `previewBulkDeleteField projectId=${input.projectId} path=${collectionPath} field=${field}`
+    )
+
+    for await (const doc of iterateCollectionDocs(input.projectId, collectionPath)) {
+      const data = doc.data() as Record<string, unknown>
+
+      if (!(field in data)) {
+        continue
+      }
+
+      previewItems.push({
+        documentPath: joinDocumentPath(collectionPath, doc.id),
+        field,
+        before: formatPreviewValue(data[field]),
+        after: null
+      })
+
+      if (previewItems.length >= PREVIEW_LIMIT) {
+        break
+      }
+    }
+
+    if (previewItems.length === 0) {
+      throw new Error('削除対象のフィールドを持つドキュメントがありません')
+    }
+
+    return { ok: true, data: previewItems }
+  } catch (error) {
+    return toBulkError(error)
+  }
+}
+
+export async function bulkDeleteField(
+  input: BulkDeleteFieldInput
+): Promise<BulkResult<BulkOperationSummary>> {
+  try {
+    ensureConnected(input.projectId)
+    ensureWritable(input.projectId)
+
+    const collectionPath = validateCollectionPath(input.collectionPath)
+    const field = validateField(input.field)
+
+    logInfo(
+      'bulk_operations',
+      `bulkDeleteField projectId=${input.projectId} path=${collectionPath} field=${field}`
+    )
+
+    let affectedCount = 0
+    let pendingPaths: string[] = []
+
+    const flush = async (): Promise<void> => {
+      if (pendingPaths.length === 0) {
+        return
+      }
+
+      const batch = getFirestore(input.projectId).batch()
+
+      for (const documentPath of pendingPaths) {
+        batch.update(getDocumentRef(documentPath, input.projectId), {
+          [field]: FieldValue.delete()
+        })
+      }
+
+      await batch.commit()
+      affectedCount += pendingPaths.length
+      pendingPaths = []
+    }
+
+    for await (const doc of iterateCollectionDocs(input.projectId, collectionPath)) {
+      const data = doc.data() as Record<string, unknown>
+
+      if (!(field in data)) {
+        continue
+      }
+
+      pendingPaths.push(joinDocumentPath(collectionPath, doc.id))
+
+      if (pendingPaths.length >= FIRESTORE_BATCH_LIMIT) {
+        await flush()
+      }
+    }
+
+    await flush()
+
+    if (affectedCount === 0) {
+      throw new Error('削除対象のフィールドを持つドキュメントがありません')
+    }
+
+    return {
+      ok: true,
+      data: {
+        affectedCount,
+        batchCount: calculateBatchCount(affectedCount)
+      }
+    }
   } catch (error) {
     return toBulkError(error)
   }

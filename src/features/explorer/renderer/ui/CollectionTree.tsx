@@ -14,8 +14,18 @@ type CollectionTreeProps = {
   selectedDocumentPath: string | null
   onSelectCollection: (collectionPath: string) => void
   onSelectDocument: (documentPath: string) => void
+  onRenameCollection?: (collectionPath: string) => void
+  onRenameFieldBulk?: (collectionPath: string) => void
+  canRename?: boolean
+  reloadToken?: number
   disabled?: boolean
   title?: string
+}
+
+type ContextMenuState = {
+  x: number
+  y: number
+  collectionPath: string
 }
 
 function CollectionTree({
@@ -25,6 +35,10 @@ function CollectionTree({
   selectedDocumentPath,
   onSelectCollection,
   onSelectDocument,
+  onRenameCollection,
+  onRenameFieldBulk,
+  canRename = false,
+  reloadToken = 0,
   disabled = false,
   title = 'コレクション'
 }: CollectionTreeProps): React.JSX.Element {
@@ -33,6 +47,7 @@ function CollectionTree({
   const childrenRef = useRef<Record<string, TreeNode[]>>({})
   const [loadingPaths, setLoadingPaths] = useState<Set<string>>(new Set())
   const [error, setError] = useState<string | null>(null)
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
 
   const resetTree = useCallback((): void => {
     childrenRef.current = {}
@@ -45,6 +60,14 @@ function CollectionTree({
   useEffect(() => {
     resetTree()
   }, [projectId, resetTree])
+
+  useEffect(() => {
+    if (reloadToken <= 0) {
+      return
+    }
+
+    resetTree()
+  }, [reloadToken, resetTree])
 
   const loadChildren = useCallback(
     async (node: TreeNode): Promise<TreeNode[]> => {
@@ -161,6 +184,8 @@ function CollectionTree({
       return
     }
 
+    setContextMenu(null)
+
     if (node.kind === 'collection') {
       onSelectCollection(node.path)
       return
@@ -168,6 +193,52 @@ function CollectionTree({
 
     onSelectDocument(node.path)
   }
+
+  const handleCollectionContextMenu = (
+    event: React.MouseEvent,
+    collectionPath: string
+  ): void => {
+    event.preventDefault()
+    event.stopPropagation()
+
+    if (disabled || !canRename) {
+      return
+    }
+
+    if (!onRenameCollection && !onRenameFieldBulk) {
+      return
+    }
+
+    onSelectCollection(collectionPath)
+    setContextMenu({
+      x: event.clientX,
+      y: event.clientY,
+      collectionPath
+    })
+  }
+
+  useEffect(() => {
+    if (!contextMenu) {
+      return
+    }
+
+    const close = (): void => setContextMenu(null)
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') {
+        close()
+      }
+    }
+
+    window.addEventListener('click', close)
+    window.addEventListener('contextmenu', close)
+    window.addEventListener('keydown', onKeyDown)
+
+    return () => {
+      window.removeEventListener('click', close)
+      window.removeEventListener('contextmenu', close)
+      window.removeEventListener('keydown', onKeyDown)
+    }
+  }, [contextMenu])
 
   const renderNode = (node: TreeNode): React.JSX.Element => {
     const depth = getTreeDepth(node.path)
@@ -200,6 +271,11 @@ function CollectionTree({
             type="button"
             className="collection-tree__label"
             onClick={() => handleSelect(node)}
+            onContextMenu={
+              node.kind === 'collection'
+                ? (event) => handleCollectionContextMenu(event, node.path)
+                : undefined
+            }
             disabled={disabled}
           >
             <span className="collection-tree__kind">{node.kind === 'collection' ? '📁' : '📄'}</span>
@@ -232,6 +308,44 @@ function CollectionTree({
         <p className="collection-tree__empty">（コレクションなし）</p>
       ) : (
         <ul className="collection-tree__roots">{rootNodes.map((node) => renderNode(node))}</ul>
+      )}
+      {contextMenu && (
+        <div
+          className="collection-tree__context-menu"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+          role="menu"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div className="collection-tree__context-header">リネーム</div>
+          <button
+            type="button"
+            className="collection-tree__context-item collection-tree__context-item--indent"
+            role="menuitem"
+            disabled={!onRenameCollection}
+            onClick={(event) => {
+              event.stopPropagation()
+              const path = contextMenu.collectionPath
+              setContextMenu(null)
+              onRenameCollection?.(path)
+            }}
+          >
+            コレクション
+          </button>
+          <button
+            type="button"
+            className="collection-tree__context-item collection-tree__context-item--indent"
+            role="menuitem"
+            disabled={!onRenameFieldBulk}
+            onClick={(event) => {
+              event.stopPropagation()
+              const path = contextMenu.collectionPath
+              setContextMenu(null)
+              onRenameFieldBulk?.(path)
+            }}
+          >
+            フィールド一括
+          </button>
+        </div>
       )}
     </div>
   )

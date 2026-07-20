@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ConnectionStatus } from '@features/connection/shared/types'
+import CollectionRenameDialog from '@features/explorer/renderer/ui/CollectionRenameDialog'
+import FieldBulkRenameDialog from '@features/explorer/renderer/ui/FieldBulkRenameDialog'
 import ExplorerSidebar from '@features/explorer/renderer/ui/ExplorerSidebar'
 import AppHeader from '@shared/shell/AppHeader'
 import type { AppView } from '@shared/shell/AppNav'
@@ -10,6 +12,7 @@ import WorkspacePane from '@shared/shell/WorkspacePane'
 import {
   createWorkspaceTab,
   parentCollectionPath,
+  remapFirestorePath,
   tabsInPane,
   workspaceTabLabel,
   type WorkspacePaneId,
@@ -60,6 +63,10 @@ function FirestorePage({
   const [focusedPane, setFocusedPane] = useState<WorkspacePaneId>('primary')
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [treeLoading, setTreeLoading] = useState(false)
+  const [treeReloadToken, setTreeReloadToken] = useState(0)
+  const [collectionDataReloadToken, setCollectionDataReloadToken] = useState(0)
+  const [renameCollectionPath, setRenameCollectionPath] = useState<string | null>(null)
+  const [fieldBulkRenamePath, setFieldBulkRenamePath] = useState<string | null>(null)
 
   const primaryTabs = useMemo(() => tabsInPane(tabs, 'primary'), [tabs])
   const secondaryTabs = useMemo(() => tabsInPane(tabs, 'secondary'), [tabs])
@@ -186,6 +193,92 @@ function FirestorePage({
       openCollection(collectionPath, { selectedDocumentPath: documentPath })
     },
     [openCollection]
+  )
+
+  const handleCollectionRenamed = useCallback(
+    (sourceCollectionPath: string, targetCollectionPath: string): void => {
+      setTabs((current) => {
+        const remapped = current.map((tab) => ({
+          ...tab,
+          collectionPath:
+            remapFirestorePath(tab.collectionPath, sourceCollectionPath, targetCollectionPath) ??
+            tab.collectionPath,
+          selectedDocumentPath: remapFirestorePath(
+            tab.selectedDocumentPath,
+            sourceCollectionPath,
+            targetCollectionPath
+          ),
+          queryResultSelectedPath: remapFirestorePath(
+            tab.queryResultSelectedPath,
+            sourceCollectionPath,
+            targetCollectionPath
+          )
+        }))
+
+        const deduped: WorkspaceTab[] = []
+        for (const tab of remapped) {
+          if (
+            deduped.some(
+              (existing) =>
+                existing.pane === tab.pane && existing.collectionPath === tab.collectionPath
+            )
+          ) {
+            continue
+          }
+          deduped.push(tab)
+        }
+
+        return deduped
+      })
+
+      setTreeReloadToken((token) => token + 1)
+      void loadRootCollections()
+
+      openCollection(targetCollectionPath, { selectedDocumentPath: null })
+    },
+    [loadRootCollections, openCollection]
+  )
+
+  const handleRequestRenameCollection = useCallback(
+    (collectionPath: string): void => {
+      if (status.readOnly) {
+        return
+      }
+
+      openCollection(collectionPath, { selectedDocumentPath: null })
+      setRenameCollectionPath(collectionPath)
+    },
+    [openCollection, status.readOnly]
+  )
+
+  const handleRequestFieldBulkRename = useCallback(
+    (collectionPath: string): void => {
+      if (status.readOnly) {
+        return
+      }
+
+      openCollection(collectionPath, { selectedDocumentPath: null })
+      setFieldBulkRenamePath(collectionPath)
+    },
+    [openCollection, status.readOnly]
+  )
+
+  const handleFieldBulkRenameCompleted = useCallback((): void => {
+    setFieldBulkRenamePath(null)
+    setTreeReloadToken((token) => token + 1)
+    setCollectionDataReloadToken((token) => token + 1)
+  }, [])
+
+  const handleRenameDialogCompleted = useCallback(
+    (targetCollectionPath: string, _movedCount: number): void => {
+      if (!renameCollectionPath) {
+        return
+      }
+
+      handleCollectionRenamed(renameCollectionPath, targetCollectionPath)
+      setRenameCollectionPath(null)
+    },
+    [handleCollectionRenamed, renameCollectionPath]
   )
 
   const handleCloseTab = useCallback(
@@ -506,6 +599,9 @@ function FirestorePage({
           onSelectCollection={(path) => handlePaneCollectionChange(active.id, path)}
           onSelectDocument={(path) => handlePaneDocumentChange(active.id, path)}
           onRootCollectionsChanged={() => void loadRootCollections()}
+          onRequestRenameCollection={handleRequestRenameCollection}
+          onRequestFieldBulkRename={handleRequestFieldBulkRename}
+          collectionDataReloadToken={collectionDataReloadToken}
           onQueryDraftChange={(patch) => updateTab(active.id, patch)}
         />
       ) : (
@@ -534,7 +630,11 @@ function FirestorePage({
             selectedDocumentPath={treeDocumentPath}
             onSelectCollection={handleSelectCollection}
             onSelectDocument={handleSelectDocument}
+            onRenameCollection={handleRequestRenameCollection}
+            onRenameFieldBulk={handleRequestFieldBulkRename}
+            canRename={!status.readOnly}
             onWorkspaceChanged={onWorkspaceChanged}
+            treeReloadToken={treeReloadToken}
             disabled={treeLoading}
           />
         }
@@ -560,6 +660,26 @@ function FirestorePage({
           </div>
         }
       />
+
+      {renameCollectionPath && (
+        <CollectionRenameDialog
+          projectId={projectId}
+          collectionPath={renameCollectionPath}
+          open
+          onClose={() => setRenameCollectionPath(null)}
+          onRenamed={handleRenameDialogCompleted}
+        />
+      )}
+
+      {fieldBulkRenamePath && (
+        <FieldBulkRenameDialog
+          projectId={projectId}
+          collectionPath={fieldBulkRenamePath}
+          open
+          onClose={() => setFieldBulkRenamePath(null)}
+          onCompleted={handleFieldBulkRenameCompleted}
+        />
+      )}
 
       <CommandPalette open={paletteOpen} items={paletteItems} onClose={() => setPaletteOpen(false)} />
     </>

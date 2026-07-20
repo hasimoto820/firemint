@@ -10,6 +10,8 @@ import type {
   DuplicateCollectionResult,
   DuplicateDocumentInput,
   ExplorerResult,
+  RenameCollectionInput,
+  RenameCollectionResult,
   UpdateDocumentInput
 } from '@features/explorer/shared/types'
 
@@ -22,8 +24,10 @@ import type {
 } from '@features/query/shared/types'
 
 import type {
+  BulkDeleteFieldInput,
   BulkDeleteInput,
   BulkOperationSummary,
+  BulkRenameFieldInput,
   BulkResult,
   BulkUpdateFieldInput,
   DiffPreviewItem
@@ -99,6 +103,9 @@ export type ExplorerIpcApi = {
   duplicateCollection: (
     input: DuplicateCollectionInput
   ) => Promise<ExplorerResult<DuplicateCollectionResult>>
+  renameCollection: (
+    input: RenameCollectionInput
+  ) => Promise<ExplorerResult<RenameCollectionResult>>
 }
 
 export type QueryIpcApi = {
@@ -111,6 +118,10 @@ export type QueryIpcApi = {
 export type BulkOperationsIpcApi = {
   previewUpdate: (input: BulkUpdateFieldInput) => Promise<BulkResult<DiffPreviewItem[]>>
   updateField: (input: BulkUpdateFieldInput) => Promise<BulkResult<BulkOperationSummary>>
+  previewRenameField: (input: BulkRenameFieldInput) => Promise<BulkResult<DiffPreviewItem[]>>
+  renameField: (input: BulkRenameFieldInput) => Promise<BulkResult<BulkOperationSummary>>
+  previewDeleteField: (input: BulkDeleteFieldInput) => Promise<BulkResult<DiffPreviewItem[]>>
+  deleteField: (input: BulkDeleteFieldInput) => Promise<BulkResult<BulkOperationSummary>>
   delete: (input: BulkDeleteInput) => Promise<BulkResult<BulkOperationSummary>>
 }
 
