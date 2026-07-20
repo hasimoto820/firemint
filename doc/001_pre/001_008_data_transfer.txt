@@ -236,7 +236,7 @@ FireMint 用語（統一・ここが正）
   - Google サインイン / Emulator 接続 → Phase 12 / 17
   - 長時間ジョブの Background Tasks 本丸 → Phase 13
   - プロジェクト間でコピー / Emulator 同期 → Phase 17
-  - Query オートコンプリート → Phase 10 保留
+  - Query オートコンプリート → Phase 11.6
 
 
 ================================================================================
