@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import type { DiffPreviewItem } from '@features/bulk_operations/shared/types'
 import Button from '@shared/ui/Button'
 import DiffPreviewPanel from '@shared/ui/DiffPreviewPanel'
+import FieldNameSuggestInput from '@shared/ui/FieldNameSuggestInput'
+import { collectDataColumns } from '@shared/ui/document_table_utils'
 
 type FieldBulkRenameDialogProps = {
   projectId: string
@@ -25,6 +27,7 @@ function FieldBulkRenameDialog({
   const [toField, setToField] = useState('')
   const [deleteFieldName, setDeleteFieldName] = useState('')
   const [previewItems, setPreviewItems] = useState<DiffPreviewItem[] | null>(null)
+  const [fieldCandidates, setFieldCandidates] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -38,9 +41,34 @@ function FieldBulkRenameDialog({
     setToField('')
     setDeleteFieldName('')
     setPreviewItems(null)
+    setFieldCandidates([])
     setBusy(false)
     setError(null)
   }, [open, collectionPath])
+
+  useEffect(() => {
+    if (!open) {
+      return
+    }
+
+    let cancelled = false
+
+    void (async () => {
+      const result = await window.api.explorer.listDocuments(projectId, collectionPath)
+
+      if (cancelled) {
+        return
+      }
+
+      if (result.ok) {
+        setFieldCandidates(collectDataColumns(result.data))
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [open, projectId, collectionPath])
 
   const clearPreview = (): void => {
     setPreviewItems(null)
@@ -185,14 +213,14 @@ function FieldBulkRenameDialog({
 
         {mode === 'rename' ? (
           <div className="bulk-actions__update-row">
-            <input
-              className="bulk-actions__input"
+            <FieldNameSuggestInput
               value={fromField}
+              candidates={fieldCandidates}
               disabled={busy}
               autoFocus
               placeholder="旧フィールド名"
-              onChange={(event) => {
-                setFromField(event.target.value)
+              onChange={(nextValue) => {
+                setFromField(nextValue)
                 clearPreview()
                 setError(null)
               }}
@@ -211,14 +239,14 @@ function FieldBulkRenameDialog({
           </div>
         ) : (
           <div className="bulk-actions__update-row">
-            <input
-              className="bulk-actions__input"
+            <FieldNameSuggestInput
               value={deleteFieldName}
+              candidates={fieldCandidates}
               disabled={busy}
               autoFocus
               placeholder="削除するフィールド名"
-              onChange={(event) => {
-                setDeleteFieldName(event.target.value)
+              onChange={(nextValue) => {
+                setDeleteFieldName(nextValue)
                 clearPreview()
                 setError(null)
               }}
