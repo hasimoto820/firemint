@@ -60,9 +60,6 @@ function WorkspacePane({
             Query
           </button>
         </nav>
-        <span className="workspace-pane__path" title={tab.collectionPath}>
-          {tab.collectionPath}
-        </span>
       </div>
 
       {tab.view === 'query' ? (

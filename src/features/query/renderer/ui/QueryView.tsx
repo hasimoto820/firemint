@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useOptionalAutocompleteApi } from '@features/autocomplete/renderer/hooks'
 import type { ConnectionStatus } from '@features/connection/shared/types'
 import type { DocumentSummary } from '@features/explorer/shared/types'
 import {
@@ -9,6 +10,7 @@ import type { WorkspaceTabQueryDraftPatch } from '@shared/shell/workspace_tab'
 import DocumentJsonPanel from '@shared/ui/DocumentJsonPanel'
 import DocumentTable from '@shared/ui/DocumentTable'
 import BulkActionsPanel from '@shared/ui/BulkActionsPanel'
+import { collectDataColumns } from '@shared/ui/document_table_utils'
 import QueryEditor from './QueryEditor'
 import SavedQueriesBar from './SavedQueriesBar'
 
@@ -54,6 +56,7 @@ function QueryView({
 }: QueryViewProps): React.JSX.Element {
   const projectId = status.projectId
   const readOnly = status.readOnly
+  const autocomplete = useOptionalAutocompleteApi()
   const source = querySource ?? buildDefaultJsQuerySource(activeCollectionPath)
   const selectedDocument =
     queryDocuments.find((document) => document.path === queryResultSelectedPath) ?? null
@@ -155,6 +158,10 @@ function QueryView({
         queryLastSource: source,
         queryResultSelectedPath: null
       })
+      const fields = collectDataColumns(nextDocuments)
+      if (fields.length > 0) {
+        autocomplete.addFieldNames(projectId, fields)
+      }
     } catch (runError) {
       setError(runError instanceof Error ? runError.message : 'Query の実行に失敗しました')
       onQueryDraftChange({ ...EMPTY_RESULTS_PATCH })
@@ -357,6 +364,7 @@ function QueryView({
   return (
     <div className="query-main">
       <QueryEditor
+        projectId={projectId}
         source={source}
         loading={loading}
         onChange={(next) => onQueryDraftChange({ querySource: next })}
@@ -390,7 +398,6 @@ function QueryView({
               selectedDocumentPath={queryResultSelectedPath}
               showPath={false}
               tableKey={`js-query:${queryResultCount}:${queryDocuments[0]?.path ?? 'empty'}`}
-              pathLabel={activeCollectionPath}
               selectable={!readOnly}
               bulkSelectedPaths={bulkSelectedPaths}
               onBulkToggle={handleBulkToggle}

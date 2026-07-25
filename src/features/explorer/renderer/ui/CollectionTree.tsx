@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useOptionalAutocompleteApi } from '@features/autocomplete/renderer/hooks'
 import {
   buildSubcollectionPath,
   getExpandableAncestorPaths,
@@ -57,6 +58,7 @@ function CollectionTree({
   disabled = false,
   title = 'コレクション'
 }: CollectionTreeProps): React.JSX.Element {
+  const autocomplete = useOptionalAutocompleteApi()
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set())
   const [childrenByPath, setChildrenByPath] = useState<Record<string, TreeNode[]>>({})
   const childrenRef = useRef<Record<string, TreeNode[]>>({})
@@ -83,6 +85,27 @@ function CollectionTree({
 
     resetTree()
   }, [reloadToken, resetTree])
+
+  useEffect(() => {
+    if (rootCollections.length === 0) {
+      return
+    }
+
+    autocomplete.addCollectionPaths(projectId, rootCollections)
+  }, [autocomplete, projectId, rootCollections])
+
+  const registerCollectionPaths = useCallback(
+    (nodes: TreeNode[]): void => {
+      const paths = nodes
+        .filter((node) => node.kind === 'collection')
+        .map((node) => node.path)
+
+      if (paths.length > 0) {
+        autocomplete.addCollectionPaths(projectId, paths)
+      }
+    },
+    [autocomplete, projectId]
+  )
 
   const loadChildren = useCallback(
     async (node: TreeNode): Promise<TreeNode[]> => {
@@ -132,6 +155,7 @@ function CollectionTree({
         childrenRef.current[path] = children
         setChildrenByPath((current) => ({ ...current, [path]: children }))
         setExpandedPaths((current) => new Set(current).add(path))
+        registerCollectionPaths(children)
       } catch (loadError) {
         setError(loadError instanceof Error ? loadError.message : 'ツリーの読み込みに失敗しました')
       } finally {
@@ -142,7 +166,7 @@ function CollectionTree({
         })
       }
     },
-    [loadChildren]
+    [loadChildren, registerCollectionPaths]
   )
 
   const expandPathChain = useCallback(

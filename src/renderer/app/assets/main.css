@@ -406,10 +406,6 @@ code {
   gap: 10px;
 }
 
-.firestore-main .workspace-pane__path {
-  font-size: 11px;
-}
-
 .firestore-main .app-nav {
   border-radius: 6px;
   padding: 2px;
@@ -445,10 +441,6 @@ code {
 
 .firestore-main .document-table-panel__toolbar {
   gap: 6px;
-}
-
-.firestore-main .document-table-panel__path {
-  font-size: 12px;
 }
 
 .firestore-main .document-table-panel__count {
@@ -533,6 +525,10 @@ code {
 
 .firestore-main .document-json-panel__path {
   font-size: 11px;
+}
+
+.firestore-main .document-json-panel__json-label {
+  font-size: 12px;
 }
 
 .firestore-main .document-json-panel__metadata {
@@ -715,16 +711,6 @@ code {
   align-items: center;
   gap: 12px;
   flex-shrink: 0;
-}
-
-.workspace-pane__path {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12px;
-  color: var(--ev-c-text-2);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 .workspace-pane > .simple-main,
@@ -1633,17 +1619,6 @@ code {
   gap: 8px;
 }
 
-.document-table-panel__path {
-  flex: 1;
-  min-width: 120px;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--ev-c-text-2);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .document-table-panel__toolbar .fm-button {
   width: auto;
 }
@@ -1653,6 +1628,7 @@ code {
 }
 
 .document-table-panel__count {
+  margin-left: auto;
   font-size: 12px;
   color: var(--ev-c-text-2);
 }
@@ -1835,6 +1811,12 @@ code {
   word-break: break-all;
 }
 
+.document-json-panel__json-label {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .document-json-panel__metadata {
   display: flex;
   flex-wrap: wrap;
@@ -1903,8 +1885,8 @@ code {
 
 .image-preview__img {
   display: block;
-  max-width: 100%;
-  max-height: 220px;
+  max-width: 50%;
+  max-height: 110px;
   border: 1px solid var(--ev-c-gray-1);
   border-radius: 6px;
   background: rgba(0, 0, 0, 0.2);
@@ -2087,7 +2069,8 @@ code {
   flex-shrink: 0;
   border: 1px solid var(--ev-c-gray-1);
   border-radius: 6px;
-  overflow: hidden;
+  /* 候補リストをクリップしない（角丸は toolbar / field 側で維持） */
+  overflow: visible;
 }
 
 .query-editor__toolbar {
@@ -2226,6 +2209,55 @@ code {
 
 .field-suggest__option:hover,
 .field-suggest__option[aria-selected='true'] {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.autocomplete-input {
+  position: relative;
+  width: 100%;
+}
+
+.autocomplete-input__field {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* position / top / left / maxWidth / maxHeight は JS（fixed）で付与 */
+.autocomplete-input__list {
+  position: fixed;
+  z-index: 1000;
+  width: max-content;
+  min-width: 140px;
+  margin: 0;
+  padding: 4px;
+  overflow-y: auto;
+  list-style: none;
+  border: 1px solid var(--ev-c-gray-1);
+  border-radius: 6px;
+  background: var(--ev-c-gray-3);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
+  box-sizing: border-box;
+}
+
+.autocomplete-input__option {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.autocomplete-input__option:hover,
+.autocomplete-input__option--active {
   background: rgba(255, 255, 255, 0.08);
 }
 

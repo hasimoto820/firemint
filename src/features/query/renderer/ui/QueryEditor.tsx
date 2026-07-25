@@ -1,6 +1,10 @@
+import { useMemo } from 'react'
+import { useOptionalAutocompleteApi } from '@features/autocomplete/renderer/hooks'
 import Button from '@shared/ui/Button'
+import AutocompleteInput from '@shared/ui/AutocompleteInput'
 
 type QueryEditorProps = {
+  projectId: string
   source: string
   loading: boolean
   onChange: (source: string) => void
@@ -9,8 +13,22 @@ type QueryEditorProps = {
 
 /**
  * JS Query のコード入力欄。FireFoo 風に Run で async function run() を実行する。
+ * 単語単位の autocomplete を AutocompleteInput 経由で提供する。
  */
-function QueryEditor({ source, loading, onChange, onRun }: QueryEditorProps): React.JSX.Element {
+function QueryEditor({
+  projectId,
+  source,
+  loading,
+  onChange,
+  onRun
+}: QueryEditorProps): React.JSX.Element {
+  const autocomplete = useOptionalAutocompleteApi()
+
+  const items = useMemo(() => {
+    void autocomplete.revision
+    return autocomplete.query(projectId, '')
+  }, [autocomplete, projectId])
+
   return (
     <div className="query-editor">
       <div className="query-editor__toolbar">
@@ -19,18 +37,18 @@ function QueryEditor({ source, loading, onChange, onRun }: QueryEditorProps): Re
           Run
         </Button>
       </div>
-      <textarea
-        className="query-editor__source"
+      <AutocompleteInput
         value={source}
-        onChange={(event) => onChange(event.target.value)}
-        spellCheck={false}
+        items={items}
+        multiline
+        wordCompletion
+        disabled={loading}
+        fieldClassName="query-editor__source"
         aria-label="JS Query コード"
-        onKeyDown={(event) => {
-          if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
-            event.preventDefault()
-            if (!loading) {
-              onRun()
-            }
+        onChange={onChange}
+        onMetaEnter={() => {
+          if (!loading) {
+            onRun()
           }
         }}
       />

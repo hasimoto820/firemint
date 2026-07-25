@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useOptionalAutocompleteApi } from '@features/autocomplete/renderer/hooks'
 import type { ConnectionStatus } from '@features/connection/shared/types'
 import CollectionImportDialog from '@features/data_transfer/renderer/ui/CollectionImportDialog'
 import type { DocumentSummary } from '@features/explorer/shared/types'
@@ -7,6 +8,7 @@ import { useRegisterAppMenu } from '@shared/shell/AppMenuContext'
 import DocumentJsonPanel from '@shared/ui/DocumentJsonPanel'
 import DocumentTable from '@shared/ui/DocumentTable'
 import BulkActionsPanel from '@shared/ui/BulkActionsPanel'
+import { collectDataColumns } from '@shared/ui/document_table_utils'
 
 type SimpleViewProps = {
   status: ConnectionStatus
@@ -45,6 +47,7 @@ function SimpleView({
 }: SimpleViewProps): React.JSX.Element {
   const projectId = status.projectId
   const readOnly = status.readOnly
+  const autocomplete = useOptionalAutocompleteApi()
   const [documents, setDocuments] = useState<DocumentSummary[]>([])
   const [selectedCreateTime, setSelectedCreateTime] = useState<string | null>(null)
   const [selectedUpdateTime, setSelectedUpdateTime] = useState<string | null>(null)
@@ -73,11 +76,15 @@ function SimpleView({
 
         setDocuments(result.data)
         setBulkSelectedPaths(new Set())
+        const fields = collectDataColumns(result.data)
+        if (fields.length > 0) {
+          autocomplete.addFieldNames(projectId, fields)
+        }
       } finally {
         setLoading(false)
       }
     },
-    [projectId]
+    [autocomplete, projectId]
   )
 
   const loadDocument = useCallback(
@@ -147,6 +154,8 @@ function SimpleView({
         return
       }
 
+      autocomplete.addFieldNames(projectId, Object.keys(parsed))
+
       if (activeCollectionPath) {
         await loadDocuments(activeCollectionPath)
         await loadDocument(selectedDocumentPath)
@@ -205,6 +214,8 @@ function SimpleView({
         setError(result.error)
         return
       }
+
+      autocomplete.addFieldNames(projectId, Object.keys(parsed))
 
       await loadDocuments(activeCollectionPath)
       onSelectDocument(`${activeCollectionPath}/${result.data}`)
@@ -491,7 +502,6 @@ function SimpleView({
           documents={documents}
           selectedDocumentPath={selectedDocumentPath}
           tableKey={activeCollectionPath}
-          pathLabel={activeCollectionPath}
           selectable={!readOnly}
           bulkSelectedPaths={bulkSelectedPaths}
           onBulkToggle={handleBulkToggle}

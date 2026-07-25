@@ -24,8 +24,6 @@ type DocumentTableProps = {
   onBulkToggle?: (documentPath: string, checked: boolean) => void
   onBulkToggleAll?: (checked: boolean) => void
   tableKey?: string
-  /** ツールバー左に表示する path（例: company/.../user） */
-  pathLabel?: string | null
 }
 
 function filterValuePlaceholder(operator: TableFilterOperator): string {
@@ -72,8 +70,7 @@ function DocumentTable({
   bulkSelectedPaths,
   onBulkToggle,
   onBulkToggleAll,
-  tableKey,
-  pathLabel = null
+  tableKey
 }: DocumentTableProps): React.JSX.Element {
   const [columnOrder, setColumnOrder] = useState<string[]>([])
   const [hiddenColumns, setHiddenColumns] = useState<Set<string>>(new Set())
@@ -151,7 +148,6 @@ function DocumentTable({
     return (
       <div className="document-table-panel">
         <div className="document-table-panel__toolbar">
-          {pathLabel && <span className="document-table-panel__path">{pathLabel}</span>}
           <span className="document-table-panel__count">0 件</span>
         </div>
         <p className="document-table__empty">ドキュメントがありません</p>
@@ -162,7 +158,6 @@ function DocumentTable({
   return (
     <div className="document-table-panel">
       <div className="document-table-panel__toolbar">
-        {pathLabel && <span className="document-table-panel__path">{pathLabel}</span>}
         <Button onClick={() => setShowColumnPanel((current) => !current)}>
           {showColumnPanel ? '列設定を閉じる' : '列設定'}
         </Button>

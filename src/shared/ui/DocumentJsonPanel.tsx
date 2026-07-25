@@ -38,7 +38,7 @@ function DocumentJsonPanel({
   return (
     <div className="document-json-panel">
       <div className="document-json-panel__header">
-        <h2 className="document-json-panel__title">JSON</h2>
+        <h2 className="document-json-panel__title">ドキュメント</h2>
         <div className="document-json-panel__actions">
           {!readOnly && (
             <>
@@ -67,6 +67,7 @@ function DocumentJsonPanel({
       )}
       <GeopointPreview points={geopoints} />
       <ImagePreview images={imageUrls} />
+      <h3 className="document-json-panel__json-label">JSON</h3>
       <textarea
         className="document-json-panel__editor"
         value={jsonText}

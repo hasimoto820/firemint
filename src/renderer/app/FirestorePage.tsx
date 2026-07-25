@@ -1,4 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  AutocompleteProvider,
+  useAutocompleteApi
+} from '@features/autocomplete/renderer/hooks'
 import type { ConnectionStatus } from '@features/connection/shared/types'
 import CollectionRenameDialog from '@features/explorer/renderer/ui/CollectionRenameDialog'
 import FieldBulkRenameDialog from '@features/explorer/renderer/ui/FieldBulkRenameDialog'
@@ -48,7 +52,7 @@ type FirestorePageProps = {
  * Simple / Query モードでコレクションを開く。Split 時は左右ペインが
  * それぞれ独立したタブグループを持つ。
  */
-function FirestorePage({
+function FirestorePageInner({
   status,
   view,
   onNavigate,
@@ -58,6 +62,7 @@ function FirestorePage({
   rootsReloadToken = 0
 }: FirestorePageProps): React.JSX.Element {
   const projectId = status.projectId
+  const autocomplete = useAutocompleteApi()
   const [rootCollections, setRootCollections] = useState<string[]>([])
   const [tabs, setTabs] = useState<WorkspaceTab[]>([])
   const [primaryActiveId, setPrimaryActiveId] = useState<string | null>(null)
@@ -204,6 +209,9 @@ function FirestorePage({
 
   const handleCollectionRenamed = useCallback(
     (sourceCollectionPath: string, targetCollectionPath: string): void => {
+      autocomplete.removeCollectionPaths(projectId, [sourceCollectionPath])
+      autocomplete.addCollectionPaths(projectId, [targetCollectionPath])
+
       setTabs((current) => {
         const remapped = current.map((tab) => ({
           ...tab,
@@ -243,7 +251,7 @@ function FirestorePage({
 
       openCollection(targetCollectionPath, { selectedDocumentPath: null })
     },
-    [loadRootCollections, openCollection]
+    [autocomplete, loadRootCollections, openCollection, projectId]
   )
 
   const handleRequestRenameCollection = useCallback(
@@ -301,16 +309,18 @@ function FirestorePage({
 
   const handleSubcollectionCreated = useCallback(
     (subcollectionPath: string, documentId: string): void => {
+      autocomplete.addCollectionPaths(projectId, [subcollectionPath])
       setTreeReloadToken((token) => token + 1)
       openCollection(subcollectionPath, {
         selectedDocumentPath: `${subcollectionPath}/${documentId}`
       })
     },
-    [openCollection]
+    [autocomplete, openCollection, projectId]
   )
 
   const handleSubcollectionDeleted = useCallback(
     (collectionPath: string): void => {
+      autocomplete.removeCollectionPaths(projectId, [collectionPath])
       const prefix = `${collectionPath}/`
 
       setTabs((current) => {
@@ -353,7 +363,7 @@ function FirestorePage({
         })
       }
     },
-    [openCollection]
+    [autocomplete, openCollection, projectId]
   )
 
   const handleFieldBulkRenameCompleted = useCallback((): void => {
@@ -804,6 +814,14 @@ function FirestorePage({
 
       <CommandPalette open={paletteOpen} items={paletteItems} onClose={() => setPaletteOpen(false)} />
     </>
+  )
+}
+
+function FirestorePage(props: FirestorePageProps): React.JSX.Element {
+  return (
+    <AutocompleteProvider>
+      <FirestorePageInner {...props} />
+    </AutocompleteProvider>
   )
 }
 

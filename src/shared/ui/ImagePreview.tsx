@@ -17,7 +17,7 @@ function ImagePreviewItem({ field, url }: ImageUrlField): React.JSX.Element {
         </a>
       </p>
       {loadFailed ? (
-        <p className="image-preview__error">プレビューを表示できませんでした（CORS 等）</p>
+        <p className="image-preview__error">プレビューを表示できませんでした</p>
       ) : (
         <a className="image-preview__link" href={url} target="_blank" rel="noreferrer">
           <img

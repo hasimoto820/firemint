@@ -46,9 +46,10 @@ features/ 一覧
   4   query                  クエリ（Simple 系）             ✓
   5   bulk_operations        一括操作（diff プレビュー等）   ✓  ★差別化の核
   6   data_transfer          インポート / エクスポート / 転送 △  export のみ
-  7   script_runner          JS エディタ・Background Tasks   —  v1
-  8   auth                   Firebase Authentication         —  v1
-  9   onboarding             初回オンボーディングガイド      —  v1
+  7   autocomplete           入力補完（path / フィールド名） —  Phase 11.6（001_011）
+  8   script_runner          JS エディタ・Background Tasks   —  v1
+  9   auth                   Firebase Authentication         —  v1
+  10  onboarding             初回オンボーディングガイド      —  v1
 
   後回し（001_002）の機能は、必要になるまで feature を増やさない。
     例: storage, audit, licensing, dashboard
@@ -89,6 +90,8 @@ features/ ツリー（全体）
         renderer/  main/  shared/
       data_transfer/
         renderer/  main/  shared/
+      autocomplete/
+        renderer/  main/  shared/
       script_runner/
         renderer/  main/  shared/
       auth/
@@ -127,6 +130,7 @@ feature 間の責務メモ
   query            … 条件を組んで検索（where / orderBy / limit、Collection Group）
   bulk_operations  … まとめて変える（一括削除・更新、diff プレビュー、バッチ 500）
   data_transfer    … ファイル経由でデータを動かす（export / import / 転送 / バックアップ）
+  autocomplete     … 入力補完候補の所有（path / フィールド名。詳細: 001_011）
   script_runner    … JS エディタ実行、Background Tasks（v1）
   auth             … Firebase Auth ユーザー管理（v1）
 
@@ -165,6 +169,7 @@ MVP 実装順（箱は全 feature 先に用意）
   プロジェクト管理             → workspace
   データ閲覧・編集             → explorer（+ shared/shell のタブ枠）
   クエリ                       → query
+  入力補完                     → autocomplete（+ shared/ui の AutocompleteInput）
   一括操作（GUI・diff）        → bulk_operations
   一括操作（JS・Tasks）        → script_runner
   インポート / エクスポート    → data_transfer

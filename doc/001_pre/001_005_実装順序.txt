@@ -11,6 +11,7 @@
   全体計画        → 001_001_plan.txt
   UI 方針         → 001_006_UI.txt（Phase 8.5）
   workspace 設計  → 001_007_workspace.txt（Phase 7）
+  autocomplete    → 001_011_autocomplete.txt（Phase 11.6）
 
 
 ================================================================================
@@ -180,11 +181,10 @@ Phase 6〜16：v1（MVP 後）
   以降は依存の少ない・体験インパクトの大きい順。順番は v1 着手前に再確認可。
   詳細・Done は 001_002 v1 節をベースに各 Phase で具体化する。
 
-  ※ 現在地（2026-07-20）:
-       Phase 0〜11 完了（Phase 8 / 10 の一部は未完のまま Phase 11.5 / 11.6 へ移した）。
-       Phase 11.5-a（リネーム）完了。
-       次は Phase 11.6（オートコンプリート）。
-       Google サインイン（Phase 12）より先にコアの穴を埋める。
+  ※ 現在地（2026-07-25）:
+       Phase 0〜11.5 完了（Phase 8 / 10 の一部は未完のまま Phase 11.5 / 11.6 へ移した）。
+       Phase 11.6（autocomplete）完了（Query 単語補完まで。JSON/フィルタ展開は任意）。
+       次は Phase 12（connection 拡張・Google サインイン）または任意の 11.6-f。
 
 
   Phase   内容
@@ -198,7 +198,7 @@ Phase 6〜16：v1（MVP 後）
   10      query 拡張             … Saved Queries ✅（補完は 11.6）
   11      data_transfer 拡張     … コレクション / プロジェクトの export・import ✅
   11.5    explorer 残り          … リネーム ✅ / サブコレ CRUD ✅ / 画像 ✅
-  11.6    query オートコンプリート … path / フィールド名補完 ★次
+  11.6    autocomplete           … path / フィールド名補完 ✅（001_011）
   12      connection 拡張        … 【保留】Google サインイン
   13      script_runner          … 【保留】長時間 Tasks 等（JS Query 本体は 10-0）
   14      auth                   … 【保留】Firebase Auth ユーザー管理
@@ -441,7 +441,7 @@ Phase 11 — data_transfer 拡張（✅ 完了。詳細: 001_008_data_transfer.t
 
 
 --------------------------------------------------------------------------------
-Phase 11.5 — explorer 残り（Google サインインより先）★次
+Phase 11.5 — explorer 残り（Google サインインより先）
 --------------------------------------------------------------------------------
 
   背景:
@@ -468,25 +468,30 @@ Phase 11.5 — explorer 残り（Google サインインより先）★次
 
 
 --------------------------------------------------------------------------------
-Phase 11.6 — query オートコンプリート
+Phase 11.6 — autocomplete（詳細: 001_011_autocomplete.txt）
 --------------------------------------------------------------------------------
 
   背景:
-    Phase 10 で Saved Queries は完了。オートコンプリートだけ保留だったものを
+    Phase 10 で Saved Queries は完了。オートコンプリートだけ残っていたものを
     Google サインインより先のコア穴埋めとしてここへ移す。
+    query 専用に閉じず、候補の所有は features/autocomplete/ に封じ込める。
 
   作るもの:
-    features/query/
-      オートコンプリート      … コレクション path / フィールド名
-                              … UI: shared/ui の SuggestInput
-                              … 違和感があれば撤去可
+    features/autocomplete/    … 候補プールの唯一の所有者（path / フィールド名）
+    shared/ui/AutocompleteInput … 入力 UI（↑↓ Enter/Tab Esc）
+    ※ 詳細・API・作成/使用の門番 → 001_011_autocomplete.txt
 
-  オートコンプリート候補の充填タイミング（固定・実装時）:
-    - 接続後〜ツリー表示時に、コレクション path 候補をプールへ入れる
-    - フィールド名は、当該コレクションを開いた・Query 実行した結果から追加する
+  実装順（要約）:
+    11.6-a〜b  箱 + catalog + AutocompleteInput  ✅
+    11.6-c〜d  explorer / Simple・Query から作成 API で登録  ✅
+    11.6-e     Query エディタに接続（最初の Done）  ✅
+    11.6-f     （任意）JSON / フィルタ等へ展開
 
   Done:
-    □ コレクション path / フィールド名が入力補完される
+    ■ features/autocomplete/ が候補の唯一の所有者になっている
+    ■ AutocompleteInput で入力中に候補が出る
+    ■ コレクション path / フィールド名が補完される（Query で確認）
+    ■ ドキュメント ID は候補に含めない
 
 
 --------------------------------------------------------------------------------

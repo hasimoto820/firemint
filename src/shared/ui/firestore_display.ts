@@ -22,6 +22,21 @@ const IMAGE_FORMAT_QUERY_VALUES = new Set([
   'avif'
 ])
 
+/** 拡張子なしでも画像配信が分かっているホスト */
+const KNOWN_IMAGE_HOSTS = [
+  'picsum.photos',
+  'images.unsplash.com',
+  'plus.unsplash.com',
+  'i.imgur.com',
+  'imgur.com',
+  'lh3.googleusercontent.com',
+  'avatars.githubusercontent.com'
+]
+
+/** フィールド名が画像っぽいときのヒント（URL が http(s) なら候補にする） */
+const IMAGE_FIELD_NAME_PATTERN =
+  /(^|[._-])(photo|image|img|avatar|thumbnail|thumb|icon|picture|pic|cover|banner|logo)(s)?($|[._-])/i
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
@@ -137,7 +152,21 @@ function hasImageFormatQuery(url: URL): boolean {
   return format !== undefined && IMAGE_FORMAT_QUERY_VALUES.has(format)
 }
 
-export function isImageUrlValue(value: unknown): value is string {
+function isKnownImageHost(url: URL): boolean {
+  const host = url.hostname.toLowerCase()
+
+  return KNOWN_IMAGE_HOSTS.some(
+    (known) => host === known || host.endsWith(`.${known}`)
+  )
+}
+
+function looksLikeImageFieldName(fieldPath: string): boolean {
+  const leaf = fieldPath.split('.').pop() ?? fieldPath
+
+  return IMAGE_FIELD_NAME_PATTERN.test(leaf)
+}
+
+export function isImageUrlValue(value: unknown, fieldPath = ''): value is string {
   if (typeof value !== 'string') {
     return false
   }
@@ -162,7 +191,15 @@ export function isImageUrlValue(value: unknown): value is string {
     return true
   }
 
-  return hasImageFormatQuery(url)
+  if (hasImageFormatQuery(url)) {
+    return true
+  }
+
+  if (isKnownImageHost(url)) {
+    return true
+  }
+
+  return fieldPath !== '' && looksLikeImageFieldName(fieldPath)
 }
 
 export function findImageUrlFields(
@@ -174,7 +211,7 @@ export function findImageUrlFields(
   for (const [key, value] of Object.entries(data)) {
     const field = prefix ? `${prefix}.${key}` : key
 
-    if (isImageUrlValue(value)) {
+    if (isImageUrlValue(value, field)) {
       results.push({ field, url: value.trim() })
       continue
     }
