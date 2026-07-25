@@ -17,6 +17,8 @@ export type AppMenuContextActions = {
   canDuplicateCollection: boolean
   canRenameCollection: boolean
   canRenameFieldBulk: boolean
+  canCreateSubcollection: boolean
+  canDeleteSubcollection: boolean
   onCreate?: () => void
   onSave?: () => void
   onDuplicate?: () => void
@@ -26,6 +28,8 @@ export type AppMenuContextActions = {
   onDuplicateCollection?: () => void
   onRenameCollection?: () => void
   onRenameFieldBulk?: () => void
+  onCreateSubcollection?: () => void
+  onDeleteSubcollection?: () => void
 }
 
 export type AppShellMenuActions = {
@@ -163,6 +167,23 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
           indent: true,
           disabled: !context?.canDuplicateCollection,
           onClick: context?.onDuplicateCollection
+        },
+        { type: 'header', label: 'サブコレクション' },
+        {
+          type: 'item',
+          id: 'edit-subcollection-create',
+          label: '作成',
+          indent: true,
+          disabled: !context?.canCreateSubcollection,
+          onClick: context?.onCreateSubcollection
+        },
+        {
+          type: 'item',
+          id: 'edit-subcollection-delete',
+          label: '削除',
+          indent: true,
+          disabled: !context?.canDeleteSubcollection,
+          onClick: context?.onDeleteSubcollection
         },
         { type: 'header', label: 'リネーム' },
         {

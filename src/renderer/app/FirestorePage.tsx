@@ -2,7 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ConnectionStatus } from '@features/connection/shared/types'
 import CollectionRenameDialog from '@features/explorer/renderer/ui/CollectionRenameDialog'
 import FieldBulkRenameDialog from '@features/explorer/renderer/ui/FieldBulkRenameDialog'
+import SubcollectionCreateDialog from '@features/explorer/renderer/ui/SubcollectionCreateDialog'
+import SubcollectionDeleteDialog from '@features/explorer/renderer/ui/SubcollectionDeleteDialog'
 import ExplorerSidebar from '@features/explorer/renderer/ui/ExplorerSidebar'
+import { parentDocumentPathOfSubcollection } from '@features/explorer/shared/tree'
 import AppHeader from '@shared/shell/AppHeader'
 import type { AppView } from '@shared/shell/AppNav'
 import AppShell from '@shared/shell/AppShell'
@@ -67,6 +70,10 @@ function FirestorePage({
   const [collectionDataReloadToken, setCollectionDataReloadToken] = useState(0)
   const [renameCollectionPath, setRenameCollectionPath] = useState<string | null>(null)
   const [fieldBulkRenamePath, setFieldBulkRenamePath] = useState<string | null>(null)
+  const [createSubcollectionDocumentPath, setCreateSubcollectionDocumentPath] = useState<string | null>(
+    null
+  )
+  const [deleteSubcollectionPath, setDeleteSubcollectionPath] = useState<string | null>(null)
 
   const primaryTabs = useMemo(() => tabsInPane(tabs, 'primary'), [tabs])
   const secondaryTabs = useMemo(() => tabsInPane(tabs, 'secondary'), [tabs])
@@ -261,6 +268,92 @@ function FirestorePage({
       setFieldBulkRenamePath(collectionPath)
     },
     [openCollection, status.readOnly]
+  )
+
+  const handleRequestCreateSubcollection = useCallback(
+    (documentPath: string): void => {
+      if (status.readOnly) {
+        return
+      }
+
+      const collectionPath = parentCollectionPath(documentPath)
+      if (!collectionPath) {
+        return
+      }
+
+      openCollection(collectionPath, { selectedDocumentPath: documentPath })
+      setCreateSubcollectionDocumentPath(documentPath)
+    },
+    [openCollection, status.readOnly]
+  )
+
+  const handleRequestDeleteSubcollection = useCallback(
+    (collectionPath: string): void => {
+      if (status.readOnly) {
+        return
+      }
+
+      openCollection(collectionPath, { selectedDocumentPath: null })
+      setDeleteSubcollectionPath(collectionPath)
+    },
+    [openCollection, status.readOnly]
+  )
+
+  const handleSubcollectionCreated = useCallback(
+    (subcollectionPath: string, documentId: string): void => {
+      setTreeReloadToken((token) => token + 1)
+      openCollection(subcollectionPath, {
+        selectedDocumentPath: `${subcollectionPath}/${documentId}`
+      })
+    },
+    [openCollection]
+  )
+
+  const handleSubcollectionDeleted = useCallback(
+    (collectionPath: string): void => {
+      const prefix = `${collectionPath}/`
+
+      setTabs((current) => {
+        const filtered = current
+          .filter(
+            (tab) => tab.collectionPath !== collectionPath && !tab.collectionPath.startsWith(prefix)
+          )
+          .map((tab) => ({
+            ...tab,
+            selectedDocumentPath:
+              tab.selectedDocumentPath?.startsWith(prefix) ||
+              tab.selectedDocumentPath === collectionPath
+                ? null
+                : tab.selectedDocumentPath,
+            queryResultSelectedPath: tab.queryResultSelectedPath?.startsWith(prefix)
+              ? null
+              : tab.queryResultSelectedPath
+          }))
+
+        setPrimaryActiveId((active) =>
+          active && filtered.some((tab) => tab.id === active)
+            ? active
+            : (filtered.find((tab) => tab.pane === 'primary')?.id ?? null)
+        )
+        setSecondaryActiveId((active) =>
+          active && filtered.some((tab) => tab.id === active)
+            ? active
+            : (filtered.find((tab) => tab.pane === 'secondary')?.id ?? null)
+        )
+
+        return filtered
+      })
+
+      setTreeReloadToken((token) => token + 1)
+
+      const parentDocument = parentDocumentPathOfSubcollection(collectionPath)
+      if (parentDocument) {
+        openCollection(parentCollectionPath(parentDocument), {
+          selectedDocumentPath: parentDocument
+        })
+      }
+    },
+    [openCollection]
   )
 
   const handleFieldBulkRenameCompleted = useCallback((): void => {
@@ -601,6 +694,8 @@ function FirestorePage({
           onRootCollectionsChanged={() => void loadRootCollections()}
           onRequestRenameCollection={handleRequestRenameCollection}
           onRequestFieldBulkRename={handleRequestFieldBulkRename}
+          onRequestCreateSubcollection={handleRequestCreateSubcollection}
+          onRequestDeleteSubcollection={handleRequestDeleteSubcollection}
           collectionDataReloadToken={collectionDataReloadToken}
           onQueryDraftChange={(patch) => updateTab(active.id, patch)}
         />
@@ -632,7 +727,10 @@ function FirestorePage({
             onSelectDocument={handleSelectDocument}
             onRenameCollection={handleRequestRenameCollection}
             onRenameFieldBulk={handleRequestFieldBulkRename}
+            onCreateSubcollection={handleRequestCreateSubcollection}
+            onDeleteSubcollection={handleRequestDeleteSubcollection}
             canRename={!status.readOnly}
+            canManageSubcollections={!status.readOnly}
             onWorkspaceChanged={onWorkspaceChanged}
             treeReloadToken={treeReloadToken}
             disabled={treeLoading}
@@ -678,6 +776,29 @@ function FirestorePage({
           open
           onClose={() => setFieldBulkRenamePath(null)}
           onCompleted={handleFieldBulkRenameCompleted}
+        />
+      )}
+
+      {createSubcollectionDocumentPath && (
+        <SubcollectionCreateDialog
+          projectId={projectId}
+          documentPath={createSubcollectionDocumentPath}
+          open
+          onClose={() => setCreateSubcollectionDocumentPath(null)}
+          onCreated={handleSubcollectionCreated}
+        />
+      )}
+
+      {deleteSubcollectionPath && (
+        <SubcollectionDeleteDialog
+          projectId={projectId}
+          collectionPath={deleteSubcollectionPath}
+          open
+          onClose={() => setDeleteSubcollectionPath(null)}
+          onDeleted={() => {
+            handleSubcollectionDeleted(deleteSubcollectionPath)
+            setDeleteSubcollectionPath(null)
+          }}
         />
       )}
 

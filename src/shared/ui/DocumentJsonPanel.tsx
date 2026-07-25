@@ -1,6 +1,7 @@
 import Button from '@shared/ui/Button'
 import GeopointPreview from '@shared/ui/GeopointPreview'
-import { findGeopointFields, formatTimestampIso } from '@shared/ui/firestore_display'
+import ImagePreview from '@shared/ui/ImagePreview'
+import { findGeopointFields, findImageUrlFields, formatTimestampIso } from '@shared/ui/firestore_display'
 
 type DocumentJsonPanelProps = {
   documentPath: string | null
@@ -32,6 +33,7 @@ function DocumentJsonPanel({
   readOnly = false
 }: DocumentJsonPanelProps): React.JSX.Element {
   const geopoints = documentData ? findGeopointFields(documentData) : []
+  const imageUrls = documentData ? findImageUrlFields(documentData) : []
 
   return (
     <div className="document-json-panel">
@@ -64,6 +66,7 @@ function DocumentJsonPanel({
         </div>
       )}
       <GeopointPreview points={geopoints} />
+      <ImagePreview images={imageUrls} />
       <textarea
         className="document-json-panel__editor"
         value={jsonText}

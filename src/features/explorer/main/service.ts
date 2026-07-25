@@ -2,6 +2,7 @@ import type { DocumentSnapshot, QueryDocumentSnapshot } from 'firebase-admin/fir
 import { getFirestore, isFirestoreConnected } from '@shared/firestore/client'
 import {
   assertCollectionPath,
+  assertDocumentPath,
   getCollectionRef,
   getDocumentRef,
   joinCollectionPath,
@@ -15,6 +16,10 @@ import { logError, logInfo } from '@shared/logging/logger'
 import { ensureWritable } from '@features/workspace/main/guard'
 import type {
   CreateDocumentInput,
+  CreateSubcollectionInput,
+  CreateSubcollectionResult,
+  DeleteCollectionInput,
+  DeleteCollectionResult,
   DocumentDetail,
   DocumentSummary,
   DuplicateCollectionInput,
@@ -25,11 +30,26 @@ import type {
   RenameCollectionResult,
   UpdateDocumentInput
 } from '@features/explorer/shared/types'
+import { isSubcollectionPath } from '@features/explorer/shared/tree'
 
 function ensureConnected(projectId: string): void {
   if (!isFirestoreConnected(projectId)) {
     throw new Error(`Firestore is not connected: ${projectId}`)
   }
+}
+
+function assertSubcollectionId(subcollectionId: string): string {
+  const trimmed = subcollectionId.trim()
+
+  if (!trimmed) {
+    throw new Error('サブコレクション名を入力してください')
+  }
+
+  if (trimmed.includes('/')) {
+    throw new Error('サブコレクション名に / は使えません')
+  }
+
+  return trimmed
 }
 
 const DUPLICATE_COLLECTION_LIMIT = 500
@@ -362,8 +382,9 @@ async function copyCollectionRecursive(
 async function deleteCollectionRecursive(
   projectId: string,
   collectionPath: string
-): Promise<void> {
+): Promise<number> {
   const collectionRef = getCollectionRef(collectionPath, projectId)
+  let deletedCount = 0
 
   while (true) {
     const snapshot = await collectionRef.orderBy('__name__').limit(PAGE_SIZE).get()
@@ -377,7 +398,7 @@ async function deleteCollectionRecursive(
       const subcollections = await getDocumentRef(documentPath, projectId).listCollections()
 
       for (const subcollection of subcollections) {
-        await deleteCollectionRecursive(
+        deletedCount += await deleteCollectionRecursive(
           projectId,
           joinCollectionPath(documentPath, subcollection.id)
         )
@@ -393,8 +414,11 @@ async function deleteCollectionRecursive(
       }
 
       await batch.commit()
+      deletedCount += chunk.length
     }
   }
+
+  return deletedCount
 }
 
 export async function renameCollection(
@@ -463,6 +487,94 @@ export async function renameCollection(
       data: {
         movedCount,
         targetCollectionPath
+      }
+    }
+  } catch (error) {
+    return toExplorerError(error)
+  }
+}
+
+export async function createSubcollection(
+  input: CreateSubcollectionInput
+): Promise<ExplorerResult<CreateSubcollectionResult>> {
+  try {
+    ensureConnected(input.projectId)
+    ensureWritable(input.projectId)
+
+    const documentPath = input.documentPath.trim()
+    assertDocumentPath(documentPath)
+
+    const subcollectionId = assertSubcollectionId(input.subcollectionId)
+    const subcollectionPath = joinCollectionPath(documentPath, subcollectionId)
+
+    assertCollectionPath(subcollectionPath)
+
+    logInfo(
+      'explorer',
+      `createSubcollection projectId=${input.projectId} document=${documentPath} sub=${subcollectionId}`
+    )
+
+    const documentSnapshot = await getDocumentRef(documentPath, input.projectId).get()
+
+    if (!documentSnapshot.exists) {
+      throw new Error('親ドキュメントが見つかりません')
+    }
+
+    const existingSubcollections = await getDocumentRef(documentPath, input.projectId).listCollections()
+
+    if (existingSubcollections.some((collection) => collection.id === subcollectionId)) {
+      throw new Error('同名のサブコレクションが既に存在します')
+    }
+
+    const createResult = await createDocument({
+      projectId: input.projectId,
+      collectionPath: subcollectionPath,
+      data: {}
+    })
+
+    if (!createResult.ok) {
+      throw new Error(createResult.error)
+    }
+
+    return {
+      ok: true,
+      data: {
+        subcollectionPath,
+        documentId: createResult.data
+      }
+    }
+  } catch (error) {
+    return toExplorerError(error)
+  }
+}
+
+export async function deleteCollection(
+  input: DeleteCollectionInput
+): Promise<ExplorerResult<DeleteCollectionResult>> {
+  try {
+    ensureConnected(input.projectId)
+    ensureWritable(input.projectId)
+
+    const collectionPath = input.collectionPath.trim()
+
+    if (!collectionPath) {
+      throw new Error('コレクション path を指定してください')
+    }
+
+    assertCollectionPath(collectionPath)
+
+    if (!isSubcollectionPath(collectionPath)) {
+      throw new Error('ルートコレクションは削除できません')
+    }
+
+    logInfo('explorer', `deleteCollection projectId=${input.projectId} path=${collectionPath}`)
+
+    const deletedDocumentCount = await deleteCollectionRecursive(input.projectId, collectionPath)
+
+    return {
+      ok: true,
+      data: {
+        deletedDocumentCount
       }
     }
   } catch (error) {

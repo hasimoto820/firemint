@@ -49,6 +49,26 @@ export type RenameCollectionResult = {
   targetCollectionPath: string
 }
 
+export type CreateSubcollectionInput = {
+  projectId: string
+  documentPath: string
+  subcollectionId: string
+}
+
+export type CreateSubcollectionResult = {
+  subcollectionPath: string
+  documentId: string
+}
+
+export type DeleteCollectionInput = {
+  projectId: string
+  collectionPath: string
+}
+
+export type DeleteCollectionResult = {
+  deletedDocumentCount: number
+}
+
 export type ExplorerResult<T> =
   | {
       ok: true

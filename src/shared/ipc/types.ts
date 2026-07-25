@@ -6,6 +6,10 @@ import type {
   CreateDocumentInput,
   DocumentDetail,
   DocumentSummary,
+  CreateSubcollectionInput,
+  CreateSubcollectionResult,
+  DeleteCollectionInput,
+  DeleteCollectionResult,
   DuplicateCollectionInput,
   DuplicateCollectionResult,
   DuplicateDocumentInput,
@@ -106,6 +110,12 @@ export type ExplorerIpcApi = {
   renameCollection: (
     input: RenameCollectionInput
   ) => Promise<ExplorerResult<RenameCollectionResult>>
+  createSubcollection: (
+    input: CreateSubcollectionInput
+  ) => Promise<ExplorerResult<CreateSubcollectionResult>>
+  deleteCollection: (
+    input: DeleteCollectionInput
+  ) => Promise<ExplorerResult<DeleteCollectionResult>>
 }
 
 export type QueryIpcApi = {

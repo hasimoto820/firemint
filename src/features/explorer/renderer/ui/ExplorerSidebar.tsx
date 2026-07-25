@@ -10,7 +10,10 @@ type ExplorerSidebarProps = {
   onSelectDocument: (documentPath: string) => void
   onRenameCollection?: (collectionPath: string) => void
   onRenameFieldBulk?: (collectionPath: string) => void
+  onCreateSubcollection?: (documentPath: string) => void
+  onDeleteSubcollection?: (collectionPath: string) => void
   canRename?: boolean
+  canManageSubcollections?: boolean
   onWorkspaceChanged: () => void
   treeReloadToken?: number
   disabled?: boolean
@@ -29,7 +32,10 @@ function ExplorerSidebar({
   onSelectDocument,
   onRenameCollection,
   onRenameFieldBulk,
+  onCreateSubcollection,
+  onDeleteSubcollection,
   canRename = false,
+  canManageSubcollections = false,
   onWorkspaceChanged,
   treeReloadToken = 0,
   disabled = false
@@ -50,7 +56,10 @@ function ExplorerSidebar({
             onSelectDocument={onSelectDocument}
             onRenameCollection={onRenameCollection}
             onRenameFieldBulk={onRenameFieldBulk}
+            onCreateSubcollection={onCreateSubcollection}
+            onDeleteSubcollection={onDeleteSubcollection}
             canRename={canRename}
+            canManageSubcollections={canManageSubcollections}
             reloadToken={treeReloadToken}
             disabled={disabled}
           />

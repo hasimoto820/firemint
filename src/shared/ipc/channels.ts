@@ -21,6 +21,8 @@ export const IPC_CHANNELS = {
   EXPLORER_DUPLICATE_DOCUMENT: 'explorer:duplicate_document',
   EXPLORER_DUPLICATE_COLLECTION: 'explorer:duplicate_collection',
   EXPLORER_RENAME_COLLECTION: 'explorer:rename_collection',
+  EXPLORER_CREATE_SUBCOLLECTION: 'explorer:create_subcollection',
+  EXPLORER_DELETE_COLLECTION: 'explorer:delete_collection',
   QUERY_EXECUTE: 'query:execute',
   QUERY_LIST_SAVED: 'query:list_saved',
   QUERY_SAVE_SAVED: 'query:save_saved',

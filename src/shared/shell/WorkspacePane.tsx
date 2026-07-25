@@ -14,6 +14,8 @@ type WorkspacePaneProps = {
   onRootCollectionsChanged: () => void
   onRequestRenameCollection: (collectionPath: string) => void
   onRequestFieldBulkRename: (collectionPath: string) => void
+  onRequestCreateSubcollection: (documentPath: string) => void
+  onRequestDeleteSubcollection: (collectionPath: string) => void
   collectionDataReloadToken?: number
   onQueryDraftChange: (patch: WorkspaceTabQueryDraftPatch) => void
 }
@@ -32,6 +34,8 @@ function WorkspacePane({
   onRootCollectionsChanged,
   onRequestRenameCollection,
   onRequestFieldBulkRename,
+  onRequestCreateSubcollection,
+  onRequestDeleteSubcollection,
   collectionDataReloadToken = 0,
   onQueryDraftChange
 }: WorkspacePaneProps): React.JSX.Element {
@@ -85,6 +89,8 @@ function WorkspacePane({
           onRootCollectionsChanged={onRootCollectionsChanged}
           onRequestRenameCollection={onRequestRenameCollection}
           onRequestFieldBulkRename={onRequestFieldBulkRename}
+          onRequestCreateSubcollection={onRequestCreateSubcollection}
+          onRequestDeleteSubcollection={onRequestDeleteSubcollection}
           collectionDataReloadToken={collectionDataReloadToken}
           menuEnabled={menuEnabled}
         />

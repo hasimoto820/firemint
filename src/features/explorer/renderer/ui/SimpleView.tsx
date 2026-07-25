@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { ConnectionStatus } from '@features/connection/shared/types'
 import CollectionImportDialog from '@features/data_transfer/renderer/ui/CollectionImportDialog'
 import type { DocumentSummary } from '@features/explorer/shared/types'
+import { isSubcollectionPath } from '@features/explorer/shared/tree'
 import { useRegisterAppMenu } from '@shared/shell/AppMenuContext'
 import DocumentJsonPanel from '@shared/ui/DocumentJsonPanel'
 import DocumentTable from '@shared/ui/DocumentTable'
@@ -16,6 +17,8 @@ type SimpleViewProps = {
   onRootCollectionsChanged: () => void
   onRequestRenameCollection: (collectionPath: string) => void
   onRequestFieldBulkRename: (collectionPath: string) => void
+  onRequestCreateSubcollection: (documentPath: string) => void
+  onRequestDeleteSubcollection: (collectionPath: string) => void
   collectionDataReloadToken?: number
   /** Split 時など、メニュー登録を行うのはフォーカス側のペインのみ */
   menuEnabled?: boolean
@@ -35,6 +38,8 @@ function SimpleView({
   onRootCollectionsChanged,
   onRequestRenameCollection,
   onRequestFieldBulkRename,
+  onRequestCreateSubcollection,
+  onRequestDeleteSubcollection,
   collectionDataReloadToken = 0,
   menuEnabled = true
 }: SimpleViewProps): React.JSX.Element {
@@ -387,6 +392,26 @@ function SimpleView({
     onRequestFieldBulkRename(activeCollectionPath)
   }
 
+  const handleCreateSubcollection = (): void => {
+    if (!selectedDocumentPath || readOnly) {
+      return
+    }
+
+    setError(null)
+    setSuccessMessage(null)
+    onRequestCreateSubcollection(selectedDocumentPath)
+  }
+
+  const handleDeleteSubcollection = (): void => {
+    if (!activeCollectionPath || readOnly || !isSubcollectionPath(activeCollectionPath)) {
+      return
+    }
+
+    setError(null)
+    setSuccessMessage(null)
+    onRequestDeleteSubcollection(activeCollectionPath)
+  }
+
   useRegisterAppMenu(
     menuEnabled
       ? {
@@ -399,6 +424,11 @@ function SimpleView({
           canDuplicateCollection: !readOnly && Boolean(activeCollectionPath),
           canRenameCollection: !readOnly && Boolean(activeCollectionPath),
           canRenameFieldBulk: !readOnly && Boolean(activeCollectionPath),
+          canCreateSubcollection: !readOnly && Boolean(selectedDocumentPath),
+          canDeleteSubcollection:
+            !readOnly &&
+            activeCollectionPath !== null &&
+            isSubcollectionPath(activeCollectionPath),
           onCreate: () => void handleCreate(),
           onSave: () => void handleSave(),
           onDuplicate: () => void handleDuplicateDocument(),
@@ -407,7 +437,9 @@ function SimpleView({
           onImport: () => handleImportCollection(),
           onDuplicateCollection: () => void handleDuplicateCollection(),
           onRenameCollection: () => handleRenameCollection(),
-          onRenameFieldBulk: () => handleRenameFieldBulk()
+          onRenameFieldBulk: () => handleRenameFieldBulk(),
+          onCreateSubcollection: () => handleCreateSubcollection(),
+          onDeleteSubcollection: () => handleDeleteSubcollection()
         }
       : {
           canCreate: false,
@@ -418,7 +450,9 @@ function SimpleView({
           canImport: false,
           canDuplicateCollection: false,
           canRenameCollection: false,
-          canRenameFieldBulk: false
+          canRenameFieldBulk: false,
+          canCreateSubcollection: false,
+          canDeleteSubcollection: false
         },
     [menuEnabled, readOnly, activeCollectionPath, selectedDocumentPath, jsonText]
   )

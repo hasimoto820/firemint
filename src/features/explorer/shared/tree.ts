@@ -32,3 +32,19 @@ export function getExpandableAncestorPaths(path: string): string[] {
 export function buildSubcollectionPath(documentPath: string, subcollectionId: string): string {
   return `${documentPath}/${subcollectionId}`
 }
+
+export function isSubcollectionPath(collectionPath: string): boolean {
+  const segments = collectionPath.split('/').filter(Boolean)
+
+  return segments.length >= 3 && segments.length % 2 === 1
+}
+
+export function parentDocumentPathOfSubcollection(collectionPath: string): string {
+  const segments = collectionPath.split('/').filter(Boolean)
+
+  if (!isSubcollectionPath(collectionPath)) {
+    return ''
+  }
+
+  return segments.slice(0, -1).join('/')
+}

@@ -54,7 +54,11 @@ const api: IpcApi = {
     duplicateCollection: (input) =>
       ipcRenderer.invoke(IPC_CHANNELS.EXPLORER_DUPLICATE_COLLECTION, input),
     renameCollection: (input) =>
-      ipcRenderer.invoke(IPC_CHANNELS.EXPLORER_RENAME_COLLECTION, input)
+      ipcRenderer.invoke(IPC_CHANNELS.EXPLORER_RENAME_COLLECTION, input),
+    createSubcollection: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.EXPLORER_CREATE_SUBCOLLECTION, input),
+    deleteCollection: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.EXPLORER_DELETE_COLLECTION, input)
   },
   query: {
     execute: (input) => ipcRenderer.invoke(IPC_CHANNELS.QUERY_EXECUTE, input),

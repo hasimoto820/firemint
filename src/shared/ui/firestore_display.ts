@@ -4,6 +4,24 @@ export type GeopointField = {
   longitude: number
 }
 
+export type ImageUrlField = {
+  field: string
+  url: string
+}
+
+const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg', '.avif', '.ico']
+
+const IMAGE_FORMAT_QUERY_VALUES = new Set([
+  'jpg',
+  'jpeg',
+  'png',
+  'gif',
+  'webp',
+  'bmp',
+  'svg',
+  'avif'
+])
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
@@ -73,6 +91,96 @@ export function findGeopointFields(
 
     if (isRecord(value) && value.__firemint_type === undefined) {
       results.push(...findGeopointFields(value, field))
+    }
+  }
+
+  return results
+}
+
+function parseHttpUrl(value: string): URL | null {
+  try {
+    const url = new URL(value.trim())
+
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      return null
+    }
+
+    return url
+  } catch {
+    return null
+  }
+}
+
+function hasImageExtension(pathname: string): boolean {
+  const lower = pathname.toLowerCase()
+
+  return IMAGE_EXTENSIONS.some((extension) => lower.endsWith(extension))
+}
+
+function isFirebaseStorageImageUrl(url: URL): boolean {
+  const host = url.hostname.toLowerCase()
+
+  if (host === 'firebasestorage.googleapis.com') {
+    return url.pathname.includes('/o/') && url.searchParams.get('alt') === 'media'
+  }
+
+  if (host === 'storage.googleapis.com') {
+    return hasImageExtension(url.pathname)
+  }
+
+  return false
+}
+
+function hasImageFormatQuery(url: URL): boolean {
+  const format = url.searchParams.get('format')?.toLowerCase()
+
+  return format !== undefined && IMAGE_FORMAT_QUERY_VALUES.has(format)
+}
+
+export function isImageUrlValue(value: unknown): value is string {
+  if (typeof value !== 'string') {
+    return false
+  }
+
+  const trimmed = value.trim()
+
+  if (!trimmed) {
+    return false
+  }
+
+  const url = parseHttpUrl(trimmed)
+
+  if (!url) {
+    return false
+  }
+
+  if (hasImageExtension(url.pathname)) {
+    return true
+  }
+
+  if (isFirebaseStorageImageUrl(url)) {
+    return true
+  }
+
+  return hasImageFormatQuery(url)
+}
+
+export function findImageUrlFields(
+  data: Record<string, unknown>,
+  prefix = ''
+): ImageUrlField[] {
+  const results: ImageUrlField[] = []
+
+  for (const [key, value] of Object.entries(data)) {
+    const field = prefix ? `${prefix}.${key}` : key
+
+    if (isImageUrlValue(value)) {
+      results.push({ field, url: value.trim() })
+      continue
+    }
+
+    if (isRecord(value) && value.__firemint_type === undefined) {
+      results.push(...findImageUrlFields(value, field))
     }
   }
 
