@@ -1,0 +1,179 @@
+
+Google sign in 設計（Phase 12）
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+関連:
+  001_005 Phase 12
+  001_003 features/connection, shared/firestore, features/workspace
+  001_004 Firestore 接続ルール（client.ts 経由は維持）
+  001_020_007_workspace.txt … 名簿・永続化・接続プール
+
+
+================================================================================
+目的
+================================================================================
+
+  - サービスアカウント JSON 以外に、Google アカウントで Firebase に接続できる
+  - 権限のある Google アカウントで、そのまま対象プロジェクトを FireMint で扱える
+  - 既存の Admin SDK 経路（shared/firestore）はそのまま使い、接続入口だけ増やす
+  - UI で接続方式（JSON / Google）を選べる
+
+
+================================================================================
+前提
+================================================================================
+
+  - 使う Google アカウントは、対象 Firebase プロジェクトの権限を持っている
+  - FireMint は今どおり main 側で Admin SDK を使う（renderer は生トークンに触らない）
+  - Emulator 接続は Phase 17（本ドキュメントの対象外）
+
+
+================================================================================
+方針
+================================================================================
+
+  今:
+    サービスアカウント JSON → admin.credential.cert → Firestore
+
+  Phase 12 で追加:
+    Google OAuth（refresh_token）→ admin credential → 同じ getFirestore(projectId)
+
+  つまり接続の入口を 2 系統にする。
+  explorer / query / bulk / data_transfer の操作本体は変えない。
+
+
+================================================================================
+責務分担
+================================================================================
+
+  features/connection/
+    - 接続方式の選択 UI（JSON / Google）
+    - Google サインイン開始（IPC → main）
+    - サインイン後のプロジェクト一覧表示・選択
+    - 既存の JSON ファイル選択フローは維持
+
+  shared/firestore/
+    - connectFromServiceAccount（既存）
+    - connectFromGoogle({ projectId, refreshToken, ... }) を追加
+    - 接続プール Map<projectId, ConnectionEntry> は共通
+    - getFirestore(projectId) 以降は今と同じ
+
+  features/workspace/
+    - WorkspaceEntry に接続種別を持つ（json / google）
+    - Google 接続の再ロードに必要な参照を永続化（トークン本体の扱い方針は下記）
+    - load / unload / focused の orchestration は既存どおり
+
+  renderer
+    - OAuth の Client Secret / refresh_token / access_token を持たない
+    - すべて IPC 経由
+
+
+================================================================================
+OAuth（デスクトップ）
+================================================================================
+
+  準備（Google Cloud）:
+    - OAuth クライアント種別: デスクトップアプリ
+    - Client ID / Client Secret は main 側のみが知る
+
+  スコープ（最低限）:
+    - openid
+    - email
+    - https://www.googleapis.com/auth/cloud-platform
+
+  フロー:
+    1. UI「Google で接続」
+    2. main がシステムブラウザを開く（PKCE + localhost コールバック）
+    3. 認可コードを受け取り、access_token / refresh_token を取得
+    4. refresh_token を安全に保持（main のみ）
+    5. そのアカウントが触れる Firebase / GCP プロジェクト一覧を API で取得
+    6. ユーザーが projectId を選ぶ
+    7. connectFromGoogle で Admin SDK を初期化し、接続プールへ載せる
+
+
+================================================================================
+プロジェクト一覧
+================================================================================
+
+  - Cloud Resource Manager / Firebase Management API 等で一覧取得
+  - 「その Google アカウントが扱えるプロジェクト」を UI に出す
+  - 選択した projectId で接続する
+
+
+================================================================================
+Firestore 接続（credential）
+================================================================================
+
+  既存:
+    admin.initializeApp({ credential: admin.credential.cert(serviceAccount) })
+
+  追加（イメージ）:
+    google-auth-library の UserRefreshClient 等から credential を作り
+    admin.initializeApp({ credential: ..., projectId })
+
+  または admin.credential.refreshToken(...) 系で同等の入口を用意する。
+
+  接続後:
+    getFirestore(projectId) / ensureWritable / 既存 IPC はそのまま
+
+
+================================================================================
+永続化（workspace との関係）
+================================================================================
+
+  WorkspaceEntry に足すもの（案）:
+    authType          … 'serviceAccount' | 'google'
+    serviceAccountPath … 既存（JSON のとき）
+    googleAccountEmail … 表示用（任意）
+    ※ refresh_token は JSON に直書きしない。OS 資格情報ストア or 暗号化ローカル等、
+      workspace 設計（001_020_007）と同じく「秘匿は main のみ」を守る。
+
+  再起動時:
+    - Google 接続エントリは refresh_token で再認証・再ロードできること
+    - 失敗したら「再サインイン」を促す
+
+
+================================================================================
+UI
+================================================================================
+
+  接続画面:
+    - 方式タブまたはラジオ: 「サービスアカウント JSON」 / 「Google アカウント」
+    - Google: 「Google でサインイン」→ プロジェクト選択 → 接続
+    - JSON: 既存フロー
+
+  接続後:
+    - 既存の FirestorePage / workspace 一覧と同じ体験
+    - 表示上、接続方式が分かる程度のメタ（任意）
+
+
+================================================================================
+実装順
+================================================================================
+
+  12-a  OAuth デスクトップフロー（トークン取得まで）+ IPC
+  12-b  プロジェクト一覧 API + 選択 UI
+  12-c  shared/firestore に connectFromGoogle
+  12-d  workspace 永続化（authType・再ロード）
+  12-e  接続 UI で JSON / Google 切替、切断・再接続
+
+
+================================================================================
+Done
+================================================================================
+
+  □ Google アカウントで Firebase プロジェクトに接続できる
+  □ 接続方式（JSON / Google）が UI で選べる
+  □ 権限のあるプロジェクトを一覧から選んで扱える
+  □ refresh_token は renderer に出さず main のみが扱う
+  □ 再起動後も Google 接続を復元できる（または再サインイン導線がある）
+  □ 既存の JSON 接続・explorer 操作に退行がない
+
+
+================================================================================
+非対象（Phase 12 ではやらない）
+================================================================================
+
+  - Emulator 接続（Phase 17）
+  - Firebase Auth ユーザー管理（Phase 14）
