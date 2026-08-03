@@ -2357,6 +2357,33 @@ code {
   font-size: 13px;
 }
 
+.connection-panel__mode {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.connection-panel__mode-btn {
+  border: 1px solid var(--ev-c-gray-1);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ev-c-text-2);
+  padding: 5px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.connection-panel__mode-btn--active {
+  border-color: #6988e6;
+  background: rgba(105, 136, 230, 0.2);
+  color: inherit;
+}
+
+.connection-panel__mode-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .connection-panel__actions {
   display: flex;
   flex-wrap: wrap;
@@ -2657,6 +2684,12 @@ code {
 
 .project-export-dialog__option .bulk-actions__input {
   width: 100%;
+  color-scheme: light;
+}
+
+.project-export-dialog__option .bulk-actions__input option {
+  background: #d4d4d8;
+  color: #18181b;
 }
 
 .project-export-dialog__hint,
@@ -2681,7 +2714,7 @@ code {
 
 .project-export-dialog__error {
   margin: 0;
-  color: #b91c1c;
+  color: var(--ev-c-text-danger, #ff9f9f);
   font-size: 12px;
 }
 

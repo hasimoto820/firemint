@@ -1,6 +1,7 @@
 import { readFile } from 'fs/promises'
 import {
   connectFirestore,
+  connectFirestoreWithGoogle,
   disconnectFirestore,
   getConnectionInfo,
   isFirestoreConnected,
@@ -9,8 +10,19 @@ import {
 } from '@shared/firestore/client'
 import { getFocusedProjectId, setFocusedProjectId } from '@shared/firestore/focused'
 import { logError } from '@shared/logging/logger'
+import { loadGoogleOAuthConfig } from '@features/connection/main/google_oauth_config'
+import {
+  loadGoogleAccountProfile,
+  patchGoogleProjectProfile,
+  saveGoogleAccountProfile
+} from '@features/connection/main/google_profile_store'
+import {
+  loadGoogleRefreshToken,
+  removeGoogleRefreshToken
+} from '@features/connection/main/google_token_store'
 import { loadWorkspaceStore, saveWorkspaceStore } from './store'
 import type {
+  AddGoogleWorkspaceEntryInput,
   AddWorkspaceEntryInput,
   UpdateWorkspaceEntryInput,
   WorkspaceEntry,
@@ -55,29 +67,76 @@ export function getWorkspaceState(): WorkspaceState {
   }
 }
 
-async function connectFromServiceAccountPath(serviceAccountPath: string): Promise<WorkspaceResult<WorkspaceEntry>> {
+function upsertEntry(entry: WorkspaceEntry): void {
+  store.entries = store.entries.filter((item) => item.id !== entry.id)
+  store.entries.push(entry)
+}
+
+async function connectFromServiceAccountPath(
+  serviceAccountPath: string,
+  existing?: WorkspaceEntry | null
+): Promise<WorkspaceResult<WorkspaceEntry>> {
   try {
     const json = await readFile(serviceAccountPath, 'utf-8')
     const info = await connectFirestore(json)
     logFirestoreState('after connectFromServiceAccountPath')
 
-    const existing = getWorkspaceEntry(info.projectId)
-
     const entry: WorkspaceEntry = {
       id: info.projectId,
       label: existing?.label ?? info.projectId,
       color: existing?.color ?? DEFAULT_ENTRY_COLOR,
+      authType: 'serviceAccount',
       serviceAccountPath,
       readOnly: existing?.readOnly ?? false
     }
 
-    store.entries = store.entries.filter((item) => item.id !== entry.id)
-    store.entries.push(entry)
+    upsertEntry(entry)
+    return { ok: true, data: entry }
+  } catch (error) {
+    return toWorkspaceError(error)
+  }
+}
+
+async function connectFromGoogleEntry(
+  entry: WorkspaceEntry
+): Promise<WorkspaceResult<WorkspaceEntry>> {
+  try {
+    if (!entry.googleAccountKey || !entry.googleAccountEmail) {
+      throw new Error('Google 接続情報が不足しています。再サインインしてください。')
+    }
+
+    const refreshToken = await loadGoogleRefreshToken(entry.googleAccountKey)
+
+    if (!refreshToken) {
+      throw new Error('保存済みの Google トークンがありません。再サインインしてください。')
+    }
+
+    const oauth = await loadGoogleOAuthConfig()
+    await connectFirestoreWithGoogle({
+      projectId: entry.id,
+      clientId: oauth.clientId,
+      clientSecret: oauth.clientSecret,
+      refreshToken,
+      accountEmail: entry.googleAccountEmail
+    })
+    logFirestoreState('after connectFromGoogleEntry')
 
     return { ok: true, data: entry }
   } catch (error) {
     return toWorkspaceError(error)
   }
+}
+
+async function connectWorkspaceEntry(entry: WorkspaceEntry): Promise<WorkspaceResult<WorkspaceEntry>> {
+  if (entry.authType === 'google') {
+    return connectFromGoogleEntry(entry)
+  }
+
+  if (!entry.serviceAccountPath) {
+    return { ok: false, error: 'サービスアカウント path がありません' }
+  }
+
+  return connectFromServiceAccountPath(entry.serviceAccountPath, entry)
 }
 
 export async function initializeWorkspace(): Promise<void> {
@@ -97,7 +156,7 @@ export async function initializeWorkspace(): Promise<void> {
     return
   }
 
-  const result = await connectFromServiceAccountPath(entry.serviceAccountPath)
+  const result = await connectWorkspaceEntry(entry)
 
   if (!result.ok) {
     logError('workspace', `auto reconnect failed project_id=${entry.id}`, result.error)
@@ -121,8 +180,7 @@ export async function addEntryAndLoad(
       readOnly: input.readOnly ?? result.data.readOnly
     }
 
-    store.entries = store.entries.filter((item) => item.id !== entry.id)
-    store.entries.push(entry)
+    upsertEntry(entry)
 
     if (input.setFocused ?? true) {
       store.focusedProjectId = entry.id
@@ -130,6 +188,60 @@ export async function addEntryAndLoad(
     }
 
     await persistStore()
+    return { ok: true, data: entry }
+  } catch (error) {
+    return toWorkspaceError(error)
+  }
+}
+
+export async function addGoogleEntryAndLoad(
+  input: AddGoogleWorkspaceEntryInput
+): Promise<WorkspaceResult<WorkspaceEntry>> {
+  try {
+    const existing = getWorkspaceEntry(input.projectId)
+    const oauth = await loadGoogleOAuthConfig()
+    const refreshToken = await loadGoogleRefreshToken(input.accountKey)
+
+    if (!refreshToken) {
+      throw new Error('Google トークンがありません。先にサインインしてください。')
+    }
+
+    await connectFirestoreWithGoogle({
+      projectId: input.projectId,
+      clientId: oauth.clientId,
+      clientSecret: oauth.clientSecret,
+      refreshToken,
+      accountEmail: input.accountEmail
+    })
+    logFirestoreState('after addGoogleEntryAndLoad')
+
+    const entry: WorkspaceEntry = {
+      id: input.projectId,
+      label: input.label?.trim() || existing?.label || input.projectId,
+      color: input.color ?? existing?.color ?? DEFAULT_ENTRY_COLOR,
+      authType: 'google',
+      serviceAccountPath: '',
+      googleAccountEmail: input.accountEmail,
+      googleAccountKey: input.accountKey,
+      readOnly: input.readOnly ?? existing?.readOnly ?? false
+    }
+
+    upsertEntry(entry)
+
+    if (input.setFocused ?? true) {
+      store.focusedProjectId = entry.id
+      syncFocusedFromStore()
+    }
+
+    await persistStore()
+
+    await patchGoogleProjectProfile(input.accountKey, input.accountEmail, entry.id, {
+      label: entry.label,
+      color: entry.color,
+      readOnly: entry.readOnly,
+      lastFocused: input.setFocused ?? true
+    })
+
     return { ok: true, data: entry }
   } catch (error) {
     return toWorkspaceError(error)
@@ -147,7 +259,7 @@ export async function loadProject(projectId: string): Promise<WorkspaceResult<Wo
     return { ok: true, data: entry }
   }
 
-  const result = await connectFromServiceAccountPath(entry.serviceAccountPath)
+  const result = await connectWorkspaceEntry(entry)
 
   if (!result.ok) {
     return result
@@ -173,13 +285,189 @@ export async function unloadProject(projectId: string): Promise<WorkspaceResult<
   }
 }
 
+/**
+ * Google 認証の取扱いを終了する（クラウド削除ではない）。
+ * プロファイル（色・表示名・read-only・最後の focus）は残し、名簿と接続と token は外す。
+ */
+export async function detachGoogleWorkspaceEntries(
+  accountKey?: string
+): Promise<WorkspaceResult<{ removedProjectIds: string[] }>> {
+  try {
+    const targets = store.entries.filter((entry) => {
+      if (entry.authType !== 'google') {
+        return false
+      }
+
+      if (!accountKey) {
+        return true
+      }
+
+      return entry.googleAccountKey === accountKey
+    })
+
+    if (targets.length === 0) {
+      return { ok: true, data: { removedProjectIds: [] } }
+    }
+
+    const byAccount = new Map<string, typeof targets>()
+
+    for (const entry of targets) {
+      const key = entry.googleAccountKey
+
+      if (!key) {
+        continue
+      }
+
+      const list = byAccount.get(key) ?? []
+      list.push(entry)
+      byAccount.set(key, list)
+    }
+
+    for (const [key, entries] of byAccount) {
+      const projects: Record<string, { label: string; color: string; readOnly: boolean }> = {}
+
+      for (const entry of entries) {
+        projects[entry.id] = {
+          label: entry.label,
+          color: entry.color,
+          readOnly: entry.readOnly
+        }
+      }
+
+      await saveGoogleAccountProfile(key, {
+        email: entries[0]?.googleAccountEmail ?? key,
+        lastFocusedProjectId:
+          store.focusedProjectId && projects[store.focusedProjectId]
+            ? store.focusedProjectId
+            : null,
+        projects
+      })
+    }
+
+    const accountKeys = new Set(byAccount.keys())
+
+    for (const entry of targets) {
+      if (isFirestoreConnected(entry.id)) {
+        await disconnectFirestore(entry.id)
+      }
+    }
+
+    const removedProjectIds = targets.map((entry) => entry.id)
+    const removedIdSet = new Set(removedProjectIds)
+    store.entries = store.entries.filter((entry) => !removedIdSet.has(entry.id))
+
+    if (store.focusedProjectId && removedIdSet.has(store.focusedProjectId)) {
+      store.focusedProjectId = null
+      syncFocusedFromStore()
+    }
+
+    await persistStore()
+
+    for (const key of accountKeys) {
+      await removeGoogleRefreshToken(key)
+    }
+
+    return { ok: true, data: { removedProjectIds } }
+  } catch (error) {
+    return toWorkspaceError(error)
+  }
+}
+
+/**
+ * Google アカウントのプロジェクトを一括で取扱い名簿へ載せる。
+ * 以前のプロファイル（label / color / readOnly / lastFocused）があれば復元する。
+ * Firestore 接続は focused の1件だけ行う。
+ */
+export async function importGoogleAccountProjects(input: {
+  accountKey: string
+  accountEmail: string
+  projects: Array<{ projectId: string; displayName: string }>
+}): Promise<WorkspaceResult<{ focusedProjectId: string | null; count: number }>> {
+  try {
+    if (input.projects.length === 0) {
+      return { ok: false, error: '取り込めるプロジェクトがありません' }
+    }
+
+    const profile = await loadGoogleAccountProfile(input.accountKey)
+    const refreshToken = await loadGoogleRefreshToken(input.accountKey)
+
+    if (!refreshToken) {
+      throw new Error('Google トークンがありません。先にサインインしてください。')
+    }
+
+    // 同じアカウントの古い取扱い分はいったん外す（プロファイルは import で上書き復元）
+    store.entries = store.entries.filter(
+      (entry) =>
+        !(entry.authType === 'google' && entry.googleAccountKey === input.accountKey)
+    )
+
+    for (const project of input.projects) {
+      const pref = profile?.projects[project.projectId]
+      const entry: WorkspaceEntry = {
+        id: project.projectId,
+        label: pref?.label?.trim() || project.displayName || project.projectId,
+        color: pref?.color ?? DEFAULT_ENTRY_COLOR,
+        authType: 'google',
+        serviceAccountPath: '',
+        googleAccountEmail: input.accountEmail,
+        googleAccountKey: input.accountKey,
+        readOnly: pref?.readOnly ?? false
+      }
+      upsertEntry(entry)
+    }
+
+    const preferredFocus =
+      (profile?.lastFocusedProjectId &&
+      input.projects.some((project) => project.projectId === profile.lastFocusedProjectId)
+        ? profile.lastFocusedProjectId
+        : null) ?? input.projects[0]?.projectId ?? null
+
+    await persistStore()
+
+    if (!preferredFocus) {
+      return { ok: true, data: { focusedProjectId: null, count: input.projects.length } }
+    }
+
+    const focusCandidates = [
+      preferredFocus,
+      ...input.projects.map((project) => project.projectId).filter((id) => id !== preferredFocus)
+    ]
+
+    for (const candidateId of focusCandidates) {
+      const focusResult = await setFocusedProject(candidateId)
+
+      if (focusResult.ok) {
+        await patchGoogleProjectProfile(input.accountKey, input.accountEmail, candidateId, {
+          lastFocused: true
+        })
+        return {
+          ok: true,
+          data: { focusedProjectId: candidateId, count: input.projects.length }
+        }
+      }
+    }
+
+    store.focusedProjectId = null
+    syncFocusedFromStore()
+    await persistStore()
+    return {
+      ok: true,
+      data: { focusedProjectId: null, count: input.projects.length }
+    }
+  } catch (error) {
+    return toWorkspaceError(error)
+  }
+}
+
 export async function removeEntry(projectId: string): Promise<WorkspaceResult<null>> {
   try {
+    const entry = getWorkspaceEntry(projectId)
+
     if (isFirestoreConnected(projectId)) {
       await disconnectFirestore(projectId)
     }
 
-    store.entries = store.entries.filter((entry) => entry.id !== projectId)
+    store.entries = store.entries.filter((item) => item.id !== projectId)
 
     if (store.focusedProjectId === projectId) {
       store.focusedProjectId = null
@@ -187,6 +475,17 @@ export async function removeEntry(projectId: string): Promise<WorkspaceResult<nu
     }
 
     await persistStore()
+
+    if (entry?.authType === 'google' && entry.googleAccountKey) {
+      const stillUsed = store.entries.some(
+        (item) => item.authType === 'google' && item.googleAccountKey === entry.googleAccountKey
+      )
+
+      if (!stillUsed) {
+        await removeGoogleRefreshToken(entry.googleAccountKey)
+      }
+    }
+
     return { ok: true, data: null }
   } catch (error) {
     return toWorkspaceError(error)
@@ -213,6 +512,19 @@ export async function updateEntry(
   store.entries = store.entries.map((item) => (item.id === projectId ? updated : item))
   await persistStore()
 
+  if (updated.authType === 'google' && updated.googleAccountKey) {
+    await patchGoogleProjectProfile(
+      updated.googleAccountKey,
+      updated.googleAccountEmail ?? updated.googleAccountKey,
+      updated.id,
+      {
+        label: updated.label,
+        color: updated.color,
+        readOnly: updated.readOnly
+      }
+    )
+  }
+
   return { ok: true, data: updated }
 }
 
@@ -234,6 +546,15 @@ export async function setFocusedProject(projectId: string): Promise<WorkspaceRes
   store.focusedProjectId = projectId
   syncFocusedFromStore()
   await persistStore()
+
+  if (entry.authType === 'google' && entry.googleAccountKey) {
+    await patchGoogleProjectProfile(
+      entry.googleAccountKey,
+      entry.googleAccountEmail ?? entry.googleAccountKey,
+      projectId,
+      { lastFocused: true }
+    )
+  }
 
   return { ok: true, data: entry }
 }

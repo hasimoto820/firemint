@@ -44,6 +44,8 @@ export type AppShellMenuActions = {
 
 export type AppMenuHandlers = {
   connected: boolean
+  /** 接続中、または Google 取扱い分が残っているとき切断可能 */
+  canDisconnect?: boolean
   activeView: AppView
   onDisconnect: () => void
   onNavigate: (view: AppView) => void
@@ -52,6 +54,7 @@ export type AppMenuHandlers = {
   onOpenDocs: () => void
   onExportProject?: () => void
   onImportProject?: () => void
+  onGoogleConnect?: () => void
   onMinimize?: () => void
   onMaximizeToggle?: () => void
   context?: AppMenuContextActions | null
@@ -103,13 +106,24 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
           onClick: context?.onExport
         },
         { type: 'separator' },
+        { type: 'header', label: '接続' },
+        {
+          type: 'item',
+          id: 'file-google-connect',
+          label: 'Google で接続…',
+          indent: true,
+          disabled: !handlers.onGoogleConnect,
+          onClick: handlers.onGoogleConnect
+        },
         {
           type: 'item',
           id: 'file-disconnect',
           label: '切断',
-          disabled: !handlers.connected,
+          indent: true,
+          disabled: !(handlers.canDisconnect ?? handlers.connected),
           onClick: handlers.onDisconnect
         },
+        { type: 'separator' },
         {
           type: 'item',
           id: 'file-quit',

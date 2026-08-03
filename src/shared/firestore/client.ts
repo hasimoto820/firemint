@@ -1,8 +1,9 @@
 import admin from 'firebase-admin'
 import { initializeFirestore, type Firestore } from 'firebase-admin/firestore'
+import { Firestore as GoogleCloudFirestore } from '@google-cloud/firestore'
 import { getFocusedProjectId, requireFocusedProjectId, setFocusedProjectId } from './focused'
 import { logInfo } from '@shared/logging/logger'
-import type { FirestoreConnectionInfo, ServiceAccountJson } from './types'
+import type { FirestoreConnectionInfo, GoogleAuthorizedUserJson, ServiceAccountJson } from './types'
 
 type ConnectionEntry = {
   app: admin.app.App
@@ -64,11 +65,67 @@ export async function connectFirestore(json: string): Promise<FirestoreConnectio
 
   const info: FirestoreConnectionInfo = {
     projectId: serviceAccount.project_id,
-    clientEmail: serviceAccount.client_email
+    clientEmail: serviceAccount.client_email,
+    authType: 'serviceAccount'
   }
 
   connections.set(projectId, { app, firestore, info })
   logInfo('firestore', `firestore client initialized project_id=${projectId}`)
+
+  return info
+}
+
+export async function connectFirestoreWithGoogle(input: {
+  projectId: string
+  clientId: string
+  clientSecret: string
+  refreshToken: string
+  accountEmail: string
+}): Promise<FirestoreConnectionInfo> {
+  const projectId = input.projectId.trim()
+
+  if (!projectId) {
+    throw new Error('projectId を指定してください')
+  }
+
+  logInfo('firestore', `connect with google account project_id=${projectId} email=${input.accountEmail}`)
+
+  await deleteExistingApp(projectId)
+
+  const refreshTokenJson: GoogleAuthorizedUserJson = {
+    type: 'authorized_user',
+    client_id: input.clientId,
+    client_secret: input.clientSecret,
+    refresh_token: input.refreshToken
+  }
+
+  // firebase-admin の initializeFirestore は RefreshTokenCredential を拒否する
+  // （cert / ADC のみ可）。Google ユーザー OAuth は @google-cloud/firestore に
+  // authorized_user を直接渡して初期化する。
+  logInfo('firestore', `initialize firestore client via google user creds preferRest=true project_id=${projectId}`)
+  const firestore = new GoogleCloudFirestore({
+    projectId,
+    preferRest: true,
+    // GoogleAuth は authorized_user を解釈できる（型定義は SA 向けのみ）
+    credentials: refreshTokenJson as unknown as { client_email?: string; private_key?: string }
+  }) as unknown as Firestore
+
+  const app = admin.initializeApp(
+    {
+      credential: admin.credential.refreshToken(refreshTokenJson),
+      projectId
+    },
+    projectId
+  )
+
+  const info: FirestoreConnectionInfo = {
+    projectId,
+    clientEmail: input.accountEmail,
+    authType: 'google'
+  }
+
+  connections.set(projectId, { app, firestore, info })
+  logInfo('firestore', `firestore client initialized via google project_id=${projectId}`)
 
   return info
 }

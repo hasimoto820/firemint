@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from 'fs/promises'
 import { dirname, join } from 'path'
-import type { WorkspaceStore } from '@features/workspace/shared/types'
+import type { WorkspaceEntry, WorkspaceStore } from '@features/workspace/shared/types'
 
 const STORE_FILE_NAME = 'workspaces.json'
 
@@ -14,6 +14,25 @@ function getStorePath(): string {
   return join(process.cwd(), 'config', STORE_FILE_NAME)
 }
 
+function normalizeEntry(raw: Partial<WorkspaceEntry> & { id?: string }): WorkspaceEntry | null {
+  if (!raw.id) {
+    return null
+  }
+
+  const authType = raw.authType === 'google' ? 'google' : 'serviceAccount'
+
+  return {
+    id: raw.id,
+    label: raw.label?.trim() || raw.id,
+    color: raw.color || '#607D8B',
+    authType,
+    serviceAccountPath: raw.serviceAccountPath ?? '',
+    googleAccountEmail: raw.googleAccountEmail,
+    googleAccountKey: raw.googleAccountKey,
+    readOnly: Boolean(raw.readOnly)
+  }
+}
+
 export async function loadWorkspaceStore(): Promise<WorkspaceStore> {
   const storePath = getStorePath()
 
@@ -25,9 +44,13 @@ export async function loadWorkspaceStore(): Promise<WorkspaceStore> {
       return { ...EMPTY_STORE }
     }
 
+    const entries = parsed.entries
+      .map((entry) => normalizeEntry(entry as Partial<WorkspaceEntry>))
+      .filter((entry): entry is WorkspaceEntry => entry !== null)
+
     return {
       version: 1,
-      entries: parsed.entries,
+      entries,
       focusedProjectId: parsed.focusedProjectId ?? null
     }
   } catch (error) {

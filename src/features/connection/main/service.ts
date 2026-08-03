@@ -3,11 +3,29 @@ import { logError, logInfo, logWarn } from '@shared/logging/logger'
 import { detectEnvironment } from '@shared/safety/environment'
 import {
   addEntryAndLoad,
+  addGoogleEntryAndLoad,
+  detachGoogleWorkspaceEntries,
   getFocusedConnectionInfo,
+  getWorkspaceEntry,
+  importGoogleAccountProjects,
   unloadProject
 } from '@features/workspace/main/service'
 import { getFocusedProjectId } from '@shared/firestore/focused'
-import type { ConnectResult, ConnectionStatus } from '@features/connection/shared/types'
+import type {
+  ConnectResult,
+  ConnectionStatus,
+  GoogleConnectAccountInput,
+  GoogleConnectProjectInput,
+  GoogleSignInResult
+} from '@features/connection/shared/types'
+import { loadGoogleOAuthConfig } from './google_oauth_config'
+import {
+  cancelGoogleOAuthLogin,
+  GOOGLE_OAUTH_CANCELED_MESSAGE,
+  listGoogleCloudProjects,
+  runGoogleOAuthLogin
+} from './google_oauth'
+import { saveGoogleRefreshToken } from './google_token_store'
 
 const CONNECT_TIMEOUT_MS = 30_000
 
@@ -22,15 +40,29 @@ function formatConnectionError(error: unknown): string {
     return 'ネットワークエラー。インターネット接続を確認してください。'
   }
 
-  if (message.includes('PERMISSION_DENIED') || message.includes('403')) {
-    return '権限がありません。サービスアカウントに Firestore 読み取り権限があるか確認してください。'
+  // API 未有効は gRPC code 7 / HTTP 403 扱いになることがあるので、汎用「権限なし」より先に判定する
+  if (
+    message.includes('Cloud Firestore API has not been used') ||
+    message.includes('Firestore API has not been used') ||
+    (message.includes('firestore.googleapis.com') && message.includes('disabled'))
+  ) {
+    return 'このプロジェクトで Cloud Firestore API が有効になっていません。Firebase Console で Firestore データベースを作成（または API を有効化）してから再試行してください。'
+  }
+
+  // プロジェクト ID に含まれる "403"（例: colorpanda-19403）に誤反応しない
+  if (
+    message.includes('PERMISSION_DENIED') ||
+    /\b403\b/.test(message) ||
+    message.includes('Forbidden')
+  ) {
+    return '権限がありません。アカウントまたはサービスアカウントの権限を確認してください。'
   }
 
   if (message.includes('INVALID_ARGUMENT') || message.includes('Invalid service account')) {
     return 'JSON の形式が正しくありません。サービスアカウントキーか確認してください。'
   }
 
-  if (message.includes('NOT_FOUND') || message.includes('Firestore API has not been used')) {
+  if (message.includes('NOT_FOUND')) {
     return 'Firestore が有効化されていない可能性があります。Firebase Console で Firestore を作成してください。'
   }
 
@@ -106,7 +138,8 @@ export async function connectWithServiceAccountFile(filePath: string): Promise<C
       projectId: entry.id,
       clientEmail: info?.clientEmail ?? '',
       environment,
-      rootCollections
+      rootCollections,
+      authType: 'serviceAccount'
     }
   } catch (error) {
     logError('connection', `connect failed in ${Date.now() - startedAt}ms`, error)
@@ -117,15 +150,172 @@ export async function connectWithServiceAccountFile(filePath: string): Promise<C
   }
 }
 
+export function cancelGoogleSignIn(): void {
+  cancelGoogleOAuthLogin()
+}
+
+export async function signInWithGoogle(): Promise<GoogleSignInResult> {
+  try {
+    const config = await loadGoogleOAuthConfig()
+    const tokens = await runGoogleOAuthLogin(config)
+    const accountKey = await saveGoogleRefreshToken(tokens.email, tokens.refreshToken)
+    const projects = await listGoogleCloudProjects(tokens.accessToken)
+
+    return {
+      ok: true,
+      accountKey,
+      email: tokens.email,
+      projects
+    }
+  } catch (error) {
+    const message = formatConnectionError(error)
+    if (error instanceof Error && error.message === GOOGLE_OAUTH_CANCELED_MESSAGE) {
+      logInfo('connection', 'google sign-in canceled')
+    } else {
+      logError('connection', 'google sign-in failed', error)
+    }
+    return {
+      ok: false,
+      error: message
+    }
+  }
+}
+
+export async function connectWithGoogleProject(
+  input: GoogleConnectProjectInput
+): Promise<ConnectResult> {
+  const startedAt = Date.now()
+  logInfo(
+    'connection',
+    `google connect start project=${input.projectId} account=${input.accountEmail}`
+  )
+
+  try {
+    const addResult = await addGoogleEntryAndLoad({
+      projectId: input.projectId,
+      accountKey: input.accountKey,
+      accountEmail: input.accountEmail,
+      setFocused: true
+    })
+
+    if (!addResult.ok) {
+      return { ok: false, error: addResult.error }
+    }
+
+    const entry = addResult.data
+    const rootCollections = await listRootCollectionsWithTimeout(entry.id)
+    const environment = detectEnvironment(entry.id)
+    const info = getConnectionInfo(entry.id)
+
+    logInfo(
+      'connection',
+      `google connect success in ${Date.now() - startedAt}ms project_id=${entry.id}`
+    )
+
+    return {
+      ok: true,
+      projectId: entry.id,
+      clientEmail: info?.clientEmail ?? input.accountEmail,
+      environment,
+      rootCollections,
+      authType: 'google'
+    }
+  } catch (error) {
+    logError('connection', `google connect failed in ${Date.now() - startedAt}ms`, error)
+    return {
+      ok: false,
+      error: formatConnectionError(error)
+    }
+  }
+}
+
+export async function connectWithGoogleAccount(
+  input: GoogleConnectAccountInput
+): Promise<ConnectResult> {
+  const startedAt = Date.now()
+  logInfo(
+    'connection',
+    `google account import start account=${input.accountEmail} projects=${input.projects.length}`
+  )
+
+  try {
+    const importResult = await importGoogleAccountProjects({
+      accountKey: input.accountKey,
+      accountEmail: input.accountEmail,
+      projects: input.projects
+    })
+
+    if (!importResult.ok) {
+      return { ok: false, error: importResult.error }
+    }
+
+    const focusedProjectId = importResult.data.focusedProjectId
+
+    if (!focusedProjectId) {
+      logInfo(
+        'connection',
+        `google account import registered=${importResult.data.count} but no project could be focused`
+      )
+      return {
+        ok: false,
+        error:
+          'プロジェクトは一覧に登録しましたが、Firestore に接続できるものがありません。Firestore が有効なプロジェクトを一覧から選んでください。'
+      }
+    }
+
+    const rootCollections = await listRootCollectionsWithTimeout(focusedProjectId)
+    const environment = detectEnvironment(focusedProjectId)
+    const info = getConnectionInfo(focusedProjectId)
+
+    logInfo(
+      'connection',
+      `google account import success in ${Date.now() - startedAt}ms count=${importResult.data.count} focused=${focusedProjectId}`
+    )
+
+    return {
+      ok: true,
+      projectId: focusedProjectId,
+      clientEmail: info?.clientEmail ?? input.accountEmail,
+      environment,
+      rootCollections,
+      authType: 'google'
+    }
+  } catch (error) {
+    logError('connection', `google account import failed in ${Date.now() - startedAt}ms`, error)
+    return {
+      ok: false,
+      error: formatConnectionError(error)
+    }
+  }
+}
+
 export async function disconnectFromFirestore(): Promise<void> {
   const projectId = getFocusedProjectId()
-  logInfo('connection', `disconnect start projectId=${projectId ?? 'none'}`)
+  const focused = projectId ? getWorkspaceEntry(projectId) : null
+  logInfo(
+    'connection',
+    `disconnect start projectId=${projectId ?? 'none'} authType=${focused?.authType ?? 'none'}`
+  )
 
-  if (!projectId) {
-    return
+  // Google 認証の取扱い分はセッション終了として名簿から外す（クラウド削除ではない）
+  const detachResult = await detachGoogleWorkspaceEntries(
+    focused?.authType === 'google' ? focused.googleAccountKey : undefined
+  )
+
+  if (!detachResult.ok) {
+    throw new Error(detachResult.error)
   }
 
-  await unloadProject(projectId)
+  logInfo(
+    'connection',
+    `google workspace detached count=${detachResult.data.removedProjectIds.length}`
+  )
+
+  // JSON 接続は名簿に残し、接続だけ切る
+  if (projectId && focused?.authType === 'serviceAccount') {
+    await unloadProject(projectId)
+  }
+
   logInfo('connection', 'disconnect done')
 }
 
@@ -140,6 +330,7 @@ export function getConnectionStatus(): ConnectionStatus | null {
     projectId: focused.projectId,
     clientEmail: focused.info.clientEmail,
     environment: detectEnvironment(focused.projectId),
-    readOnly: focused.entry?.readOnly ?? false
+    readOnly: focused.entry?.readOnly ?? false,
+    authType: focused.info.authType ?? focused.entry?.authType
   }
 }

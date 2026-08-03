@@ -15,7 +15,7 @@ type WorkspaceProjectListProps = {
 
 /**
  * 接続後の左ペイン用、コンパクトなプロジェクト一覧。
- * 一覧・追加・フォーカス切替が主役で、編集（表示名 / 色 / read-only / 削除）は
+ * 一覧・追加・フォーカス切替が主役で、編集（表示名 / 色 / read-only / 登録解除）は
  * 各行の歯車から折りたたみで開く。focusedChildren を渡すとツリー表示になる。
  */
 function WorkspaceProjectList({
@@ -145,7 +145,11 @@ function WorkspaceProjectList({
   }
 
   const handleRemove = async (projectId: string): Promise<void> => {
-    if (!window.confirm('このプロジェクトを名簿から削除しますか？')) {
+    if (
+      !window.confirm(
+        'このプロジェクトの登録を解除しますか？（Firestore 上のデータは消えません）'
+      )
+    ) {
       return
     }
 
@@ -235,9 +239,9 @@ function WorkspaceProjectList({
                   <span className="project-list__body">
                     <span className="project-list__label">{entry.label}</span>
                     <span className="project-list__meta">
-                      {entry.readOnly ? 'read-only' : ''}
-                      {entry.readOnly && isLoaded ? ' · ' : ''}
-                      {isLoaded ? 'loaded' : ''}
+                      {entry.authType === 'google' ? 'google' : 'json'}
+                      {entry.readOnly ? ' · read-only' : ''}
+                      {isLoaded ? ' · loaded' : ''}
                     </span>
                   </span>
                 </button>
@@ -301,7 +305,7 @@ function WorkspaceProjectList({
                       onClick={() => void handleRemove(entry.id)}
                       disabled={busy}
                     >
-                      削除
+                      登録解除
                     </Button>
                   </div>
                 </div>

@@ -1,6 +1,9 @@
 import type {
   ConnectResult,
-  ConnectionStatus
+  ConnectionStatus,
+  GoogleConnectAccountInput,
+  GoogleConnectProjectInput,
+  GoogleSignInResult
 } from '@features/connection/shared/types'
 import type {
   CreateDocumentInput,
@@ -88,6 +91,10 @@ export type WindowIpcApi = {
 export type ConnectionIpcApi = {
   selectServiceAccountFile: () => Promise<string | null>
   connect: (filePath: string) => Promise<ConnectResult>
+  googleSignIn: () => Promise<GoogleSignInResult>
+  googleCancelSignIn: () => Promise<void>
+  googleConnectProject: (input: GoogleConnectProjectInput) => Promise<ConnectResult>
+  googleConnectAccount: (input: GoogleConnectAccountInput) => Promise<ConnectResult>
   disconnect: () => Promise<void>
   getStatus: () => Promise<ConnectionStatus | null>
 }

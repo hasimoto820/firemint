@@ -91,7 +91,11 @@ function WorkspacePanel({ onChanged, disabled = false }: WorkspacePanelProps): R
   }
 
   const handleRemove = async (projectId: string): Promise<void> => {
-    if (!window.confirm('このプロジェクトを名簿から削除しますか？')) {
+    if (
+      !window.confirm(
+        'このプロジェクトの登録を解除しますか？（Firestore 上のデータは消えません）'
+      )
+    ) {
       return
     }
 
@@ -245,7 +249,7 @@ function WorkspacePanel({ onChanged, disabled = false }: WorkspacePanelProps): R
               onClick={() => void handleRemove(selectedId)}
               disabled={disabled || loading}
             >
-              削除
+              登録解除
             </Button>
           </div>
           {entries

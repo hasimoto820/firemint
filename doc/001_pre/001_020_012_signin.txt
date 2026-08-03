@@ -122,16 +122,28 @@ Firestore 接続（credential）
 永続化（workspace との関係）
 ================================================================================
 
-  WorkspaceEntry に足すもの（案）:
+  WorkspaceEntry に足すもの:
     authType          … 'serviceAccount' | 'google'
     serviceAccountPath … 既存（JSON のとき）
-    googleAccountEmail … 表示用（任意）
-    ※ refresh_token は JSON に直書きしない。OS 資格情報ストア or 暗号化ローカル等、
-      workspace 設計（001_020_007）と同じく「秘匿は main のみ」を守る。
+    googleAccountEmail … 表示用
+    googleAccountKey   … google_oauth_tokens / google_profiles のキー
 
-  再起動時:
-    - Google 接続エントリは refresh_token で再認証・再ロードできること
-    - 失敗したら「再サインイン」を促す
+  ※ refresh_token は workspaces.json に直書きしない。
+    config/google_oauth_tokens.json（暗号化可）に main のみが保持。
+
+  プロファイル（config/google_profiles.json）:
+    - アカウント単位で label / color / readOnly / lastFocused を保持
+    - 「切断」しても残す（取扱い名簿からは外す）
+    - 再ログイン時に復元する
+
+  切断（Google）:
+    - 取扱い名簿から外す + 接続切断 + token 破棄
+    - プロファイルは残す（クラウドデータは消さない）
+
+  再ログイン:
+    - 権限のあるプロジェクトを一括取り込み
+    - プロファイルがあれば表示設定を復元
+    - lastFocused（または接続可能な先頭）を focus
 
 
 ================================================================================
@@ -140,7 +152,7 @@ UI
 
   接続画面:
     - 方式タブまたはラジオ: 「サービスアカウント JSON」 / 「Google アカウント」
-    - Google: 「Google でサインイン」→ プロジェクト選択 → 接続
+    - Google: 「Google でサインイン」→ 権限プロジェクトを一括取り込み
     - JSON: 既存フロー
 
   接続後:
@@ -163,12 +175,12 @@ UI
 Done
 ================================================================================
 
-  □ Google アカウントで Firebase プロジェクトに接続できる
-  □ 接続方式（JSON / Google）が UI で選べる
-  □ 権限のあるプロジェクトを一覧から選んで扱える
-  □ refresh_token は renderer に出さず main のみが扱う
-  □ 再起動後も Google 接続を復元できる（または再サインイン導線がある）
-  □ 既存の JSON 接続・explorer 操作に退行がない
+  ■ Google アカウントで Firebase プロジェクトに接続できる
+  ■ 接続方式（JSON / Google）が UI で選べる
+  ■ 権限のあるプロジェクトを一覧から選んで扱える
+  ■ refresh_token は renderer に出さず main のみが扱う
+  ■ 再起動後も Google 接続を復元できる（または再サインイン導線がある）
+  ■ 既存の JSON 接続・explorer 操作に退行がない
 
 
 ================================================================================

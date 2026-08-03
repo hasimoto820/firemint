@@ -1,2 +1,3 @@
 *.json
 !README*
+!google_oauth.example.json

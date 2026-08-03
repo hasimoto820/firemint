@@ -19,6 +19,12 @@ const api: IpcApi = {
   connection: {
     selectServiceAccountFile: () => ipcRenderer.invoke(IPC_CHANNELS.CONNECTION_SELECT_FILE),
     connect: (filePath: string) => ipcRenderer.invoke(IPC_CHANNELS.CONNECTION_CONNECT, filePath),
+    googleSignIn: () => ipcRenderer.invoke(IPC_CHANNELS.CONNECTION_GOOGLE_SIGN_IN),
+    googleCancelSignIn: () => ipcRenderer.invoke(IPC_CHANNELS.CONNECTION_GOOGLE_CANCEL_SIGN_IN),
+    googleConnectProject: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.CONNECTION_GOOGLE_CONNECT_PROJECT, input),
+    googleConnectAccount: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.CONNECTION_GOOGLE_CONNECT_ACCOUNT, input),
     disconnect: () => ipcRenderer.invoke(IPC_CHANNELS.CONNECTION_DISCONNECT),
     getStatus: () => ipcRenderer.invoke(IPC_CHANNELS.CONNECTION_GET_STATUS)
   },
