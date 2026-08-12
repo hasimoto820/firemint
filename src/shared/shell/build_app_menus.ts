@@ -55,6 +55,7 @@ export type AppMenuHandlers = {
   onExportProject?: () => void
   onImportProject?: () => void
   onGoogleConnect?: () => void
+  onJsonConnect?: () => void
   onMinimize?: () => void
   onMaximizeToggle?: () => void
   context?: AppMenuContextActions | null
@@ -114,6 +115,14 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
           indent: true,
           disabled: !handlers.onGoogleConnect,
           onClick: handlers.onGoogleConnect
+        },
+        {
+          type: 'item',
+          id: 'file-json-connect',
+          label: 'Json で接続…',
+          indent: true,
+          disabled: !handlers.onJsonConnect,
+          onClick: handlers.onJsonConnect
         },
         {
           type: 'item',

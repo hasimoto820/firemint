@@ -85,6 +85,23 @@ function App(): React.JSX.Element {
     setGoogleConnectOpen(true)
   }, [])
 
+  const handleJsonConnect = useCallback(async (): Promise<void> => {
+    const filePath = await window.api.connection.selectServiceAccountFile()
+
+    if (!filePath) {
+      return
+    }
+
+    const result = await window.api.connection.connect(filePath)
+
+    if (!result.ok) {
+      window.alert(result.error)
+      return
+    }
+
+    handleWorkspaceChanged()
+  }, [handleWorkspaceChanged])
+
   const handleProjectImported = useCallback((): void => {
     setRootsReloadToken((current) => current + 1)
   }, [])
@@ -103,6 +120,7 @@ function App(): React.JSX.Element {
         onExportProject: handleExportProject,
         onImportProject: handleImportProject,
         onGoogleConnect: handleGoogleConnect,
+        onJsonConnect: () => void handleJsonConnect(),
         context: menuContext,
         shell: shellCommands
           ? {
@@ -133,6 +151,7 @@ function App(): React.JSX.Element {
       handleExportProject,
       handleImportProject,
       handleGoogleConnect,
+      handleJsonConnect,
       menuContext,
       shellCommands,
       useWindowMenuActions
