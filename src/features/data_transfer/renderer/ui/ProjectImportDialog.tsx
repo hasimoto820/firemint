@@ -3,11 +3,12 @@ import type {
   ImportProjectProgress,
   ImportProjectValidation
 } from '@features/data_transfer/shared/types'
+import type { WorkspaceEntry } from '@features/workspace/shared/types'
 import Button from '@shared/ui/Button'
 
 type ProjectImportDialogProps = {
-  projectId: string
-  readOnly: boolean
+  projectId: string | null
+  destinations: WorkspaceEntry[]
   open: boolean
   onClose: () => void
   onImported?: () => void
@@ -15,11 +16,12 @@ type ProjectImportDialogProps = {
 
 function ProjectImportDialog({
   projectId,
-  readOnly,
+  destinations,
   open,
   onClose,
   onImported
 }: ProjectImportDialogProps): React.JSX.Element | null {
+  const [destinationId, setDestinationId] = useState(projectId ?? '')
   const [filePath, setFilePath] = useState<string | null>(null)
   const [validation, setValidation] = useState<ImportProjectValidation | null>(null)
   const [acceptMismatch, setAcceptMismatch] = useState(false)
@@ -28,11 +30,21 @@ function ProjectImportDialog({
   const [success, setSuccess] = useState<string | null>(null)
   const [progress, setProgress] = useState<ImportProjectProgress | null>(null)
 
+  const destination = destinations.find((entry) => entry.id === destinationId) ?? destinations[0] ?? null
+  const resolvedProjectId = destination?.id ?? ''
+  const readOnly = destination?.readOnly ?? false
+
   useEffect(() => {
     if (!open) {
       return
     }
 
+    const initial =
+      (projectId && destinations.some((entry) => entry.id === projectId) ? projectId : null) ??
+      destinations[0]?.id ??
+      ''
+
+    setDestinationId(initial)
     setFilePath(null)
     setValidation(null)
     setAcceptMismatch(false)
@@ -40,7 +52,7 @@ function ProjectImportDialog({
     setError(null)
     setSuccess(null)
     setProgress(null)
-  }, [open, projectId])
+  }, [open, projectId, destinations])
 
   useEffect(() => {
     if (!open || !busy) {
@@ -105,6 +117,22 @@ function ProjectImportDialog({
     setFilePath(result.filePath)
   }
 
+  const ensureDestinationLoaded = async (): Promise<string | null> => {
+    if (!resolvedProjectId) {
+      setError('インポート先のプロジェクトを選んでください')
+      return null
+    }
+
+    const result = await window.api.workspace.loadProject(resolvedProjectId)
+
+    if (!result.ok) {
+      setError(result.error)
+      return null
+    }
+
+    return resolvedProjectId
+  }
+
   const handleValidate = async (): Promise<void> => {
     if (!filePath) {
       setError('ZIP ファイルを選択してください')
@@ -124,8 +152,14 @@ function ProjectImportDialog({
     })
 
     try {
+      const loadedProjectId = await ensureDestinationLoaded()
+
+      if (!loadedProjectId) {
+        return
+      }
+
       const result = await window.api.dataTransfer.validateProjectImport({
-        projectId,
+        projectId: loadedProjectId,
         filePath
       })
 
@@ -164,8 +198,14 @@ function ProjectImportDialog({
     })
 
     try {
+      const loadedProjectId = await ensureDestinationLoaded()
+
+      if (!loadedProjectId) {
+        return
+      }
+
       const result = await window.api.dataTransfer.importProject({
-        projectId,
+        projectId: loadedProjectId,
         filePath,
         acceptProjectIdMismatch: acceptMismatch
       })
@@ -194,9 +234,38 @@ function ProjectImportDialog({
         <header className="project-export-dialog__header">
           <h2 className="project-export-dialog__title">プロジェクトにインポート</h2>
           <p className="project-export-dialog__lead">
-            ZIP を検証してから、プロジェクト <code>{projectId}</code> へ書き込みます。
+            ZIP を検証してから、選んだプロジェクトへ書き込みます。接続中でなくても実行できます。
           </p>
         </header>
+
+        {destinations.length === 0 ? (
+          <p className="project-export-dialog__error">
+            インポート先がありません。先に Json で接続するか、Google で接続してください。
+          </p>
+        ) : (
+          <label className="project-export-dialog__option">
+            インポート先
+            <select
+              className="bulk-actions__input"
+              value={resolvedProjectId}
+              disabled={busy || Boolean(success)}
+              onChange={(event) => {
+                setDestinationId(event.target.value)
+                setValidation(null)
+                setAcceptMismatch(false)
+                setError(null)
+                setSuccess(null)
+              }}
+            >
+              {destinations.map((entry) => (
+                <option key={entry.id} value={entry.id}>
+                  {entry.label !== entry.id ? `${entry.label} — ${entry.id}` : entry.id}
+                  {entry.readOnly ? '（read-only）' : ''}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
 
         {readOnly && (
           <p className="project-export-dialog__error">
@@ -205,7 +274,7 @@ function ProjectImportDialog({
         )}
 
         <div className="project-export-dialog__actions" style={{ justifyContent: 'flex-start' }}>
-          <Button onClick={() => void handleSelectFile()} disabled={busy}>
+          <Button onClick={() => void handleSelectFile()} disabled={busy || destinations.length === 0}>
             ZIP を選択…
           </Button>
         </div>

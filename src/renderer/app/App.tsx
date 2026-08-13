@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ConnectionStatus } from '@features/connection/shared/types'
+import type { WorkspaceEntry } from '@features/workspace/shared/types'
 import ConnectionPanel from '@features/connection/renderer/ui/ConnectionPanel'
 import GoogleConnectDialog from '@features/connection/renderer/ui/GoogleConnectDialog'
 import ProjectExportDialog from '@features/data_transfer/renderer/ui/ProjectExportDialog'
@@ -20,6 +21,7 @@ function App(): React.JSX.Element {
     undefined
   )
   const [hasGoogleWorkspace, setHasGoogleWorkspace] = useState(false)
+  const [workspaceEntries, setWorkspaceEntries] = useState<WorkspaceEntry[]>([])
   const [view, setView] = useState<AppView>('simple')
   const [refreshKey, setRefreshKey] = useState(0)
   const [menuContext, setMenuContext] = useState<AppMenuContextActions | null>(null)
@@ -36,6 +38,7 @@ function App(): React.JSX.Element {
     ])
     setConnectionStatus(status)
     setHasGoogleWorkspace(workspace.entries.some((entry) => entry.authType === 'google'))
+    setWorkspaceEntries(workspace.entries)
   }, [])
 
   useEffect(() => {
@@ -70,6 +73,7 @@ function App(): React.JSX.Element {
 
   const connected = Boolean(connectionStatus)
   const canDisconnect = connected || hasGoogleWorkspace
+  const canImportProject = workspaceEntries.length > 0
   const platform = window.electron.process.platform
   const useWindowMenuActions = platform === 'linux'
 
@@ -119,6 +123,7 @@ function App(): React.JSX.Element {
         onOpenDocs: handleOpenDocs,
         onExportProject: handleExportProject,
         onImportProject: handleImportProject,
+        canImportProject,
         onGoogleConnect: handleGoogleConnect,
         onJsonConnect: () => void handleJsonConnect(),
         context: menuContext,
@@ -143,6 +148,7 @@ function App(): React.JSX.Element {
     [
       connected,
       canDisconnect,
+      canImportProject,
       view,
       handleDisconnect,
       handleQuit,
@@ -198,21 +204,19 @@ function App(): React.JSX.Element {
           onClose={() => setGoogleConnectOpen(false)}
           onConnected={handleWorkspaceChanged}
         />
+        <ProjectImportDialog
+          projectId={connectionStatus?.projectId ?? null}
+          destinations={workspaceEntries}
+          open={projectImportOpen}
+          onClose={() => setProjectImportOpen(false)}
+          onImported={handleProjectImported}
+        />
         {connectionStatus && (
-          <>
-            <ProjectExportDialog
-              projectId={connectionStatus.projectId}
-              open={projectExportOpen}
-              onClose={() => setProjectExportOpen(false)}
-            />
-            <ProjectImportDialog
-              projectId={connectionStatus.projectId}
-              readOnly={connectionStatus.readOnly}
-              open={projectImportOpen}
-              onClose={() => setProjectImportOpen(false)}
-              onImported={handleProjectImported}
-            />
-          </>
+          <ProjectExportDialog
+            projectId={connectionStatus.projectId}
+            open={projectExportOpen}
+            onClose={() => setProjectExportOpen(false)}
+          />
         )}
       </AppChrome>
     </AppMenuRegistryProvider>

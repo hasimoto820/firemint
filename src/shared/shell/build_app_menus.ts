@@ -54,6 +54,8 @@ export type AppMenuHandlers = {
   onOpenDocs: () => void
   onExportProject?: () => void
   onImportProject?: () => void
+  /** 名簿に行き先プロジェクトがあるとき true（接続中でなくてよい） */
+  canImportProject?: boolean
   onGoogleConnect?: () => void
   onJsonConnect?: () => void
   onMinimize?: () => void
@@ -78,7 +80,7 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
           id: 'file-import-project',
           label: 'プロジェクト',
           indent: true,
-          disabled: !handlers.connected,
+          disabled: !(handlers.canImportProject ?? handlers.connected),
           onClick: handlers.onImportProject
         },
         {
