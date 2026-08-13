@@ -1,28 +1,38 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { ConnectResult, ConnectionStatus } from '@features/connection/shared/types'
+import type { WorkspaceState } from '@features/workspace/shared/types'
 import EnvironmentBadge from '@shared/ui/EnvironmentBadge'
 
 type ConnectionPanelProps = {
   onConnected?: () => void
   onRequestGoogleConnect?: () => void
+  /** 親が名簿を更新したときに再取得する */
+  refreshToken?: number
 }
 
-type AuthMode = 'serviceAccount' | 'google'
+type ConnectMode = 'list' | 'json' | 'google'
 
 function ConnectionPanel({
   onConnected,
-  onRequestGoogleConnect
+  onRequestGoogleConnect,
+  refreshToken = 0
 }: ConnectionPanelProps): React.JSX.Element {
-  const [mode, setMode] = useState<AuthMode>('serviceAccount')
+  const [mode, setMode] = useState<ConnectMode>('list')
+  const [workspace, setWorkspace] = useState<WorkspaceState | null>(null)
   const [selectedFile, setSelectedFile] = useState<string | null>(null)
   const [status, setStatus] = useState<ConnectionStatus | null>(null)
   const [rootCollections, setRootCollections] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
+  const refreshWorkspace = useCallback(async (): Promise<void> => {
+    setWorkspace(await window.api.workspace.getState())
+  }, [])
+
   useEffect(() => {
     void window.api.connection.getStatus().then(setStatus)
-  }, [])
+    void refreshWorkspace()
+  }, [refreshToken, refreshWorkspace])
 
   const handleSelectFile = async (): Promise<void> => {
     setError(null)
@@ -41,10 +51,33 @@ function ConnectionPanel({
     setError(null)
     setRootCollections(result.rootCollections)
     setStatus(await window.api.connection.getStatus())
+    await refreshWorkspace()
     onConnected?.()
   }
 
-  const handleConnect = async (): Promise<void> => {
+  const handleListConnect = async (projectId: string): Promise<void> => {
+    setLoading(true)
+    setError(null)
+
+    try {
+      const result = await window.api.workspace.setFocused(projectId, { exclusive: true })
+
+      if (!result.ok) {
+        setError(result.error)
+        return
+      }
+
+      setStatus(await window.api.connection.getStatus())
+      await refreshWorkspace()
+      onConnected?.()
+    } catch (error) {
+      setError(error instanceof Error ? error.message : '接続に失敗しました')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleJsonConnect = async (): Promise<void> => {
     if (!selectedFile) {
       setError('サービスアカウント JSON を選択してください')
       return
@@ -73,10 +106,16 @@ function ConnectionPanel({
       await window.api.connection.disconnect()
       setStatus(null)
       setRootCollections([])
+      await refreshWorkspace()
+      onConnected?.()
     } finally {
       setLoading(false)
     }
   }
+
+  const entries = workspace?.entries ?? []
+  const loadedIds = new Set(workspace?.loadedProjectIds ?? [])
+  const focusedId = workspace?.focusedProjectId ?? null
 
   return (
     <section className="connection-panel">
@@ -87,14 +126,26 @@ function ConnectionPanel({
         <button
           type="button"
           className={
-            mode === 'serviceAccount'
+            mode === 'list'
               ? 'connection-panel__mode-btn connection-panel__mode-btn--active'
               : 'connection-panel__mode-btn'
           }
-          onClick={() => setMode('serviceAccount')}
+          onClick={() => setMode('list')}
           disabled={loading}
         >
-          サービスアカウント JSON
+          リスト
+        </button>
+        <button
+          type="button"
+          className={
+            mode === 'json'
+              ? 'connection-panel__mode-btn connection-panel__mode-btn--active'
+              : 'connection-panel__mode-btn'
+          }
+          onClick={() => setMode('json')}
+          disabled={loading}
+        >
+          JSON
         </button>
         <button
           type="button"
@@ -106,29 +157,73 @@ function ConnectionPanel({
           onClick={() => setMode('google')}
           disabled={loading}
         >
-          Google アカウント
+          Google
         </button>
       </div>
 
-      {mode === 'serviceAccount' ? (
+      {mode === 'list' && (
+        <div className="connection-panel__list">
+          <p className="connection-panel__hint">登録済みをクリックして接続します。</p>
+          {entries.length === 0 ? (
+            <p className="connection-panel__empty">
+              登録済みがありません。JSON または Google で接続してください。
+            </p>
+          ) : (
+            <ul className="workspace-panel__list">
+              {entries.map((entry) => {
+                const isFocused = entry.id === focusedId
+                const isLoaded = loadedIds.has(entry.id)
+
+                return (
+                  <li key={entry.id}>
+                    <button
+                      type="button"
+                      className={
+                        isFocused
+                          ? 'workspace-panel__item workspace-panel__item--focused'
+                          : 'workspace-panel__item'
+                      }
+                      onClick={() => void handleListConnect(entry.id)}
+                      disabled={loading}
+                    >
+                      <span
+                        className="workspace-panel__dot"
+                        style={{ backgroundColor: entry.color }}
+                        aria-hidden
+                      />
+                      <span className="workspace-panel__item-body">
+                        <span className="workspace-panel__label">{entry.label}</span>
+                        <span className="workspace-panel__meta">
+                          {entry.authType === 'google' ? 'google' : 'json'}
+                          {entry.readOnly ? ' · read-only' : ''}
+                          {isLoaded ? ' · loaded' : ''}
+                        </span>
+                      </span>
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {mode === 'json' && (
         <div className="connection-panel__actions">
           <button type="button" onClick={() => void handleSelectFile()} disabled={loading}>
             JSON を選択
           </button>
           <button
             type="button"
-            onClick={() => void handleConnect()}
+            onClick={() => void handleJsonConnect()}
             disabled={loading || !selectedFile}
           >
             接続
           </button>
-          {status && (
-            <button type="button" onClick={() => void handleDisconnect()} disabled={loading}>
-              切断
-            </button>
-          )}
         </div>
-      ) : (
+      )}
+
+      {mode === 'google' && (
         <div className="connection-panel__actions">
           <button
             type="button"
@@ -137,15 +232,18 @@ function ConnectionPanel({
           >
             Google でサインイン…
           </button>
-          {status && (
-            <button type="button" onClick={() => void handleDisconnect()} disabled={loading}>
-              切断
-            </button>
-          )}
         </div>
       )}
 
-      {mode === 'serviceAccount' && selectedFile && (
+      {status && (
+        <div className="connection-panel__actions">
+          <button type="button" onClick={() => void handleDisconnect()} disabled={loading}>
+            切断
+          </button>
+        </div>
+      )}
+
+      {mode === 'json' && selectedFile && (
         <p className="connection-panel__file">選択: {selectedFile}</p>
       )}
       {loading && <p className="connection-panel__loading">接続中...</p>}

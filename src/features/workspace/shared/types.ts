@@ -50,6 +50,11 @@ export type AddGoogleWorkspaceEntryInput = {
   setFocused?: boolean
 }
 
+export type SetFocusedProjectOptions = {
+  /** true のとき、他プロジェクトの接続を切ってから開く（リストから1件選ぶ用） */
+  exclusive?: boolean
+}
+
 export type WorkspaceResult<T> =
   | {
       ok: true

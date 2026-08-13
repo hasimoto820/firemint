@@ -4,10 +4,10 @@ import { detectEnvironment } from '@shared/safety/environment'
 import {
   addEntryAndLoad,
   addGoogleEntryAndLoad,
-  detachGoogleWorkspaceEntries,
   getFocusedConnectionInfo,
   getWorkspaceEntry,
   importGoogleAccountProjects,
+  unloadGoogleAccountConnections,
   unloadProject
 } from '@features/workspace/main/service'
 import { getFocusedProjectId } from '@shared/firestore/focused'
@@ -297,22 +297,19 @@ export async function disconnectFromFirestore(): Promise<void> {
     `disconnect start projectId=${projectId ?? 'none'} authType=${focused?.authType ?? 'none'}`
   )
 
-  // Google 認証の取扱い分はセッション終了として名簿から外す（クラウド削除ではない）
-  const detachResult = await detachGoogleWorkspaceEntries(
-    focused?.authType === 'google' ? focused.googleAccountKey : undefined
-  )
+  // Google / JSON とも名簿は残し、接続だけ切る（リストから再接続できる）
+  if (focused?.authType === 'google') {
+    const unloadResult = await unloadGoogleAccountConnections(focused.googleAccountKey)
 
-  if (!detachResult.ok) {
-    throw new Error(detachResult.error)
-  }
+    if (!unloadResult.ok) {
+      throw new Error(unloadResult.error)
+    }
 
-  logInfo(
-    'connection',
-    `google workspace detached count=${detachResult.data.removedProjectIds.length}`
-  )
-
-  // JSON 接続は名簿に残し、接続だけ切る
-  if (projectId && focused?.authType === 'serviceAccount') {
+    logInfo(
+      'connection',
+      `google connections unloaded count=${unloadResult.data.unloadedProjectIds.length}`
+    )
+  } else if (projectId && focused?.authType === 'serviceAccount') {
     await unloadProject(projectId)
   }
 

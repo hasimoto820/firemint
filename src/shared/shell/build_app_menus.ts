@@ -56,6 +56,8 @@ export type AppMenuHandlers = {
   onImportProject?: () => void
   /** 名簿に行き先プロジェクトがあるとき true（接続中でなくてよい） */
   canImportProject?: boolean
+  onListConnect?: () => void
+  canListConnect?: boolean
   onGoogleConnect?: () => void
   onJsonConnect?: () => void
   onMinimize?: () => void
@@ -112,19 +114,27 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
         { type: 'header', label: '接続' },
         {
           type: 'item',
+          id: 'file-list-connect',
+          label: 'リストから接続…',
+          indent: true,
+          disabled: !(handlers.canListConnect ?? false),
+          onClick: handlers.onListConnect
+        },
+        {
+          type: 'item',
+          id: 'file-json-connect',
+          label: 'JSON で接続…',
+          indent: true,
+          disabled: !handlers.onJsonConnect,
+          onClick: handlers.onJsonConnect
+        },
+        {
+          type: 'item',
           id: 'file-google-connect',
           label: 'Google で接続…',
           indent: true,
           disabled: !handlers.onGoogleConnect,
           onClick: handlers.onGoogleConnect
-        },
-        {
-          type: 'item',
-          id: 'file-json-connect',
-          label: 'Json で接続…',
-          indent: true,
-          disabled: !handlers.onJsonConnect,
-          onClick: handlers.onJsonConnect
         },
         {
           type: 'item',

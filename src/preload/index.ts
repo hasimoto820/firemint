@@ -39,8 +39,8 @@ const api: IpcApi = {
       ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_LOAD_PROJECT, projectId),
     unloadProject: (projectId: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_UNLOAD_PROJECT, projectId),
-    setFocused: (projectId: string) =>
-      ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_SET_FOCUSED, projectId)
+    setFocused: (projectId: string, options?) =>
+      ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_SET_FOCUSED, projectId, options)
   },
   explorer: {
     listRootCollections: (projectId: string) =>

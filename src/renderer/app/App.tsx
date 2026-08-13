@@ -3,9 +3,9 @@ import type { ConnectionStatus } from '@features/connection/shared/types'
 import type { WorkspaceEntry } from '@features/workspace/shared/types'
 import ConnectionPanel from '@features/connection/renderer/ui/ConnectionPanel'
 import GoogleConnectDialog from '@features/connection/renderer/ui/GoogleConnectDialog'
+import ListConnectDialog from '@features/connection/renderer/ui/ListConnectDialog'
 import ProjectExportDialog from '@features/data_transfer/renderer/ui/ProjectExportDialog'
 import ProjectImportDialog from '@features/data_transfer/renderer/ui/ProjectImportDialog'
-import WorkspacePanel from '@features/workspace/renderer/ui/WorkspacePanel'
 import FirestorePage, { type ShellCommands } from './FirestorePage'
 import type { AppView } from '@shared/shell/AppNav'
 import AppChrome from '@shared/shell/AppChrome'
@@ -29,6 +29,7 @@ function App(): React.JSX.Element {
   const [projectExportOpen, setProjectExportOpen] = useState(false)
   const [projectImportOpen, setProjectImportOpen] = useState(false)
   const [googleConnectOpen, setGoogleConnectOpen] = useState(false)
+  const [listConnectOpen, setListConnectOpen] = useState(false)
   const [rootsReloadToken, setRootsReloadToken] = useState(0)
 
   const refreshStatus = useCallback(async (): Promise<void> => {
@@ -74,6 +75,7 @@ function App(): React.JSX.Element {
   const connected = Boolean(connectionStatus)
   const canDisconnect = connected || hasGoogleWorkspace
   const canImportProject = workspaceEntries.length > 0
+  const canListConnect = workspaceEntries.length > 0
   const platform = window.electron.process.platform
   const useWindowMenuActions = platform === 'linux'
 
@@ -83,6 +85,10 @@ function App(): React.JSX.Element {
 
   const handleImportProject = useCallback((): void => {
     setProjectImportOpen(true)
+  }, [])
+
+  const handleListConnect = useCallback((): void => {
+    setListConnectOpen(true)
   }, [])
 
   const handleGoogleConnect = useCallback((): void => {
@@ -124,6 +130,8 @@ function App(): React.JSX.Element {
         onExportProject: handleExportProject,
         onImportProject: handleImportProject,
         canImportProject,
+        onListConnect: handleListConnect,
+        canListConnect,
         onGoogleConnect: handleGoogleConnect,
         onJsonConnect: () => void handleJsonConnect(),
         context: menuContext,
@@ -149,6 +157,7 @@ function App(): React.JSX.Element {
       connected,
       canDisconnect,
       canImportProject,
+      canListConnect,
       view,
       handleDisconnect,
       handleQuit,
@@ -156,6 +165,7 @@ function App(): React.JSX.Element {
       handleOpenDocs,
       handleExportProject,
       handleImportProject,
+      handleListConnect,
       handleGoogleConnect,
       handleJsonConnect,
       menuContext,
@@ -173,10 +183,10 @@ function App(): React.JSX.Element {
   } else if (!connectionStatus) {
     content = (
       <main className="app-shell app-shell--landing">
-        <WorkspacePanel onChanged={handleWorkspaceChanged} />
         <ConnectionPanel
           onConnected={handleWorkspaceChanged}
           onRequestGoogleConnect={handleGoogleConnect}
+          refreshToken={refreshKey}
         />
       </main>
     )
@@ -199,6 +209,11 @@ function App(): React.JSX.Element {
     <AppMenuRegistryProvider value={registerMenu}>
       <AppChrome title={chromeTitle} menus={menus}>
         {content}
+        <ListConnectDialog
+          open={listConnectOpen}
+          onClose={() => setListConnectOpen(false)}
+          onConnected={handleWorkspaceChanged}
+        />
         <GoogleConnectDialog
           open={googleConnectOpen}
           onClose={() => setGoogleConnectOpen(false)}

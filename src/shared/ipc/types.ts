@@ -59,6 +59,7 @@ import type {
 
 import type {
   AddWorkspaceEntryInput,
+  SetFocusedProjectOptions,
   UpdateWorkspaceEntryInput,
   WorkspaceEntry,
   WorkspaceResult,
@@ -178,7 +179,10 @@ export type WorkspaceIpcApi = {
   ) => Promise<WorkspaceResult<WorkspaceEntry>>
   loadProject: (projectId: string) => Promise<WorkspaceResult<WorkspaceEntry>>
   unloadProject: (projectId: string) => Promise<WorkspaceResult<null>>
-  setFocused: (projectId: string) => Promise<WorkspaceResult<WorkspaceEntry>>
+  setFocused: (
+    projectId: string,
+    options?: SetFocusedProjectOptions
+  ) => Promise<WorkspaceResult<WorkspaceEntry>>
 }
 
 export interface IpcApi {

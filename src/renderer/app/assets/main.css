@@ -2384,6 +2384,17 @@ code {
   cursor: not-allowed;
 }
 
+.connection-panel__list {
+  margin-bottom: 12px;
+}
+
+.connection-panel__hint,
+.connection-panel__empty {
+  margin: 0 0 8px;
+  color: var(--ev-c-text-2);
+  font-size: 12px;
+}
+
 .connection-panel__actions {
   display: flex;
   flex-wrap: wrap;

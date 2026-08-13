@@ -24,6 +24,7 @@ import { loadWorkspaceStore, saveWorkspaceStore } from './store'
 import type {
   AddGoogleWorkspaceEntryInput,
   AddWorkspaceEntryInput,
+  SetFocusedProjectOptions,
   UpdateWorkspaceEntryInput,
   WorkspaceEntry,
   WorkspaceResult,
@@ -286,12 +287,12 @@ export async function unloadProject(projectId: string): Promise<WorkspaceResult<
 }
 
 /**
- * Google 認証の取扱いを終了する（クラウド削除ではない）。
- * プロファイル（色・表示名・read-only・最後の focus）は残し、名簿と接続と token は外す。
+ * Google アカウントの接続だけ切る（クラウド削除ではない）。
+ * 名簿・token・プロファイルは残し、リストから再接続できる状態にする。
  */
-export async function detachGoogleWorkspaceEntries(
+export async function unloadGoogleAccountConnections(
   accountKey?: string
-): Promise<WorkspaceResult<{ removedProjectIds: string[] }>> {
+): Promise<WorkspaceResult<{ unloadedProjectIds: string[] }>> {
   try {
     const targets = store.entries.filter((entry) => {
       if (entry.authType !== 'google') {
@@ -306,7 +307,7 @@ export async function detachGoogleWorkspaceEntries(
     })
 
     if (targets.length === 0) {
-      return { ok: true, data: { removedProjectIds: [] } }
+      return { ok: true, data: { unloadedProjectIds: [] } }
     }
 
     const byAccount = new Map<string, typeof targets>()
@@ -344,39 +345,33 @@ export async function detachGoogleWorkspaceEntries(
       })
     }
 
-    const accountKeys = new Set(byAccount.keys())
+    const unloadedProjectIds: string[] = []
 
     for (const entry of targets) {
       if (isFirestoreConnected(entry.id)) {
         await disconnectFirestore(entry.id)
+        unloadedProjectIds.push(entry.id)
       }
     }
 
-    const removedProjectIds = targets.map((entry) => entry.id)
-    const removedIdSet = new Set(removedProjectIds)
-    store.entries = store.entries.filter((entry) => !removedIdSet.has(entry.id))
+    const targetIds = new Set(targets.map((entry) => entry.id))
 
-    if (store.focusedProjectId && removedIdSet.has(store.focusedProjectId)) {
+    if (store.focusedProjectId && targetIds.has(store.focusedProjectId)) {
       store.focusedProjectId = null
       syncFocusedFromStore()
     }
 
     await persistStore()
 
-    for (const key of accountKeys) {
-      await removeGoogleRefreshToken(key)
-    }
-
-    return { ok: true, data: { removedProjectIds } }
+    return { ok: true, data: { unloadedProjectIds } }
   } catch (error) {
     return toWorkspaceError(error)
   }
 }
 
 /**
- * Google アカウントのプロジェクトを一括で取扱い名簿へ載せる。
+ * Google アカウントのプロジェクトを一括で取扱い名簿へ載せ、接続もできるだけ開く。
  * 以前のプロファイル（label / color / readOnly / lastFocused）があれば復元する。
- * Firestore 接続は focused の1件だけ行う。
  */
 export async function importGoogleAccountProjects(input: {
   accountKey: string
@@ -424,6 +419,18 @@ export async function importGoogleAccountProjects(input: {
 
     await persistStore()
 
+    // 一括で開く: 権限のあるプロジェクトをできるだけ接続プールへ載せる
+    for (const project of input.projects) {
+      const loadResult = await loadProject(project.projectId)
+
+      if (!loadResult.ok) {
+        logError(
+          'workspace',
+          `google bulk load skipped project=${project.projectId}: ${loadResult.error}`
+        )
+      }
+    }
+
     if (!preferredFocus) {
       return { ok: true, data: { focusedProjectId: null, count: input.projects.length } }
     }
@@ -434,6 +441,10 @@ export async function importGoogleAccountProjects(input: {
     ]
 
     for (const candidateId of focusCandidates) {
+      if (!isFirestoreConnected(candidateId)) {
+        continue
+      }
+
       const focusResult = await setFocusedProject(candidateId)
 
       if (focusResult.ok) {
@@ -528,11 +539,22 @@ export async function updateEntry(
   return { ok: true, data: updated }
 }
 
-export async function setFocusedProject(projectId: string): Promise<WorkspaceResult<WorkspaceEntry>> {
+export async function setFocusedProject(
+  projectId: string,
+  options?: SetFocusedProjectOptions
+): Promise<WorkspaceResult<WorkspaceEntry>> {
   const entry = getWorkspaceEntry(projectId)
 
   if (!entry) {
     return { ok: false, error: 'プロジェクトが登録されていません' }
+  }
+
+  if (options?.exclusive) {
+    for (const loadedId of listConnectedProjectIds()) {
+      if (loadedId !== projectId) {
+        await disconnectFirestore(loadedId)
+      }
+    }
   }
 
   if (!isFirestoreConnected(projectId)) {

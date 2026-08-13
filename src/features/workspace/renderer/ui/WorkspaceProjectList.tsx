@@ -172,8 +172,8 @@ function WorkspaceProjectList({
     }
   }
 
-  const entries = state?.entries ?? []
   const loadedIds = new Set(state?.loadedProjectIds ?? [])
+  const entries = (state?.entries ?? []).filter((entry) => loadedIds.has(entry.id))
   const focusedId = state?.focusedProjectId ?? null
   const busy = disabled || loading
   const treeMode = focusedChildren !== undefined
@@ -196,7 +196,9 @@ function WorkspaceProjectList({
 
       {error && <p className="project-list__error">{error}</p>}
 
-      {entries.length === 0 && <p className="project-list__empty">プロジェクトがありません</p>}
+      {entries.length === 0 && (
+        <p className="project-list__empty">接続中のプロジェクトがありません</p>
+      )}
 
       <ul className="project-list__items">
         {entries.map((entry) => {

@@ -3,6 +3,7 @@ import { IPC_CHANNELS } from '@shared/ipc/channels'
 import { logInfo } from '@shared/logging/logger'
 import type {
   AddWorkspaceEntryInput,
+  SetFocusedProjectOptions,
   UpdateWorkspaceEntryInput
 } from '@features/workspace/shared/types'
 import {
@@ -50,8 +51,14 @@ export function registerWorkspaceHandlers(): void {
     return unloadProject(projectId)
   })
 
-  ipcMain.handle(IPC_CHANNELS.WORKSPACE_SET_FOCUSED, async (_event, projectId: string) => {
-    logInfo('ipc:workspace', `setFocused invoked projectId=${projectId}`)
-    return setFocusedProject(projectId)
-  })
+  ipcMain.handle(
+    IPC_CHANNELS.WORKSPACE_SET_FOCUSED,
+    async (_event, projectId: string, options?: SetFocusedProjectOptions) => {
+      logInfo(
+        'ipc:workspace',
+        `setFocused invoked projectId=${projectId} exclusive=${options?.exclusive === true}`
+      )
+      return setFocusedProject(projectId, options)
+    }
+  )
 }
