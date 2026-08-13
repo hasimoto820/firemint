@@ -1,4 +1,5 @@
-:root {
+:root,
+:root[data-theme='dark'] {
   --ev-c-white: #ffffff;
   --ev-c-white-soft: #f8f8f8;
   --ev-c-white-mute: #f2f2f2;
@@ -21,14 +22,45 @@
   --ev-button-alt-hover-border: transparent;
   --ev-button-alt-hover-text: var(--ev-c-text-1);
   --ev-button-alt-hover-bg: var(--ev-c-gray-2);
-}
 
-:root {
   --color-background: var(--ev-c-black);
   --color-background-soft: var(--ev-c-black-soft);
   --color-background-mute: var(--ev-c-black-mute);
-
   --color-text: var(--ev-c-text-1);
+  --color-danger: #c62828;
+  --color-border: var(--ev-c-gray-1);
+}
+
+:root[data-theme='light'] {
+  --ev-c-white: #1b1b1f;
+  --ev-c-white-soft: #2a2a2e;
+  --ev-c-white-mute: #3a3a3f;
+
+  --ev-c-black: #f4f4f5;
+  --ev-c-black-soft: #ffffff;
+  --ev-c-black-mute: #e8e8ea;
+
+  --ev-c-gray-1: #c8c8ce;
+  --ev-c-gray-2: #dedee3;
+  --ev-c-gray-3: #ececf0;
+
+  --ev-c-text-1: rgba(20, 20, 24, 0.92);
+  --ev-c-text-2: rgba(20, 20, 24, 0.62);
+  --ev-c-text-3: rgba(20, 20, 24, 0.42);
+
+  --ev-button-alt-border: transparent;
+  --ev-button-alt-text: var(--ev-c-text-1);
+  --ev-button-alt-bg: var(--ev-c-gray-3);
+  --ev-button-alt-hover-border: transparent;
+  --ev-button-alt-hover-text: var(--ev-c-text-1);
+  --ev-button-alt-hover-bg: var(--ev-c-gray-2);
+
+  --color-background: var(--ev-c-black);
+  --color-background-soft: var(--ev-c-black-soft);
+  --color-background-mute: var(--ev-c-black-mute);
+  --color-text: var(--ev-c-text-1);
+  --color-danger: #b71c1c;
+  --color-border: var(--ev-c-gray-1);
 }
 
 *,

@@ -79,6 +79,9 @@ import type {
   UpdateAuthUserInput
 } from '@features/auth_users/shared/types'
 
+import type { AppSettings, Theme } from '@shared/settings/shared/types'
+import type { Locale } from '@shared/i18n/shared/types'
+
 export type PingResult = {
   message: string
 }
@@ -213,6 +216,14 @@ export type AuthUsersIpcApi = {
   ) => Promise<AuthUsersResult<ExportAuthUsersResult>>
 }
 
+export type SettingsIpcApi = {
+  get: () => Promise<AppSettings>
+  setLocale: (locale: Locale) => Promise<AppSettings>
+  setTheme: (theme: Theme) => Promise<AppSettings>
+  openWindow: () => Promise<null>
+  onChanged: (listener: (settings: AppSettings) => void) => () => void
+}
+
 export interface IpcApi {
   ping: () => Promise<PingResult>
   app: AppIpcApi
@@ -224,4 +235,5 @@ export interface IpcApi {
   bulk: BulkOperationsIpcApi
   dataTransfer: DataTransferIpcApi
   authUsers: AuthUsersIpcApi
+  settings: SettingsIpcApi
 }

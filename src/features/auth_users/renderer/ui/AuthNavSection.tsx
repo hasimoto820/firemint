@@ -1,3 +1,5 @@
+import { useI18n } from '@shared/i18n/renderer/I18nProvider'
+
 type AuthNavSectionProps = {
   active: boolean
   onSelect: () => void
@@ -10,6 +12,8 @@ function AuthNavSection({
   onSelect,
   disabled = false
 }: AuthNavSectionProps): React.JSX.Element {
+  const { t } = useI18n()
+
   return (
     <div className="auth-nav">
       <button
@@ -18,7 +22,7 @@ function AuthNavSection({
         onClick={onSelect}
         disabled={disabled}
       >
-        AUTH
+        {t('auth_users.nav')}
       </button>
     </div>
   )

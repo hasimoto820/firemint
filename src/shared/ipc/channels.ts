@@ -63,7 +63,12 @@ export const IPC_CHANNELS = {
   AUTH_USERS_UPDATE: 'auth_users:update',
   AUTH_USERS_SET_DISABLED: 'auth_users:set_disabled',
   AUTH_USERS_DELETE: 'auth_users:delete',
-  AUTH_USERS_EXPORT: 'auth_users:export'
+  AUTH_USERS_EXPORT: 'auth_users:export',
+  SETTINGS_GET: 'settings:get',
+  SETTINGS_SET_LOCALE: 'settings:set_locale',
+  SETTINGS_SET_THEME: 'settings:set_theme',
+  SETTINGS_OPEN_WINDOW: 'settings:open_window',
+  SETTINGS_CHANGED: 'settings:changed'
 } as const
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS]

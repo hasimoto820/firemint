@@ -2585,6 +2585,23 @@ code {
   font-size: 13px;
 }
 
+.connection-panel__language {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: var(--ev-c-text-2);
+}
+
+.connection-panel__language select {
+  padding: 4px 8px;
+  border: 1px solid var(--ev-c-gray-1);
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+}
+
 .connection-panel__mode {
   display: flex;
   gap: 6px;
@@ -3023,4 +3040,65 @@ code {
   .actions {
     display: none;
   }
+}
+
+html.settings-window-root,
+html.settings-window-root body,
+html.settings-window-root #root {
+  overflow: auto;
+  height: auto;
+  min-height: 100%;
+  width: 100%;
+}
+
+.settings-window {
+  min-height: 100%;
+  padding: 20px 22px 28px;
+  box-sizing: border-box;
+  background: var(--color-background);
+  color: var(--color-text);
+}
+
+.settings-window__header {
+  margin-bottom: 18px;
+}
+
+.settings-window__title {
+  margin: 0;
+  font-size: 18px;
+}
+
+.settings-window__lead {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--ev-c-text-2);
+}
+
+.settings-window__section {
+  margin-bottom: 20px;
+}
+
+.settings-window__section-title {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.settings-window__options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.settings-window__option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.settings-window__busy {
+  margin: 0;
+  color: var(--ev-c-text-2);
 }

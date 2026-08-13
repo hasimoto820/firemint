@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { AuthUser } from '@features/auth_users/shared/types'
 import Button from '@shared/ui/Button'
+import { useT } from '@shared/i18n/renderer/I18nProvider'
 
 type AuthUsersViewProps = {
   projectId: string
@@ -30,6 +31,7 @@ function toDraft(user: AuthUser): EditDraft {
 }
 
 function AuthUsersView({ projectId, readOnly }: AuthUsersViewProps): React.JSX.Element {
+  const t = useT()
   const [users, setUsers] = useState<AuthUser[]>([])
   const [pageToken, setPageToken] = useState<string | null>(null)
   const [search, setSearch] = useState('')
@@ -47,9 +49,7 @@ function AuthUsersView({ projectId, readOnly }: AuthUsersViewProps): React.JSX.E
 
     try {
       if (!window.api.authUsers?.listUsers) {
-        setError(
-          'AUTH API が未ロードです。FireMint を一度終了して npm run dev から再起動してください。'
-        )
+        setError(t('auth_users.api_missing'))
         setUsers([])
         setPageToken(null)
         return
@@ -76,7 +76,7 @@ function AuthUsersView({ projectId, readOnly }: AuthUsersViewProps): React.JSX.E
     } finally {
       setLoading(false)
     }
-  }, [projectId])
+  }, [projectId, t])
 
   useEffect(() => {
     void loadFirstPage()
@@ -315,7 +315,7 @@ function AuthUsersView({ projectId, readOnly }: AuthUsersViewProps): React.JSX.E
     <div className="auth-users">
       <header className="auth-users__header">
         <div>
-          <h2 className="auth-users__title">AUTH ユーザー</h2>
+          <h2 className="auth-users__title">{t('auth_users.title')}</h2>
           <p className="auth-users__lead">
             {projectId}
             {readOnly ? ' · read-only' : ''}
@@ -323,26 +323,26 @@ function AuthUsersView({ projectId, readOnly }: AuthUsersViewProps): React.JSX.E
         </div>
         <div className="auth-users__actions">
           <Button onClick={() => void loadFirstPage()} disabled={loading || busy}>
-            再読込
+            {t('common.reload')}
           </Button>
           <Button onClick={() => void handleExport('json')} disabled={busy}>
-            JSON
+            {t('auth_users.json')}
           </Button>
           <Button onClick={() => void handleExport('csv')} disabled={busy}>
-            CSV
+            {t('auth_users.csv')}
           </Button>
           <Button
             onClick={() => void handleBulkDisable(true)}
             disabled={readOnly || busy || selected.size === 0}
           >
-            無効化
+            {t('auth_users.disable')}
           </Button>
           <Button
             variant="danger"
             onClick={() => void handleBulkDelete()}
             disabled={readOnly || busy || selected.size === 0}
           >
-            削除
+            {t('common.delete')}
           </Button>
         </div>
       </header>
@@ -352,11 +352,11 @@ function AuthUsersView({ projectId, readOnly }: AuthUsersViewProps): React.JSX.E
           className="auth-users__search"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
-          placeholder="検索（email / uid / 表示名）"
+          placeholder={t('auth_users.search_placeholder')}
           disabled={busy}
         />
         <label className="auth-users__sort">
-          並び
+          {t('auth_users.sort')}
           <select
             value={sortKey}
             onChange={(event) =>
@@ -370,8 +370,8 @@ function AuthUsersView({ projectId, readOnly }: AuthUsersViewProps): React.JSX.E
           </select>
         </label>
         <span className="auth-users__count">
-          表示 {filtered.length} / 取得 {users.length}
-          {selected.size > 0 ? ` · 選択 ${selected.size}` : ''}
+          {t('auth_users.count', { shown: filtered.length, loaded: users.length })}
+          {selected.size > 0 ? t('auth_users.selected', { count: selected.size }) : ''}
         </span>
       </div>
 
@@ -395,9 +395,9 @@ function AuthUsersView({ projectId, readOnly }: AuthUsersViewProps): React.JSX.E
                 </th>
                 <th>email</th>
                 <th>uid</th>
-                <th>状態</th>
-                <th>providers</th>
-                <th>lastSignIn</th>
+                <th>{t('auth_users.status')}</th>
+                <th>{t('auth_users.providers')}</th>
+                <th>{t('auth_users.last_sign_in')}</th>
               </tr>
             </thead>
             <tbody>
@@ -431,13 +431,13 @@ function AuthUsersView({ projectId, readOnly }: AuthUsersViewProps): React.JSX.E
           </table>
 
           {filtered.length === 0 && !loading && (
-            <p className="auth-users__empty">ユーザーがありません</p>
+            <p className="auth-users__empty">{t('auth_users.empty')}</p>
           )}
 
           {pageToken && (
             <div className="auth-users__more">
               <Button onClick={() => void loadMore()} disabled={loading || busy}>
-                さらに読み込む
+                {t('auth_users.load_more')}
               </Button>
             </div>
           )}
@@ -445,10 +445,10 @@ function AuthUsersView({ projectId, readOnly }: AuthUsersViewProps): React.JSX.E
 
         <aside className="auth-users__detail">
           {!editingUser || !draft ? (
-            <p className="auth-users__empty">行をクリックして編集</p>
+            <p className="auth-users__empty">{t('auth_users.edit_hint')}</p>
           ) : (
             <>
-              <h3 className="auth-users__detail-title">ユーザー編集</h3>
+              <h3 className="auth-users__detail-title">{t('auth_users.edit_title')}</h3>
               <p className="auth-users__mono">{editingUser.uid}</p>
 
               <label className="auth-users__field">
@@ -520,7 +520,7 @@ function AuthUsersView({ projectId, readOnly }: AuthUsersViewProps): React.JSX.E
 
               <div className="auth-users__detail-actions">
                 <Button onClick={() => void handleSave()} disabled={readOnly || busy}>
-                  保存
+                  {t('common.save')}
                 </Button>
               </div>
             </>

@@ -15,8 +15,10 @@ import {
   FIREMINT_DOCS_URL,
   type AppMenuContextActions
 } from '@shared/shell/build_app_menus'
+import { useI18n } from '@shared/i18n/renderer/I18nProvider'
 
 function App(): React.JSX.Element {
+  const { t, ready } = useI18n()
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus | null | undefined>(
     undefined
   )
@@ -146,6 +148,10 @@ function App(): React.JSX.Element {
               splitEnabled: shellCommands.splitEnabled
             }
           : null,
+        t,
+        onOpenSettings: () => {
+          void window.api.settings.openWindow()
+        },
         ...(useWindowMenuActions
           ? {
               onMinimize: () => void window.api.window.minimize(),
@@ -170,7 +176,8 @@ function App(): React.JSX.Element {
       handleJsonConnect,
       menuContext,
       shellCommands,
-      useWindowMenuActions
+      useWindowMenuActions,
+      t
     ]
   )
 
@@ -178,8 +185,8 @@ function App(): React.JSX.Element {
 
   let content: React.JSX.Element
 
-  if (connectionStatus === undefined) {
-    content = <main className="app-shell app-shell--loading">読み込み中...</main>
+  if (!ready || connectionStatus === undefined) {
+    content = <main className="app-shell app-shell--loading">{t('common.busy')}</main>
   } else if (!connectionStatus) {
     content = (
       <main className="app-shell app-shell--landing">

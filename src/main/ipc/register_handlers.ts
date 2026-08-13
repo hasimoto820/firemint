@@ -8,6 +8,7 @@ import { registerBulkOperationsHandlers } from '@features/bulk_operations/main/i
 import { registerDataTransferHandlers } from '@features/data_transfer/main/ipc'
 import { registerWorkspaceHandlers } from '@features/workspace/main/ipc'
 import { registerAuthUsersHandlers } from '@features/auth_users/main/ipc'
+import { registerSettingsHandlers } from '@shared/settings/main/ipc'
 import { registerWindowHandlers } from '../shell/window_ipc'
 import { registerAppHandlers } from '../shell/app_ipc'
 
@@ -25,4 +26,5 @@ export function registerIpcHandlers(): void {
   registerBulkOperationsHandlers()
   registerDataTransferHandlers()
   registerAuthUsersHandlers()
+  registerSettingsHandlers()
 }

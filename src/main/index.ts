@@ -5,17 +5,17 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { registerIpcHandlers } from './ipc/register_handlers'
 import { initializeWorkspace } from '@features/workspace/main/service'
+import { getSettings } from '@shared/settings/main/service'
+import {
+  titleBarOverlayOptions,
+  windowBackgroundColor
+} from '@shared/settings/main/window_chrome'
 
-const TITLE_BAR_HEIGHT = 32
-const TITLE_BAR_OVERLAY = {
-  color: '#222222',
-  symbolColor: '#ebebf5'
-} as const
-
-function createWindow(): void {
+async function createWindow(): Promise<void> {
   const isMac = process.platform === 'darwin'
   const isWin = process.platform === 'win32'
   const isLinux = process.platform === 'linux'
+  const { theme } = await getSettings()
 
   const mainWindow = new BrowserWindow({
     width: 960,
@@ -24,7 +24,7 @@ function createWindow(): void {
     minHeight: 600,
     show: false,
     autoHideMenuBar: true,
-    backgroundColor: '#1b1b1f',
+    backgroundColor: windowBackgroundColor(theme),
     ...(isMac
       ? {
           titleBarStyle: 'hiddenInset',
@@ -34,10 +34,7 @@ function createWindow(): void {
     ...(isWin
       ? {
           titleBarStyle: 'hidden',
-          titleBarOverlay: {
-            ...TITLE_BAR_OVERLAY,
-            height: TITLE_BAR_HEIGHT
-          }
+          titleBarOverlay: titleBarOverlayOptions(theme)
         }
       : {}),
     ...(isLinux ? { frame: false, icon } : {}),
@@ -81,13 +78,13 @@ app.whenReady().then(() => {
 
   void initializeWorkspace().then(() => {
     registerIpcHandlers()
-    createWindow()
+    void createWindow()
   })
 
   app.on('activate', function () {
     // On macOS it's common to re-create a window in the app when the
     // dock icon is clicked and there are no other windows open.
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    if (BrowserWindow.getAllWindows().length === 0) void createWindow()
   })
 })
 

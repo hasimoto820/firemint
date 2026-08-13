@@ -5,6 +5,7 @@ import {
 } from '@features/autocomplete/renderer/hooks'
 import AuthUsersView from '@features/auth_users/renderer/ui/AuthUsersView'
 import type { ConnectionStatus } from '@features/connection/shared/types'
+import { useT } from '@shared/i18n/renderer/I18nProvider'
 import CollectionRenameDialog from '@features/explorer/renderer/ui/CollectionRenameDialog'
 import FieldBulkRenameDialog from '@features/explorer/renderer/ui/FieldBulkRenameDialog'
 import SubcollectionCreateDialog from '@features/explorer/renderer/ui/SubcollectionCreateDialog'
@@ -63,6 +64,7 @@ function FirestorePageInner({
   rootsReloadToken = 0
 }: FirestorePageProps): React.JSX.Element {
   const projectId = status.projectId
+  const t = useT()
   const autocomplete = useAutocompleteApi()
   const [rootCollections, setRootCollections] = useState<string[]>([])
   const [tabs, setTabs] = useState<WorkspaceTab[]>([])
@@ -762,11 +764,8 @@ function FirestorePageInner({
               <AuthUsersView projectId={projectId} readOnly={status.readOnly} />
             ) : tabs.length === 0 ? (
               <div className="simple-main simple-main--empty">
-                <p className="simple-main__empty-title">コレクションを開いてください</p>
-                <p className="simple-main__empty-hint">
-                  左のツリーからコレクションを選ぶか、Ctrl+P（Mac: ⌘P）で Command Palette
-                  を開き、タブとして開けます。
-                </p>
+                <p className="simple-main__empty-title">{t('explorer.open_title')}</p>
+                <p className="simple-main__empty-hint">{t('explorer.open_hint')}</p>
               </div>
             ) : splitEnabled ? (
               <div className="firestore-split">

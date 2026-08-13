@@ -4,6 +4,7 @@ import type { ConnectionStatus } from '@features/connection/shared/types'
 import CollectionImportDialog from '@features/data_transfer/renderer/ui/CollectionImportDialog'
 import type { DocumentSummary } from '@features/explorer/shared/types'
 import { isSubcollectionPath } from '@features/explorer/shared/tree'
+import { useI18n } from '@shared/i18n/renderer/I18nProvider'
 import { useRegisterAppMenu } from '@shared/shell/AppMenuContext'
 import DocumentJsonPanel from '@shared/ui/DocumentJsonPanel'
 import DocumentTable from '@shared/ui/DocumentTable'
@@ -45,6 +46,7 @@ function SimpleView({
   collectionDataReloadToken = 0,
   menuEnabled = true
 }: SimpleViewProps): React.JSX.Element {
+  const { t } = useI18n()
   const projectId = status.projectId
   const readOnly = status.readOnly
   const autocomplete = useOptionalAutocompleteApi()
@@ -133,7 +135,7 @@ function SimpleView({
     void loadDocument(selectedDocumentPath)
   }, [selectedDocumentPath, loadDocument])
 
-  const handleSave = async (): Promise<void> => {
+  const handleSave = async (forceOverwrite = false): Promise<void> => {
     if (!selectedDocumentPath) {
       return
     }
@@ -146,10 +148,27 @@ function SimpleView({
       const result = await window.api.explorer.updateDocument({
         projectId,
         documentPath: selectedDocumentPath,
-        data: parsed
+        data: parsed,
+        expectedUpdateTime: selectedUpdateTime,
+        forceOverwrite
       })
 
       if (!result.ok) {
+        if (result.code === 'conflict') {
+          setLoading(false)
+          setError(t('explorer.conflict.message'))
+          const overwrite = window.confirm(t('explorer.conflict.overwrite_confirm'))
+          if (overwrite) {
+            await handleSave(true)
+            return
+          }
+          const reload = window.confirm(t('explorer.conflict.reload_confirm'))
+          if (reload) {
+            await loadDocument(selectedDocumentPath)
+          }
+          return
+        }
+
         setError(result.error)
         return
       }

@@ -1,4 +1,5 @@
 import type { AppView } from '@shared/shell/AppNav'
+import type { TranslateFn } from '@shared/i18n/shared/types'
 import type { AppMenuSection } from './app_menu'
 
 export const FIREMINT_DOCS_URL = 'https://electron-vite.org'
@@ -64,23 +65,26 @@ export type AppMenuHandlers = {
   onMaximizeToggle?: () => void
   context?: AppMenuContextActions | null
   shell?: AppShellMenuActions | null
+  t: TranslateFn
+  onOpenSettings: () => void
 }
 
 export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
   const showWindowItems = Boolean(handlers.onMinimize && handlers.onMaximizeToggle)
   const context = handlers.context ?? null
   const shell = handlers.shell ?? null
+  const t = handlers.t
 
   return [
     {
       id: 'file',
-      label: 'File',
+      label: t('menu.file'),
       items: [
-        { type: 'header', label: 'インポート' },
+        { type: 'header', label: t('menu.import') },
         {
           type: 'item',
           id: 'file-import-project',
-          label: 'プロジェクト',
+          label: t('menu.project'),
           indent: true,
           disabled: !(handlers.canImportProject ?? handlers.connected),
           onClick: handlers.onImportProject
@@ -88,16 +92,16 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
         {
           type: 'item',
           id: 'file-import',
-          label: 'コレクション',
+          label: t('menu.collection'),
           indent: true,
           disabled: !context?.canImport,
           onClick: context?.onImport
         },
-        { type: 'header', label: 'エクスポート' },
+        { type: 'header', label: t('menu.export') },
         {
           type: 'item',
           id: 'file-export-project',
-          label: 'プロジェクト',
+          label: t('menu.project'),
           indent: true,
           disabled: !handlers.connected,
           onClick: handlers.onExportProject
@@ -105,17 +109,17 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
         {
           type: 'item',
           id: 'file-export',
-          label: 'コレクション',
+          label: t('menu.collection'),
           indent: true,
           disabled: !context?.canExport,
           onClick: context?.onExport
         },
         { type: 'separator' },
-        { type: 'header', label: '接続' },
+        { type: 'header', label: t('menu.connection') },
         {
           type: 'item',
           id: 'file-list-connect',
-          label: 'リストから接続…',
+          label: t('menu.connect_list'),
           indent: true,
           disabled: !(handlers.canListConnect ?? false),
           onClick: handlers.onListConnect
@@ -123,7 +127,7 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
         {
           type: 'item',
           id: 'file-json-connect',
-          label: 'JSON で接続…',
+          label: t('menu.connect_json'),
           indent: true,
           disabled: !handlers.onJsonConnect,
           onClick: handlers.onJsonConnect
@@ -131,7 +135,7 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
         {
           type: 'item',
           id: 'file-google-connect',
-          label: 'Google で接続…',
+          label: t('menu.connect_google'),
           indent: true,
           disabled: !handlers.onGoogleConnect,
           onClick: handlers.onGoogleConnect
@@ -139,7 +143,7 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
         {
           type: 'item',
           id: 'file-disconnect',
-          label: '切断',
+          label: t('menu.disconnect'),
           indent: true,
           disabled: !(handlers.canDisconnect ?? handlers.connected),
           onClick: handlers.onDisconnect
@@ -148,7 +152,7 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
         {
           type: 'item',
           id: 'file-quit',
-          label: '終了',
+          label: t('menu.quit'),
           shortcut: 'Alt+F4',
           onClick: handlers.onQuit
         }
@@ -156,13 +160,13 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
     },
     {
       id: 'edit',
-      label: 'Edit',
+      label: t('menu.edit'),
       items: [
-        { type: 'header', label: 'ドキュメント' },
+        { type: 'header', label: t('menu.documents') },
         {
           type: 'item',
           id: 'edit-new',
-          label: '新規',
+          label: t('menu.new'),
           shortcut: 'Ctrl+N',
           indent: true,
           disabled: !context?.canCreate,
@@ -171,7 +175,7 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
         {
           type: 'item',
           id: 'edit-save',
-          label: '保存',
+          label: t('common.save'),
           shortcut: 'Ctrl+S',
           indent: true,
           disabled: !context?.canSave,
@@ -180,7 +184,7 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
         {
           type: 'item',
           id: 'edit-duplicate',
-          label: '複製',
+          label: t('menu.duplicate'),
           indent: true,
           disabled: !context?.canDuplicate,
           onClick: context?.onDuplicate
@@ -188,26 +192,26 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
         {
           type: 'item',
           id: 'edit-delete',
-          label: '削除',
+          label: t('common.delete'),
           shortcut: 'Del',
           indent: true,
           disabled: !context?.canDelete,
           onClick: context?.onDelete
         },
-        { type: 'header', label: 'コレクション' },
+        { type: 'header', label: t('menu.collection') },
         {
           type: 'item',
           id: 'edit-duplicate-collection',
-          label: '複製',
+          label: t('menu.duplicate'),
           indent: true,
           disabled: !context?.canDuplicateCollection,
           onClick: context?.onDuplicateCollection
         },
-        { type: 'header', label: 'サブコレクション' },
+        { type: 'header', label: t('menu.subcollection') },
         {
           type: 'item',
           id: 'edit-subcollection-create',
-          label: '作成',
+          label: t('menu.create'),
           indent: true,
           disabled: !context?.canCreateSubcollection,
           onClick: context?.onCreateSubcollection
@@ -215,16 +219,16 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
         {
           type: 'item',
           id: 'edit-subcollection-delete',
-          label: '削除',
+          label: t('common.delete'),
           indent: true,
           disabled: !context?.canDeleteSubcollection,
           onClick: context?.onDeleteSubcollection
         },
-        { type: 'header', label: 'リネーム' },
+        { type: 'header', label: t('menu.rename') },
         {
           type: 'item',
           id: 'edit-rename-collection',
-          label: 'コレクション',
+          label: t('menu.rename_collection'),
           indent: true,
           disabled: !context?.canRenameCollection,
           onClick: context?.onRenameCollection
@@ -232,7 +236,7 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
         {
           type: 'item',
           id: 'edit-rename-field-bulk',
-          label: 'フィールド一括',
+          label: t('menu.rename_field_bulk'),
           indent: true,
           disabled: !context?.canRenameFieldBulk,
           onClick: context?.onRenameFieldBulk
@@ -241,7 +245,7 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
     },
     {
       id: 'view',
-      label: 'View',
+      label: t('menu.view'),
       items: [
         {
           type: 'item',
@@ -276,13 +280,25 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
       ]
     },
     {
+      id: 'settings',
+      label: t('menu.settings'),
+      items: [
+        {
+          type: 'item',
+          id: 'settings-open',
+          label: t('menu.settings_open'),
+          onClick: handlers.onOpenSettings
+        }
+      ]
+    },
+    {
       id: 'tab',
-      label: 'Tab',
+      label: t('menu.tab'),
       items: [
         {
           type: 'item',
           id: 'tab-close',
-          label: 'タブを閉じる',
+          label: t('menu.close_tab'),
           shortcut: 'Ctrl+W',
           disabled: !shell?.canCloseTab,
           onClick: shell?.closeActiveTab
@@ -290,7 +306,7 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
         {
           type: 'item',
           id: 'tab-close-others',
-          label: '他のタブを閉じる',
+          label: t('menu.close_other_tabs'),
           disabled: !shell?.canCloseOtherTabs,
           onClick: shell?.closeOtherTabs
         }
@@ -298,19 +314,19 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
     },
     {
       id: 'window',
-      label: 'Window',
+      label: t('menu.window'),
       items: [
         {
           type: 'item',
           id: 'window-minimize',
-          label: '最小化',
+          label: t('menu.minimize'),
           disabled: !showWindowItems,
           onClick: handlers.onMinimize
         },
         {
           type: 'item',
           id: 'window-zoom',
-          label: 'ズーム',
+          label: t('menu.zoom'),
           disabled: !showWindowItems,
           onClick: handlers.onMaximizeToggle
         }
@@ -318,18 +334,18 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
     },
     {
       id: 'help',
-      label: 'Help',
+      label: t('menu.help'),
       items: [
         {
           type: 'item',
           id: 'help-about',
-          label: 'FireMint について',
+          label: t('menu.about'),
           onClick: handlers.onAbout
         },
         {
           type: 'item',
           id: 'help-docs',
-          label: 'ドキュメント',
+          label: t('menu.docs'),
           onClick: handlers.onOpenDocs
         }
       ]

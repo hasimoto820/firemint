@@ -1,5 +1,6 @@
 import type { ConnectionStatus } from '@features/connection/shared/types'
 import EnvironmentBadge from '@shared/ui/EnvironmentBadge'
+import { useT } from '@shared/i18n/renderer/I18nProvider'
 
 type AppHeaderProps = {
   status: ConnectionStatus
@@ -12,6 +13,8 @@ function AppHeader({
   onDisconnect,
   disconnectDisabled = false
 }: AppHeaderProps): React.JSX.Element {
+  const t = useT()
+
   return (
     <div className="app-header app-header--end">
       <div className="app-header__end">
@@ -23,7 +26,7 @@ function AppHeader({
           onClick={onDisconnect}
           disabled={disconnectDisabled}
         >
-          切断
+          {t('common.disconnect')}
         </button>
       </div>
     </div>

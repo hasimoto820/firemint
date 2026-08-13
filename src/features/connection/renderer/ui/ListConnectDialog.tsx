@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { WorkspaceEntry, WorkspaceState } from '@features/workspace/shared/types'
 import Button from '@shared/ui/Button'
+import { useT } from '@shared/i18n/renderer/I18nProvider'
 
 type ListConnectDialogProps = {
   open: boolean
@@ -13,6 +14,7 @@ function ListConnectDialog({
   onClose,
   onConnected
 }: ListConnectDialogProps): React.JSX.Element | null {
+  const t = useT()
   const [state, setState] = useState<WorkspaceState | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -62,16 +64,12 @@ function ListConnectDialog({
       <div className="project-export-dialog__backdrop" onClick={busy ? undefined : onClose} />
       <div className="project-export-dialog__panel">
         <header className="project-export-dialog__header">
-          <h2 className="project-export-dialog__title">リストから接続</h2>
-          <p className="project-export-dialog__lead">
-            登録済みプロジェクトを選んで接続します。
-          </p>
+          <h2 className="project-export-dialog__title">{t('list_connect.title')}</h2>
+          <p className="project-export-dialog__lead">{t('list_connect.lead')}</p>
         </header>
 
         {entries.length === 0 ? (
-          <p className="project-export-dialog__error">
-            登録済みがありません。先に JSON または Google で接続してください。
-          </p>
+          <p className="project-export-dialog__error">{t('list_connect.empty')}</p>
         ) : (
           <ul className="workspace-panel__list">
             {entries.map((entry) => {
@@ -109,7 +107,7 @@ function ListConnectDialog({
 
         <div className="project-export-dialog__actions">
           <Button onClick={onClose} disabled={busy}>
-            キャンセル
+            {t('common.cancel')}
           </Button>
         </div>
       </div>

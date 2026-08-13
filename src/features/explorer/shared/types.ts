@@ -19,6 +19,10 @@ export type UpdateDocumentInput = {
   projectId: string
   documentPath: string
   data: Record<string, unknown>
+  /** 開いた時点の updateTime（ISO）。指定時は一致しないと conflict */
+  expectedUpdateTime?: string | null
+  /** true ならコンフリクト検出をスキップして上書き */
+  forceOverwrite?: boolean
 }
 
 export type DuplicateDocumentInput = {
@@ -77,4 +81,8 @@ export type ExplorerResult<T> =
   | {
       ok: false
       error: string
+      /** 保存時コンフリクトなど、UI が分岐するためのコード */
+      code?: 'conflict'
+      /** サーバ側の現在 updateTime（conflict 時） */
+      currentUpdateTime?: string | null
     }

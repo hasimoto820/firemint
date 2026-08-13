@@ -1,5 +1,6 @@
 import AuthNavSection from '@features/auth_users/renderer/ui/AuthNavSection'
 import WorkspaceProjectList from '@features/workspace/renderer/ui/WorkspaceProjectList'
+import { useT } from '@shared/i18n/renderer/I18nProvider'
 import CollectionTree from './CollectionTree'
 
 type ExplorerSidebarProps = {
@@ -47,6 +48,8 @@ function ExplorerSidebar({
   treeReloadToken = 0,
   disabled = false
 }: ExplorerSidebarProps): React.JSX.Element {
+  const t = useT()
+
   return (
     <div className="explorer-sidebar">
       <WorkspaceProjectList
@@ -55,7 +58,7 @@ function ExplorerSidebar({
         focusedChildren={
           <>
             <CollectionTree
-              title="FIRESTORE"
+              title={t('explorer.firestore')}
               projectId={projectId}
               rootCollections={rootCollections}
               activeCollectionPath={

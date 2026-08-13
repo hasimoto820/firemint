@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { WorkspaceEntry, WorkspaceState } from '@features/workspace/shared/types'
 import Button from '@shared/ui/Button'
+import { useT } from '@shared/i18n/renderer/I18nProvider'
 
 type WorkspaceProjectListProps = {
   onChanged: () => void
@@ -23,6 +24,7 @@ function WorkspaceProjectList({
   disabled = false,
   focusedChildren
 }: WorkspaceProjectListProps): React.JSX.Element {
+  const t = useT()
   const [state, setState] = useState<WorkspaceState | null>(null)
   const [settingsFor, setSettingsFor] = useState<string | null>(null)
   const [labelDraft, setLabelDraft] = useState('')
@@ -145,11 +147,7 @@ function WorkspaceProjectList({
   }
 
   const handleRemove = async (projectId: string): Promise<void> => {
-    if (
-      !window.confirm(
-        'このプロジェクトの登録を解除しますか？（Firestore 上のデータは消えません）'
-      )
-    ) {
+    if (!window.confirm(t('workspace.unregister_confirm'))) {
       return
     }
 
@@ -181,14 +179,14 @@ function WorkspaceProjectList({
   return (
     <section className="project-list">
       <div className="project-list__header">
-        <span className="project-list__title">PROJECTS</span>
+        <span className="project-list__title">{t('workspace.projects')}</span>
         <button
           type="button"
           className="project-list__add"
           onClick={() => void handleAdd()}
           disabled={busy}
-          title="プロジェクトを追加"
-          aria-label="プロジェクトを追加"
+          title={t('workspace.add_project')}
+          aria-label={t('workspace.add_project')}
         >
           +
         </button>
@@ -197,7 +195,7 @@ function WorkspaceProjectList({
       {error && <p className="project-list__error">{error}</p>}
 
       {entries.length === 0 && (
-        <p className="project-list__empty">接続中のプロジェクトがありません</p>
+        <p className="project-list__empty">{t('workspace.no_connected')}</p>
       )}
 
       <ul className="project-list__items">
@@ -271,7 +269,7 @@ function WorkspaceProjectList({
               {isOpen && (
                 <div className="project-list__settings">
                   <label className="project-list__field">
-                    表示名
+                    {t('workspace.display_name')}
                     <input
                       className="project-list__input"
                       value={labelDraft}
@@ -280,7 +278,7 @@ function WorkspaceProjectList({
                     />
                   </label>
                   <label className="project-list__field">
-                    色
+                    {t('workspace.color')}
                     <input
                       className="project-list__input project-list__input--color"
                       type="color"
@@ -296,18 +294,18 @@ function WorkspaceProjectList({
                       onChange={() => void handleToggleReadOnly(entry)}
                       disabled={busy}
                     />
-                    read-only（書込禁止）
+                    {t('workspace.read_only')}
                   </label>
                   <div className="project-list__settings-actions">
                     <Button onClick={() => void handleSaveMeta(entry.id)} disabled={busy}>
-                      保存
+                      {t('common.save')}
                     </Button>
                     <Button
                       variant="danger"
                       onClick={() => void handleRemove(entry.id)}
                       disabled={busy}
                     >
-                      登録解除
+                      {t('workspace.unregister')}
                     </Button>
                   </div>
                 </div>

@@ -11,7 +11,9 @@
   ],
   "exclude": [
     "src/shared/shell/**/*",
-    "src/shared/ui/**/*"
+    "src/shared/ui/**/*",
+    "src/shared/i18n/renderer/**/*",
+    "src/shared/settings/renderer/**/*"
   ],
   "compilerOptions": {
     "composite": true,

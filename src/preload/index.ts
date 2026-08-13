@@ -1,7 +1,8 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import { IPC_CHANNELS } from '@shared/ipc/channels'
 import type { IpcApi } from '@shared/ipc/types'
+import type { AppSettings } from '@shared/settings/shared/types'
 
 const api: IpcApi = {
   ping: () => ipcRenderer.invoke(IPC_CHANNELS.PING),
@@ -151,6 +152,21 @@ const api: IpcApi = {
       ipcRenderer.invoke(IPC_CHANNELS.AUTH_USERS_SET_DISABLED, input),
     deleteUsers: (input) => ipcRenderer.invoke(IPC_CHANNELS.AUTH_USERS_DELETE, input),
     exportUsers: (input) => ipcRenderer.invoke(IPC_CHANNELS.AUTH_USERS_EXPORT, input)
+  },
+  settings: {
+    get: () => ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_GET),
+    setLocale: (locale) => ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_SET_LOCALE, locale),
+    setTheme: (theme) => ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_SET_THEME, theme),
+    openWindow: () => ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_OPEN_WINDOW),
+    onChanged: (listener) => {
+      const handler = (_event: IpcRendererEvent, settings: AppSettings): void => {
+        listener(settings)
+      }
+      ipcRenderer.on(IPC_CHANNELS.SETTINGS_CHANGED, handler)
+      return () => {
+        ipcRenderer.removeListener(IPC_CHANNELS.SETTINGS_CHANGED, handler)
+      }
+    }
   }
 }
 

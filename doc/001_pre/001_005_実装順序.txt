@@ -185,9 +185,8 @@ Phase 6〜16：v1（MVP 後）
   詳細・Done は 001_002 v1 節をベースに各 Phase で具体化する。
 
   ※ 現在地（2026-08-13）:
-       Phase 0〜12・14 完了。Phase 15 onboarding は保留。
-       次は Phase 16-a（i18n: en デフォルト + ja / zh-Hant / zh-Hans）。
-       Phase 13 / 16-b 以降 / 17 は後続。
+       Phase 0〜12・14・16-a/b/d 完了。16-c（ショートカット）後回し。Phase 15 は保留。
+       次は 16-e / Phase 13 / 17 など。
 
 
   Phase   内容
@@ -206,7 +205,7 @@ Phase 6〜16：v1（MVP 後）
   13      script_runner          … 【保留】長時間 Tasks 等（JS Query 本体は 10-0）
   14      auth_users             … Firebase Auth ユーザー管理 ✅
   15      onboarding             … 【保留】初回オンボーディング
-  16      shared/i18n, settings  … 16-a i18n 着手（テーマ等は後続）
+  16      shared/i18n, settings  … 16-a i18n ✅（テーマ等は後続）
   17      Emulator / 転送        … 【後回し】Emulator 接続・プロジェクト間転送・同期
 
   ※ features/auth/ は残置（将来のアプリ側認証・課金などの予感）。Phase 14 の対象外。
@@ -579,10 +578,10 @@ Phase 16 — shared/i18n, settings
   詳細（多言語）: 001_020_016_i18n.txt
 
   分割:
-    16-a  i18n … en デフォルト + ja / zh-Hant / zh-Hans（いまここ）
-    16-b  テーマ（ダーク）
-    16-c  キーボードショートカット
-    16-d  保存時コンフリクト検出
+    16-a  i18n … en デフォルト + ja / zh-Hant / zh-Hans ✅
+    16-b  テーマ（Dark / Light）✅
+    16-c  キーボードショートカット【後回し】
+    16-d  保存時コンフリクト検出 ✅
     16-e  Mac / Linux ビルド
 
   作るもの（16-a）:
@@ -591,16 +590,16 @@ Phase 16 — shared/i18n, settings
     UI                        … 言語切替 + 主要文言の置換
 
   Done（16-a）:
-    □ locale を en / ja / zh-Hant / zh-Hans から選べる
-    □ デフォルトは en
-    □ 選択が再起動後も残る
-    □ 主要 UI が t() 経由
-    □ 欠落キーは en にフォールバック
+    ■ locale を en / ja / zh-Hant / zh-Hans から選べる
+    ■ デフォルトは en
+    ■ 選択が再起動後も残る
+    ■ 主要 UI が t() 経由
+    ■ 欠落キーは en にフォールバック
 
   Done（Phase 16 全体・後続）:
-    □ ダークテーマに切り替えられる
-    □ 主要操作にキーボードショートカットがある
-    □ 保存時にコンフリクト（他者更新）を検出できる
+    ■ ダーク / ライトテーマに切り替えられる
+    □ 主要操作にキーボードショートカットがある（16-c 後回し）
+    ■ 保存時にコンフリクト（他者更新）を検出できる
     □ Mac / Linux でビルド・起動できる
 
 

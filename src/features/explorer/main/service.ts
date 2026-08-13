@@ -64,6 +64,15 @@ function toExplorerError<T>(error: unknown): ExplorerResult<T> {
   }
 }
 
+class DocumentConflictError extends Error {
+  readonly code = 'conflict' as const
+
+  constructor(readonly currentUpdateTime: string | null) {
+    super('Document was modified elsewhere')
+    this.name = 'DocumentConflictError'
+  }
+}
+
 function snapshotTimestamps(snapshot: DocumentSnapshot | QueryDocumentSnapshot): {
   createTime: string | null
   updateTime: string | null
@@ -176,10 +185,46 @@ export async function updateDocument(input: UpdateDocumentInput): Promise<Explor
     ensureConnected(input.projectId)
     ensureWritable(input.projectId)
     logInfo('explorer', `updateDocument projectId=${input.projectId} path=${input.documentPath}`)
-    await getDocumentRef(input.documentPath, input.projectId).set(deserializeDocumentData(input.data))
+
+    const ref = getDocumentRef(input.documentPath, input.projectId)
+    const data = deserializeDocumentData(input.data)
+    const skipConflictCheck =
+      input.forceOverwrite === true || input.expectedUpdateTime === undefined
+
+    if (skipConflictCheck) {
+      await ref.set(data)
+      return { ok: true, data: null }
+    }
+
+    // 開いた時点の updateTime と一致するときだけ set（楽観ロック）
+    await getFirestore(input.projectId).runTransaction(async (tx) => {
+      const snapshot = await tx.get(ref)
+      const currentUpdateTime = snapshot.exists
+        ? (snapshot.updateTime?.toDate().toISOString() ?? null)
+        : null
+
+      if (!snapshot.exists || currentUpdateTime !== input.expectedUpdateTime) {
+        throw new DocumentConflictError(currentUpdateTime)
+      }
+
+      tx.set(ref, data)
+    })
 
     return { ok: true, data: null }
   } catch (error) {
+    if (error instanceof DocumentConflictError) {
+      logInfo(
+        'explorer',
+        `updateDocument conflict path=${input.documentPath} current=${error.currentUpdateTime ?? 'null'}`
+      )
+      return {
+        ok: false,
+        error: 'Document was modified elsewhere',
+        code: 'conflict',
+        currentUpdateTime: error.currentUpdateTime
+      }
+    }
+
     return toExplorerError(error)
   }
 }

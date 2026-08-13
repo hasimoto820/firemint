@@ -205,17 +205,48 @@ function AutocompleteInput({
   }
 
   const applyItem = (item: AutocompleteItem): void => {
-    if (wordCompletion) {
+    const element = multiline ? textareaRef.current : inputRef.current
+
+    if (wordCompletion && element) {
       const range = getWordRange(value, caret)
+      element.focus()
+      element.setSelectionRange(range.start, range.end)
+
+      // React の value 丸ごと差し替えだと Undo 履歴が消える。
+      // insertText ならブラウザの Ctrl+Z が効く。
+      const inserted =
+        typeof document.execCommand === 'function' &&
+        document.execCommand('insertText', false, item.value)
+
+      if (inserted) {
+        setCaret(range.start + item.value.length)
+        setOpen(false)
+        return
+      }
+
       const next = `${value.slice(0, range.start)}${item.value}${value.slice(range.end)}`
       const nextCaret = range.start + item.value.length
       onChange(next)
       setCaret(nextCaret)
       focusField(nextCaret)
-    } else {
-      onChange(item.value)
+      setOpen(false)
+      return
     }
 
+    if (element && !wordCompletion) {
+      element.focus()
+      element.setSelectionRange(0, element.value.length)
+      const inserted =
+        typeof document.execCommand === 'function' &&
+        document.execCommand('insertText', false, item.value)
+
+      if (inserted) {
+        setOpen(false)
+        return
+      }
+    }
+
+    onChange(item.value)
     setOpen(false)
   }
 
@@ -227,6 +258,11 @@ function AutocompleteInput({
         event.preventDefault()
         onMetaEnter()
       }
+      return
+    }
+
+    // Ctrl+Z 等はブラウザに任せ、候補操作と干渉させない
+    if (event.ctrlKey || event.metaKey || event.altKey) {
       return
     }
 
