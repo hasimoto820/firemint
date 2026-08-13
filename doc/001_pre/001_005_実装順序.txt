@@ -12,6 +12,8 @@
   UI 方針         → 001_006_UI.txt（Phase 8.5）
   workspace 設計  → 001_007_workspace.txt（Phase 7）
   autocomplete    → 001_011_autocomplete.txt（Phase 11.6）
+  auth_users      → 001_020_014_auth_users.txt（Phase 14）
+  i18n            → 001_020_016_i18n.txt（Phase 16-a）
 
 
 ================================================================================
@@ -140,7 +142,8 @@ MVP で触らない feature（箱のみ）
 --------------------------------------------------------------------------------
 
   script_runner   … v1（Phase 13）
-  auth            … v1（Phase 14）
+  auth_users      … v1（Phase 14）
+  auth            … 箱のみ（将来・課金等の予感。Phase 未割当）
   onboarding      … v1（Phase 15）
 
   ※ workspace は当初「箱のみ → Phase 7」だったが、Phase 7 で実装済み。
@@ -181,11 +184,10 @@ Phase 6〜16：v1（MVP 後）
   以降は依存の少ない・体験インパクトの大きい順。順番は v1 着手前に再確認可。
   詳細・Done は 001_002 v1 節をベースに各 Phase で具体化する。
 
-  ※ 現在地（2026-07-25）:
-       Phase 0〜11.5 完了（Phase 8 / 10 の一部は未完のまま Phase 11.5 / 11.6 へ移した）。
-       Phase 11.6（autocomplete）完了（Query 単語補完まで。JSON/フィルタ展開は任意）。
-       Phase 12（Google サインイン）実装済み。
-       次は Phase 13 以降（保留）または任意の 11.6-f。
+  ※ 現在地（2026-08-13）:
+       Phase 0〜12・14 完了。Phase 15 onboarding は保留。
+       次は Phase 16-a（i18n: en デフォルト + ja / zh-Hant / zh-Hans）。
+       Phase 13 / 16-b 以降 / 17 は後続。
 
 
   Phase   内容
@@ -202,10 +204,12 @@ Phase 6〜16：v1（MVP 後）
   11.6    autocomplete           … path / フィールド名補完 ✅（001_011）
   12      connection 拡張        … Google サインイン ✅
   13      script_runner          … 【保留】長時間 Tasks 等（JS Query 本体は 10-0）
-  14      auth                   … 【保留】Firebase Auth ユーザー管理
+  14      auth_users             … Firebase Auth ユーザー管理 ✅
   15      onboarding             … 【保留】初回オンボーディング
-  16      shared/i18n, settings  … 【保留】日本語 UI、テーマ、ショートカット
+  16      shared/i18n, settings  … 16-a i18n 着手（テーマ等は後続）
   17      Emulator / 転送        … 【後回し】Emulator 接続・プロジェクト間転送・同期
+
+  ※ features/auth/ は残置（将来のアプリ側認証・課金などの予感）。Phase 14 の対象外。
 
 
 --------------------------------------------------------------------------------
@@ -530,21 +534,27 @@ Phase 13 — script_runner 【保留】
 
 
 --------------------------------------------------------------------------------
-Phase 14 — auth 【保留】
+Phase 14 — auth_users ✅
 --------------------------------------------------------------------------------
 
+  詳細: 001_020_014_auth_users.txt
+
   作るもの:
-    features/auth/
+    features/auth_users/
       ユーザー一覧            … 検索・ソート
       ユーザー編集            … メール・パスワード・custom claims
       一括操作                … 削除・無効化
       export                  … CSV / JSON
+    UI:
+      左ペインでプロジェクト配下の FIRESTORE と兄弟の AUTH セクション
+
+  ※ features/auth/ は使わない（将来用の別箱）。
 
   Done:
-    □ Firebase Auth ユーザー一覧を表示・検索できる
-    □ ユーザーのメール・claims 等を編集できる
-    □ ユーザーを一括削除・無効化できる
-    □ ユーザーを CSV / JSON export できる
+    ■ Firebase Auth ユーザー一覧を表示・検索できる
+    ■ ユーザーのメール・claims 等を編集できる
+    ■ ユーザーを一括削除・無効化できる
+    ■ ユーザーを CSV / JSON export できる
 
 
 --------------------------------------------------------------------------------
@@ -563,17 +573,31 @@ Phase 15 — onboarding 【保留】
 
 
 --------------------------------------------------------------------------------
-Phase 16 — shared/i18n, settings 【保留】
+Phase 16 — shared/i18n, settings
 --------------------------------------------------------------------------------
 
-  作るもの:
-    shared/i18n/              … 日本語 UI 整備（文字列の集約）
-    shared/settings/          … ダークテーマ、キーボードショートカット
-    features/explorer/ 等    … 保存時コンフリクト検出（001_002 差別化）
-    ビルド                    … Mac / Linux 対応（001_002 v1）
+  詳細（多言語）: 001_020_016_i18n.txt
 
-  Done:
-    □ 主要 UI が日本語化されている
+  分割:
+    16-a  i18n … en デフォルト + ja / zh-Hant / zh-Hans（いまここ）
+    16-b  テーマ（ダーク）
+    16-c  キーボードショートカット
+    16-d  保存時コンフリクト検出
+    16-e  Mac / Linux ビルド
+
+  作るもの（16-a）:
+    shared/i18n/              … 辞書・t()・I18nProvider
+    shared/settings/          … locale 永続化（config/settings.json）
+    UI                        … 言語切替 + 主要文言の置換
+
+  Done（16-a）:
+    □ locale を en / ja / zh-Hant / zh-Hans から選べる
+    □ デフォルトは en
+    □ 選択が再起動後も残る
+    □ 主要 UI が t() 経由
+    □ 欠落キーは en にフォールバック
+
+  Done（Phase 16 全体・後続）:
     □ ダークテーマに切り替えられる
     □ 主要操作にキーボードショートカットがある
     □ 保存時にコンフリクト（他者更新）を検出できる

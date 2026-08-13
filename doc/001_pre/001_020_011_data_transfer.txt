@@ -82,8 +82,9 @@ FireMint 用語（統一・ここが正）
     - 今開いているコレクション / クエリ結果をエクスポート対象に渡す
     - インポートの宛先ヒント（選択中コレクション path）を渡す程度。本体は data_transfer
 
-  features/auth（Phase 14）
+  features/auth_users（Phase 14）
     - Auth ユーザーの CSV/JSON はここ。Phase 11 には含めない
+    - features/auth/ とは別（auth は将来用）
 
   features/script_runner / Tasks（Phase 13）
     - 超長時間のプロジェクトエクスポートは将来。Phase 11 初期は同期＋進捗表示でよい

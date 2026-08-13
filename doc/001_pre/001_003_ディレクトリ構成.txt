@@ -48,11 +48,16 @@ features/ 一覧
   6   data_transfer          インポート / エクスポート / 転送 △  export のみ
   7   autocomplete           入力補完（path / フィールド名） —  Phase 11.6（001_011）
   8   script_runner          JS エディタ・Background Tasks   —  v1
-  9   auth                   Firebase Authentication         —  v1
-  10  onboarding             初回オンボーディングガイド      —  v1
+  9   auth_users             Firebase Auth ユーザー管理      ✓  Phase 14
+  10  auth                   将来用（アプリ側認証・課金など）—  箱のみ・未着手
+  11  onboarding             初回オンボーディングガイド      —  v1
 
   後回し（001_002）の機能は、必要になるまで feature を増やさない。
     例: storage, audit, licensing, dashboard
+
+  ※ auth と auth_users は別物:
+      auth_users … プロジェクト内の Firebase Authentication ユーザー管理
+      auth       … FireMint 自身の認証・課金などに使う予感の箱（接続 Google でもない）
 
 
 ================================================================================
@@ -94,6 +99,8 @@ features/ ツリー（全体）
         renderer/  main/  shared/
       script_runner/
         renderer/  main/  shared/
+      auth_users/
+        renderer/  main/  shared/
       auth/
         renderer/  main/  shared/
       onboarding/
@@ -113,7 +120,8 @@ shared/ 一覧（feature にしない横断モジュール）
       settings/              … ダークテーマ、ショートカット
       ui/                    … 共通 UI コンポーネント
       firestore/             … firebase-admin 接続の共通基盤
-      i18n/                  … 日本語 UI
+      i18n/                  … 多言語 UI（en / ja / zh-Hant / zh-Hans。詳細: 001_020_016）
+      settings/              … locale 等のユーザー設定（テーマは後続）
 
   補足:
     - preload/ は IPC の窓口（contextBridge）のみ。チャンネル定義・型は shared/ipc/。
@@ -132,7 +140,9 @@ feature 間の責務メモ
   data_transfer    … ファイル経由でデータを動かす（export / import / 転送 / バックアップ）
   autocomplete     … 入力補完候補の所有（path / フィールド名。詳細: 001_011）
   script_runner    … JS エディタ実行、Background Tasks（v1）
-  auth             … Firebase Auth ユーザー管理（v1）
+  auth_users       … Firebase Auth ユーザー管理（Phase 14）
+  auth             … 将来用の箱（アプリ側認証・課金などの予感。未着手）
+  onboarding       … 初回ガイド（v1）
 
   協調の例:
     テーブル複数選択 → 一括削除
@@ -173,7 +183,8 @@ MVP 実装順（箱は全 feature 先に用意）
   一括操作（GUI・diff）        → bulk_operations
   一括操作（JS・Tasks）        → script_runner
   インポート / エクスポート    → data_transfer
-  Firebase Authentication      → auth
+  Firebase Authentication      → auth_users
+  （将来）アプリ側認証・課金   → auth（箱のみ）
   オンボーディング             → onboarding
   安全・UX（警告・確認）       → shared/safety, shared/settings
   アプリ基盤（タブ・Split）    → shared/shell

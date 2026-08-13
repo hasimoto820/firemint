@@ -57,7 +57,13 @@ export const IPC_CHANNELS = {
   WORKSPACE_UPDATE_ENTRY: 'workspace:update_entry',
   WORKSPACE_LOAD_PROJECT: 'workspace:load_project',
   WORKSPACE_UNLOAD_PROJECT: 'workspace:unload_project',
-  WORKSPACE_SET_FOCUSED: 'workspace:set_focused'
+  WORKSPACE_SET_FOCUSED: 'workspace:set_focused',
+  AUTH_USERS_LIST: 'auth_users:list',
+  AUTH_USERS_GET: 'auth_users:get',
+  AUTH_USERS_UPDATE: 'auth_users:update',
+  AUTH_USERS_SET_DISABLED: 'auth_users:set_disabled',
+  AUTH_USERS_DELETE: 'auth_users:delete',
+  AUTH_USERS_EXPORT: 'auth_users:export'
 } as const
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS]

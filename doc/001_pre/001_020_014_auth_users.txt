@@ -1,0 +1,176 @@
+
+auth_users 設計（Phase 14）
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+関連:
+  001_005 Phase 14
+  001_003 features/auth_users（≠ features/auth、≠ connection）
+  001_002 Auth（基本）
+  001_020_007_workspace.txt … projectId・read-only
+  001_020_012_signin.txt … 接続用 Google。本 feature の対象外
+
+
+================================================================================
+目的
+================================================================================
+
+  - 接続済み Firebase プロジェクトの Authentication ユーザーを管理する
+  - 一覧・検索・編集・一括操作・export までを FireMint 上で行う
+  - Firestore ツリーとは別入口（兄弟セクション AUTH）
+
+
+================================================================================
+前提・非対象
+================================================================================
+
+  前提:
+    - 対象プロジェクトはすでに接続済み（JSON または Google）
+    - main のみが Admin SDK を使う（renderer に秘密を出さない）
+    - workspace の read-only なら Auth の書込・削除も不可
+
+  非対象（本 Phase）:
+    - FireMint 自身へのログイン / 課金 → features/auth（将来・箱のみ）
+    - 接続用 Google OAuth → features/connection（Phase 12 済み）
+    - ユーザー import / プロジェクト間ユーザー転送 / Auth 用 JS
+    - Auth マルチテナンシー
+    - Emulator Auth（必要なら Phase 17 で再検討）
+
+
+================================================================================
+名前の切り分け
+================================================================================
+
+  features/auth_users/  … 本 Phase。プロジェクト内の Firebase Auth ユーザー
+  features/auth/        … 将来用の別箱（アプリ側認証・課金などの予感）。触らない
+  features/connection/  … FireMint が Firestore に入るための接続
+
+
+================================================================================
+UI
+================================================================================
+
+  左ペイン（接続後）:
+
+    PROJECTS
+      ▾ <project>
+          FIRESTORE
+            … コレクションツリー（既存）
+          AUTH
+            … 押すと右メインを Auth ユーザー画面にする
+
+  - AUTH はプロジェクト配下・FIRESTORE の兄弟（コレクションの子ではない）
+  - 右メイン: ユーザー一覧テーブル + 詳細 / 編集
+  - タブとの関係: 当面は focused プロジェクトの Auth 画面切替でよい
+    （専用タブ種別が必要なら Phase 9 流儀に後から足す）
+
+
+================================================================================
+責務分担
+================================================================================
+
+  features/auth_users/
+    - Auth ユーザーの型・IPC・service（list / get / update / disable / delete / export）
+    - 右メイン UI（一覧・検索・ソート・編集・一括・export）
+    - 左 AUTH 行の中身連携（選択状態）
+
+  shared/firestore/（または既存接続プール経由）
+    - 接続済み projectId から Admin Auth を取る入口を最小追加
+      例: getAuth(projectId) … 既存 app / credential を再利用
+    - Firestore の getFirestore と同様、接続プールに載っていることが前提
+
+  features/workspace/
+    - projectId / read-only / focused は既存のまま提供
+    - Auth 専用の永続化は持たない
+
+  features/explorer（左ペイン配線）
+    - FIRESTORE と並べて AUTH 行を出す薄い差し込みのみ
+    - Auth の業務ロジックは持たない
+
+  shared/safety/
+    - 一括削除・無効化は確認ダイアログ（bulk と同系統）
+
+
+================================================================================
+データ（表示・編集の単位）
+================================================================================
+
+  AuthUser（UI / IPC 用の要約。Admin UserRecord をそのまま露出しない）:
+
+    uid
+    email
+    displayName
+    phoneNumber
+    disabled
+    emailVerified
+    customClaims        … JSON オブジェクト（編集可）
+    creationTime
+    lastSignInTime
+    providerIds         … 表示用（password / google.com 等）
+
+  編集で触るもの（v1）:
+    email / password / phoneNumber / displayName
+    emailVerified / disabled
+    customClaims
+
+  一括:
+    選択ユーザーの削除
+    選択ユーザーの無効化（disabled=true）
+
+
+================================================================================
+main API（概要）
+================================================================================
+
+  listUsers(projectId, { pageToken?, maxResults? })
+    → { users, pageToken? }
+
+  getUser(projectId, uid)
+
+  updateUser(projectId, uid, patch)
+    → ensureWritable(projectId) のあと Admin updateUser
+
+  setDisabled(projectId, uids[], disabled)
+  deleteUsers(projectId, uids[])
+    → 確認済み前提。バッチは Admin の制約に合わせる
+
+  exportUsers(projectId, format: 'json' | 'csv')
+    → ファイル保存は main（または既存 data_transfer 流儀に寄せる）
+
+  ※ 実装は firebase-admin/auth。接続は既存プールの app を使う。
+
+
+================================================================================
+実装順
+================================================================================
+
+  14-a  設計メモ（本ファイル）+ 箱の確認              ✅
+  14-b  shared に getAuth(projectId) + auth_users main/IPC（list まで） ✅
+  14-c  左 AUTH 兄弟セクション + 右一覧 UI           ✅
+  14-d  1ユーザー編集（claims 含む）+ read-only 門番 ✅
+  14-e  一括削除・無効化（確認 UI）                  ✅
+  14-f  CSV / JSON export                            ✅
+
+
+================================================================================
+Done
+================================================================================
+
+  ■ 左ペインで FIRESTORE と兄弟の AUTH から入れる
+  ■ Firebase Auth ユーザー一覧を表示・検索できる
+  ■ ユーザーのメール・claims 等を編集できる
+  ■ ユーザーを一括削除・無効化できる
+  ■ ユーザーを CSV / JSON export できる
+  ■ read-only プロジェクトでは書込系が効かない
+  ■ features/auth・connection の責務を侵さない
+
+
+================================================================================
+非対象（再掲）
+================================================================================
+
+  - features/auth（課金・アプリ認証）
+  - 接続 Google（Phase 12）
+  - ユーザー import / プロジェクト間転送 / Auth JS
+  - Auth マルチテナンシー
+  - Emulator Auth

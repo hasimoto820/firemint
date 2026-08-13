@@ -141,6 +141,16 @@ const api: IpcApi = {
         ipcRenderer.removeListener(IPC_CHANNELS.DATA_TRANSFER_IMPORT_PROJECT_PROGRESS, handler)
       }
     }
+  },
+  authUsers: {
+    listUsers: (input) => ipcRenderer.invoke(IPC_CHANNELS.AUTH_USERS_LIST, input),
+    getUser: (projectId: string, uid: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.AUTH_USERS_GET, projectId, uid),
+    updateUser: (input) => ipcRenderer.invoke(IPC_CHANNELS.AUTH_USERS_UPDATE, input),
+    setUsersDisabled: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.AUTH_USERS_SET_DISABLED, input),
+    deleteUsers: (input) => ipcRenderer.invoke(IPC_CHANNELS.AUTH_USERS_DELETE, input),
+    exportUsers: (input) => ipcRenderer.invoke(IPC_CHANNELS.AUTH_USERS_EXPORT, input)
   }
 }
 

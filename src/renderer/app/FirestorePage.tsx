@@ -3,6 +3,7 @@ import {
   AutocompleteProvider,
   useAutocompleteApi
 } from '@features/autocomplete/renderer/hooks'
+import AuthUsersView from '@features/auth_users/renderer/ui/AuthUsersView'
 import type { ConnectionStatus } from '@features/connection/shared/types'
 import CollectionRenameDialog from '@features/explorer/renderer/ui/CollectionRenameDialog'
 import FieldBulkRenameDialog from '@features/explorer/renderer/ui/FieldBulkRenameDialog'
@@ -79,6 +80,7 @@ function FirestorePageInner({
     null
   )
   const [deleteSubcollectionPath, setDeleteSubcollectionPath] = useState<string | null>(null)
+  const [mainSection, setMainSection] = useState<'firestore' | 'auth'>('firestore')
 
   const primaryTabs = useMemo(() => tabsInPane(tabs, 'primary'), [tabs])
   const secondaryTabs = useMemo(() => tabsInPane(tabs, 'secondary'), [tabs])
@@ -105,6 +107,10 @@ function FirestorePageInner({
   useEffect(() => {
     void loadRootCollections()
   }, [loadRootCollections])
+
+  useEffect(() => {
+    setMainSection('firestore')
+  }, [projectId])
 
   useEffect(() => {
     if (rootsReloadToken <= 0) {
@@ -139,6 +145,7 @@ function FirestorePageInner({
       collectionPath: string,
       options?: { view?: AppView; selectedDocumentPath?: string | null; pane?: WorkspacePaneId }
     ): void => {
+      setMainSection('firestore')
       const targetPane = options?.pane ?? (splitEnabled ? focusedPane : 'primary')
       const nextView = options?.view
       const nextDoc = options?.selectedDocumentPath
@@ -733,6 +740,9 @@ function FirestorePageInner({
             rootCollections={rootCollections}
             activeCollectionPath={treeCollectionPath}
             selectedDocumentPath={treeDocumentPath}
+            mainSection={mainSection}
+            onSelectFirestore={() => setMainSection('firestore')}
+            onSelectAuth={() => setMainSection('auth')}
             onSelectCollection={handleSelectCollection}
             onSelectDocument={handleSelectDocument}
             onRenameCollection={handleRequestRenameCollection}
@@ -748,7 +758,9 @@ function FirestorePageInner({
         }
         main={
           <div className="firestore-main">
-            {tabs.length === 0 ? (
+            {mainSection === 'auth' ? (
+              <AuthUsersView projectId={projectId} readOnly={status.readOnly} />
+            ) : tabs.length === 0 ? (
               <div className="simple-main simple-main--empty">
                 <p className="simple-main__empty-title">コレクションを開いてください</p>
                 <p className="simple-main__empty-hint">

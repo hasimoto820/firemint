@@ -66,6 +66,19 @@ import type {
   WorkspaceState
 } from '@features/workspace/shared/types'
 
+import type {
+  AuthUser,
+  AuthUsersMutationSummary,
+  AuthUsersResult,
+  DeleteAuthUsersInput,
+  ExportAuthUsersInput,
+  ExportAuthUsersResult,
+  ListAuthUsersInput,
+  ListAuthUsersResult,
+  SetAuthUsersDisabledInput,
+  UpdateAuthUserInput
+} from '@features/auth_users/shared/types'
+
 export type PingResult = {
   message: string
 }
@@ -185,6 +198,21 @@ export type WorkspaceIpcApi = {
   ) => Promise<WorkspaceResult<WorkspaceEntry>>
 }
 
+export type AuthUsersIpcApi = {
+  listUsers: (input: ListAuthUsersInput) => Promise<AuthUsersResult<ListAuthUsersResult>>
+  getUser: (projectId: string, uid: string) => Promise<AuthUsersResult<AuthUser>>
+  updateUser: (input: UpdateAuthUserInput) => Promise<AuthUsersResult<AuthUser>>
+  setUsersDisabled: (
+    input: SetAuthUsersDisabledInput
+  ) => Promise<AuthUsersResult<AuthUsersMutationSummary>>
+  deleteUsers: (
+    input: DeleteAuthUsersInput
+  ) => Promise<AuthUsersResult<AuthUsersMutationSummary>>
+  exportUsers: (
+    input: ExportAuthUsersInput
+  ) => Promise<AuthUsersResult<ExportAuthUsersResult>>
+}
+
 export interface IpcApi {
   ping: () => Promise<PingResult>
   app: AppIpcApi
@@ -195,4 +223,5 @@ export interface IpcApi {
   query: QueryIpcApi
   bulk: BulkOperationsIpcApi
   dataTransfer: DataTransferIpcApi
+  authUsers: AuthUsersIpcApi
 }

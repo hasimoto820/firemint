@@ -163,6 +163,18 @@ export function getFirestore(projectId?: string): Firestore {
   return entry.firestore
 }
 
+/** 接続プール上の app から Admin Auth を返す（Auth ユーザー管理用） */
+export function getAuth(projectId?: string): admin.auth.Auth {
+  const resolvedProjectId = resolveProjectId(projectId)
+  const entry = connections.get(resolvedProjectId)
+
+  if (!entry) {
+    throw new Error(`Firestore is not connected: ${resolvedProjectId}`)
+  }
+
+  return admin.auth(entry.app)
+}
+
 export function getConnectionInfo(projectId?: string): FirestoreConnectionInfo | null {
   const resolvedProjectId = projectId ?? getFocusedProjectId()
 

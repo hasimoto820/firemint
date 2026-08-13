@@ -193,4 +193,4 @@ Done
 ================================================================================
 
   - Emulator 接続（Phase 17）
-  - Firebase Auth ユーザー管理（Phase 14）
+  - Firebase Auth ユーザー管理（Phase 14 / features/auth_users）
