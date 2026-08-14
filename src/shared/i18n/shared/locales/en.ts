@@ -72,6 +72,8 @@ export const en: Record<string, string> = {
   'workspace.unregister': 'Unregister',
   'workspace.unregister_confirm':
     'Unregister this project? (Cloud data will not be deleted)',
+  'workspace.disconnect_confirm':
+    'Disconnect this project? (You can reconnect from the list. Cloud data will not be deleted)',
 
   'explorer.firestore': 'FIRESTORE',
   'explorer.open_title': 'Open a collection',

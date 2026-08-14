@@ -7,7 +7,6 @@ import {
   getFocusedConnectionInfo,
   getWorkspaceEntry,
   importGoogleAccountProjects,
-  unloadGoogleAccountConnections,
   unloadProject
 } from '@features/workspace/main/service'
 import { getFocusedProjectId } from '@shared/firestore/focused'
@@ -297,20 +296,15 @@ export async function disconnectFromFirestore(): Promise<void> {
     `disconnect start projectId=${projectId ?? 'none'} authType=${focused?.authType ?? 'none'}`
   )
 
-  // Google / JSON とも名簿は残し、接続だけ切る（リストから再接続できる）
-  if (focused?.authType === 'google') {
-    const unloadResult = await unloadGoogleAccountConnections(focused.googleAccountKey)
+  if (!projectId) {
+    logInfo('connection', 'disconnect skipped: no focused project')
+    return
+  }
 
-    if (!unloadResult.ok) {
-      throw new Error(unloadResult.error)
-    }
+  const unloadResult = await unloadProject(projectId)
 
-    logInfo(
-      'connection',
-      `google connections unloaded count=${unloadResult.data.unloadedProjectIds.length}`
-    )
-  } else if (projectId && focused?.authType === 'serviceAccount') {
-    await unloadProject(projectId)
+  if (!unloadResult.ok) {
+    throw new Error(unloadResult.error)
   }
 
   logInfo('connection', 'disconnect done')

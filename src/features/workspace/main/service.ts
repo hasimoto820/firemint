@@ -270,15 +270,19 @@ export async function loadProject(projectId: string): Promise<WorkspaceResult<Wo
   return { ok: true, data: entry }
 }
 
+function refocusAfterUnload(unloadedProjectId: string): void {
+  if (store.focusedProjectId !== unloadedProjectId) {
+    return
+  }
+
+  store.focusedProjectId = listConnectedProjectIds()[0] ?? null
+  syncFocusedFromStore()
+}
+
 export async function unloadProject(projectId: string): Promise<WorkspaceResult<null>> {
   try {
     await disconnectFirestore(projectId)
-
-    if (store.focusedProjectId === projectId) {
-      store.focusedProjectId = null
-      syncFocusedFromStore()
-    }
-
+    refocusAfterUnload(projectId)
     await persistStore()
     return { ok: true, data: null }
   } catch (error) {
@@ -479,12 +483,7 @@ export async function removeEntry(projectId: string): Promise<WorkspaceResult<nu
     }
 
     store.entries = store.entries.filter((item) => item.id !== projectId)
-
-    if (store.focusedProjectId === projectId) {
-      store.focusedProjectId = null
-      syncFocusedFromStore()
-    }
-
+    refocusAfterUnload(projectId)
     await persistStore()
 
     if (entry?.authType === 'google' && entry.googleAccountKey) {

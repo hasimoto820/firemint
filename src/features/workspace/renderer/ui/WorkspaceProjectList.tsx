@@ -146,6 +146,30 @@ function WorkspaceProjectList({
     }
   }
 
+  const handleDisconnect = async (projectId: string): Promise<void> => {
+    if (!window.confirm(t('workspace.disconnect_confirm'))) {
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+
+    try {
+      const result = await window.api.workspace.unloadProject(projectId)
+
+      if (!result.ok) {
+        setError(result.error)
+        return
+      }
+
+      setSettingsFor(null)
+      await refresh()
+      onChanged()
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleRemove = async (projectId: string): Promise<void> => {
     if (!window.confirm(t('workspace.unregister_confirm'))) {
       return
@@ -299,6 +323,12 @@ function WorkspaceProjectList({
                   <div className="project-list__settings-actions">
                     <Button onClick={() => void handleSaveMeta(entry.id)} disabled={busy}>
                       {t('common.save')}
+                    </Button>
+                    <Button
+                      onClick={() => void handleDisconnect(entry.id)}
+                      disabled={busy}
+                    >
+                      {t('common.disconnect')}
                     </Button>
                     <Button
                       variant="danger"

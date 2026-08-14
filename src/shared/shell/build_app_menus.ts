@@ -48,7 +48,7 @@ export type AppShellMenuActions = {
 
 export type AppMenuHandlers = {
   connected: boolean
-  /** 接続中、または Google 取扱い分が残っているとき切断可能 */
+  /** フォーカス中プロジェクトをツリーから外せるとき */
   canDisconnect?: boolean
   activeView: AppView
   onDisconnect: () => void

@@ -73,6 +73,8 @@ export const zhHant: MessageCatalog = {
   'workspace.read_only': 'read-only（禁止寫入）',
   'workspace.unregister': '取消註冊',
   'workspace.unregister_confirm': '要取消註冊此專案嗎？（雲端資料不會刪除）',
+  'workspace.disconnect_confirm':
+    '要中斷此專案連線嗎？（可從清單重新連線。雲端資料不會刪除）',
 
   'explorer.firestore': 'FIRESTORE',
   'explorer.open_title': '請開啟集合',

@@ -74,6 +74,8 @@ export const ja: MessageCatalog = {
   'workspace.unregister': '登録解除',
   'workspace.unregister_confirm':
     'このプロジェクトの登録を解除しますか？（クラウド上のデータは消えません）',
+  'workspace.disconnect_confirm':
+    'このプロジェクトを切断しますか？（リストから再接続できます。クラウド上のデータは消えません）',
 
   'explorer.firestore': 'FIRESTORE',
   'explorer.open_title': 'コレクションを開いてください',

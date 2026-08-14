@@ -21,7 +21,6 @@ function App(): React.JSX.Element {
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus | null | undefined>(
     undefined
   )
-  const [hasGoogleWorkspace, setHasGoogleWorkspace] = useState(false)
   const [workspaceEntries, setWorkspaceEntries] = useState<WorkspaceEntry[]>([])
   const [view, setView] = useState<AppView>('simple')
   const [refreshKey, setRefreshKey] = useState(0)
@@ -38,7 +37,6 @@ function App(): React.JSX.Element {
       window.api.workspace.getState()
     ])
     setConnectionStatus(status)
-    setHasGoogleWorkspace(workspace.entries.some((entry) => entry.authType === 'google'))
     setWorkspaceEntries(workspace.entries)
   }, [])
 
@@ -51,9 +49,13 @@ function App(): React.JSX.Element {
   }, [])
 
   const handleDisconnect = useCallback(async (): Promise<void> => {
+    if (!window.confirm(t('workspace.disconnect_confirm'))) {
+      return
+    }
+
     await window.api.connection.disconnect()
     handleWorkspaceChanged()
-  }, [handleWorkspaceChanged])
+  }, [handleWorkspaceChanged, t])
 
   const handleAbout = useCallback(async (): Promise<void> => {
     const about = await window.api.app.getAbout()
@@ -73,7 +75,7 @@ function App(): React.JSX.Element {
   }, [])
 
   const connected = Boolean(connectionStatus)
-  const canDisconnect = connected || hasGoogleWorkspace
+  const canDisconnect = connected
   const canImportProject = workspaceEntries.length > 0
   const canListConnect = workspaceEntries.length > 0
   const platform = window.electron.process.platform
@@ -203,7 +205,6 @@ function App(): React.JSX.Element {
         status={connectionStatus}
         view={view}
         onNavigate={setView}
-        onDisconnected={handleWorkspaceChanged}
         onWorkspaceChanged={handleWorkspaceChanged}
         onShellCommandsChange={setShellCommands}
         rootsReloadToken={rootsReloadToken}

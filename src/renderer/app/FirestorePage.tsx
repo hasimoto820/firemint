@@ -54,7 +54,6 @@ type FirestorePageProps = {
   status: ConnectionStatus
   view: AppView
   onNavigate: (view: AppView) => void
-  onDisconnected: () => void
   onWorkspaceChanged: () => void
   onShellCommandsChange?: (commands: ShellCommands | null) => void
   /** インクリメントするとルートコレクション一覧を再読込 */
@@ -70,7 +69,6 @@ function FirestorePageInner({
   status,
   view,
   onNavigate,
-  onDisconnected,
   onWorkspaceChanged,
   onShellCommandsChange,
   rootsReloadToken = 0
@@ -859,11 +857,6 @@ function FirestorePageInner({
     tabs
   ])
 
-  const handleDisconnect = async (): Promise<void> => {
-    await window.api.connection.disconnect()
-    onDisconnected()
-  }
-
   const renderEditorGroup = (
     pane: WorkspacePaneId,
     paneTabs: WorkspaceTab[],
@@ -928,7 +921,7 @@ function FirestorePageInner({
   return (
     <>
       <AppShell
-        header={<AppHeader status={status} onDisconnect={() => void handleDisconnect()} />}
+        header={<AppHeader status={status} />}
         sidebar={
           <ExplorerSidebar
             projectId={projectId}

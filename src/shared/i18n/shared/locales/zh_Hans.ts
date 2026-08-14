@@ -73,6 +73,8 @@ export const zhHans: MessageCatalog = {
   'workspace.read_only': 'read-only（禁止写入）',
   'workspace.unregister': '取消注册',
   'workspace.unregister_confirm': '要取消注册此项目吗？（云端数据不会删除）',
+  'workspace.disconnect_confirm':
+    '要断开此项目吗？（可从列表重新连接。云端数据不会删除）',
 
   'explorer.firestore': 'FIRESTORE',
   'explorer.open_title': '请打开集合',

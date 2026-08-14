@@ -1075,26 +1075,6 @@ code {
   color: var(--ev-c-text-1);
 }
 
-.app-header__disconnect {
-  padding: 5px 12px;
-  border: 1px solid var(--ev-button-alt-border);
-  border-radius: 8px;
-  background: transparent;
-  color: var(--ev-c-text-2);
-  font-size: 13px;
-  cursor: pointer;
-}
-
-.app-header__disconnect:hover:not(:disabled) {
-  border-color: var(--ev-c-text-danger, #e57373);
-  color: var(--ev-c-text-danger, #e57373);
-}
-
-.app-header__disconnect:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
 .app-menu-bar {
   display: flex;
   align-items: stretch;
@@ -1591,6 +1571,7 @@ code {
 
 .project-list__settings-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
