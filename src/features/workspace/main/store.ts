@@ -7,7 +7,8 @@ const STORE_FILE_NAME = 'workspaces.json'
 const EMPTY_STORE: WorkspaceStore = {
   version: 1,
   entries: [],
-  focusedProjectId: null
+  focusedProjectId: null,
+  loadedProjectIds: []
 }
 
 function getStorePath(): string {
@@ -48,10 +49,31 @@ export async function loadWorkspaceStore(): Promise<WorkspaceStore> {
       .map((entry) => normalizeEntry(entry as Partial<WorkspaceEntry>))
       .filter((entry): entry is WorkspaceEntry => entry !== null)
 
+    const entryIds = new Set(entries.map((entry) => entry.id))
+    const focusedProjectId =
+      parsed.focusedProjectId && entryIds.has(parsed.focusedProjectId)
+        ? parsed.focusedProjectId
+        : null
+    const loadedFromFile = Array.isArray(parsed.loadedProjectIds)
+      ? parsed.loadedProjectIds.filter(
+          (id): id is string => typeof id === 'string' && entryIds.has(id)
+        )
+      : []
+    const loadedProjectIds = [
+      ...new Set(
+        loadedFromFile.length > 0
+          ? loadedFromFile
+          : focusedProjectId
+            ? [focusedProjectId]
+            : []
+      )
+    ]
+
     return {
       version: 1,
       entries,
-      focusedProjectId: parsed.focusedProjectId ?? null
+      focusedProjectId,
+      loadedProjectIds
     }
   } catch (error) {
     if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {

@@ -58,6 +58,8 @@ type FirestorePageProps = {
   onShellCommandsChange?: (commands: ShellCommands | null) => void
   /** インクリメントするとルートコレクション一覧を再読込 */
   rootsReloadToken?: number
+  /** インクリメントすると左ツリーのプロジェクト一覧を再取得 */
+  workspaceRefreshToken?: number
 }
 
 /**
@@ -71,7 +73,8 @@ function FirestorePageInner({
   onNavigate,
   onWorkspaceChanged,
   onShellCommandsChange,
-  rootsReloadToken = 0
+  rootsReloadToken = 0,
+  workspaceRefreshToken = 0
 }: FirestorePageProps): React.JSX.Element {
   const projectId = status.projectId
   const t = useT()
@@ -941,6 +944,7 @@ function FirestorePageInner({
             canManageSubcollections={!status.readOnly}
             onWorkspaceChanged={onWorkspaceChanged}
             treeReloadToken={treeReloadToken}
+            workspaceRefreshToken={workspaceRefreshToken}
             disabled={treeLoading}
           />
         }

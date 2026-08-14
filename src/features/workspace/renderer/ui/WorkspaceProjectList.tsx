@@ -7,6 +7,8 @@ import { useT } from '@shared/i18n/renderer/I18nProvider'
 type WorkspaceProjectListProps = {
   onChanged: () => void
   disabled?: boolean
+  /** 親が名簿／接続を更新したときに再取得する */
+  refreshToken?: number
   /**
    * 指定すると各プロジェクトをツリーの親ノードとして描画し、フォーカス中の
    * プロジェクト配下にこの要素（例: FIRESTORE ツリー）を差し込む。
@@ -22,6 +24,7 @@ type WorkspaceProjectListProps = {
 function WorkspaceProjectList({
   onChanged,
   disabled = false,
+  refreshToken = 0,
   focusedChildren
 }: WorkspaceProjectListProps): React.JSX.Element {
   const t = useT()
@@ -39,7 +42,7 @@ function WorkspaceProjectList({
 
   useEffect(() => {
     void refresh()
-  }, [refresh])
+  }, [refresh, refreshToken])
 
   const handleAdd = async (): Promise<void> => {
     setError(null)

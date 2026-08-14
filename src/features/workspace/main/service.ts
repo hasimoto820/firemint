@@ -53,6 +53,7 @@ function syncFocusedFromStore(): void {
 }
 
 async function persistStore(): Promise<void> {
+  store.loadedProjectIds = listConnectedProjectIds()
   await saveWorkspaceStore(store)
 }
 
@@ -142,26 +143,42 @@ async function connectWorkspaceEntry(entry: WorkspaceEntry): Promise<WorkspaceRe
 
 export async function initializeWorkspace(): Promise<void> {
   store = await loadWorkspaceStore()
+
+  const restoreIds = [
+    ...new Set(
+      [
+        ...store.loadedProjectIds,
+        ...(store.focusedProjectId ? [store.focusedProjectId] : [])
+      ].filter((projectId) => getWorkspaceEntry(projectId))
+    )
+  ]
+
+  if (store.focusedProjectId && !getWorkspaceEntry(store.focusedProjectId)) {
+    store.focusedProjectId = null
+  }
+
   syncFocusedFromStore()
 
-  if (!store.focusedProjectId) {
-    return
+  for (const projectId of restoreIds) {
+    const entry = getWorkspaceEntry(projectId)
+
+    if (!entry) {
+      continue
+    }
+
+    const result = await connectWorkspaceEntry(entry)
+
+    if (!result.ok) {
+      logError('workspace', `auto reconnect failed project_id=${entry.id}`, result.error)
+    }
   }
 
-  const entry = getWorkspaceEntry(store.focusedProjectId)
-
-  if (!entry) {
-    store.focusedProjectId = null
+  if (store.focusedProjectId && !isFirestoreConnected(store.focusedProjectId)) {
+    store.focusedProjectId = listConnectedProjectIds()[0] ?? null
     syncFocusedFromStore()
-    await persistStore()
-    return
   }
 
-  const result = await connectWorkspaceEntry(entry)
-
-  if (!result.ok) {
-    logError('workspace', `auto reconnect failed project_id=${entry.id}`, result.error)
-  }
+  await persistStore()
 }
 
 export async function addEntryAndLoad(

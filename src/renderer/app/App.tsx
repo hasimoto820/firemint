@@ -208,6 +208,7 @@ function App(): React.JSX.Element {
         onWorkspaceChanged={handleWorkspaceChanged}
         onShellCommandsChange={setShellCommands}
         rootsReloadToken={rootsReloadToken}
+        workspaceRefreshToken={refreshKey}
       />
     )
   }

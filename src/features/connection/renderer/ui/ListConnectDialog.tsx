@@ -38,7 +38,7 @@ function ListConnectDialog({
     setError(null)
 
     try {
-      const result = await window.api.workspace.setFocused(entry.id, { exclusive: true })
+      const result = await window.api.workspace.setFocused(entry.id)
 
       if (!result.ok) {
         setError(result.error)

@@ -21,6 +21,7 @@ type ExplorerSidebarProps = {
   canManageSubcollections?: boolean
   onWorkspaceChanged: () => void
   treeReloadToken?: number
+  workspaceRefreshToken?: number
   disabled?: boolean
 }
 
@@ -46,6 +47,7 @@ function ExplorerSidebar({
   canManageSubcollections = false,
   onWorkspaceChanged,
   treeReloadToken = 0,
+  workspaceRefreshToken = 0,
   disabled = false
 }: ExplorerSidebarProps): React.JSX.Element {
   const t = useT()
@@ -55,6 +57,7 @@ function ExplorerSidebar({
       <WorkspaceProjectList
         onChanged={onWorkspaceChanged}
         disabled={disabled}
+        refreshToken={workspaceRefreshToken}
         focusedChildren={
           <>
             <CollectionTree

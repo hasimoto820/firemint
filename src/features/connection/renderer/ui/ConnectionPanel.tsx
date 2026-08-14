@@ -60,7 +60,7 @@ function ConnectionPanel({
     setError(null)
 
     try {
-      const result = await window.api.workspace.setFocused(projectId, { exclusive: true })
+      const result = await window.api.workspace.setFocused(projectId)
 
       if (!result.ok) {
         setError(result.error)

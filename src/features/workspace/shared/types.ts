@@ -18,6 +18,8 @@ export type WorkspaceStore = {
   version: 1
   entries: WorkspaceEntry[]
   focusedProjectId: string | null
+  /** 前回ツリーに出していたプロジェクト。起動時に再接続する */
+  loadedProjectIds: string[]
 }
 
 export type WorkspaceState = {
