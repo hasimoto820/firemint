@@ -14,7 +14,7 @@
   autocomplete    → 001_011_autocomplete.txt（Phase 11.6）
   auth_users      → 001_020_014_auth_users.txt（Phase 14）
   i18n            → 001_020_016_i18n.txt（Phase 16-a）
-  script_runner   → 001_020_018_script_runner.txt（Phase 13・保留）
+  script_runner   → 001_020_018_script_runner.txt（Phase 13）
 
 
 ================================================================================
@@ -185,9 +185,9 @@ Phase 6〜16：v1（MVP 後）
   以降は依存の少ない・体験インパクトの大きい順。順番は v1 着手前に再確認可。
   詳細・Done は 001_002 v1 節をベースに各 Phase で具体化する。
 
-  ※ 現在地（2026-08-13）:
-       Phase 0〜12・14・16-a/b/d 完了。16-c（ショートカット）後回し。Phase 15 は保留。
-       次は 16-e / Phase 13 / 17 など。
+  ※ 現在地（2026-08-14）:
+       Phase 0〜14・16-a/b/d 完了。16-c（ショートカット）後回し。Phase 15 は保留。
+       残りは 16-e（Mac / Linux ビルド）/ Phase 15 / 17。
 
 
   Phase   内容
@@ -203,7 +203,7 @@ Phase 6〜16：v1（MVP 後）
   11.5    explorer 残り          … リネーム ✅ / サブコレ CRUD ✅ / 画像 ✅
   11.6    autocomplete           … path / フィールド名補完 ✅（001_011）
   12      connection 拡張        … Google サインイン ✅
-  13      script_runner          … 【保留】長時間 Tasks 等（JS Query 本体は 10-0）
+  13      script_runner          … Imp/Exp タブ + 裏実行 ✅（JS Query 本体は 10-0）
   14      auth_users             … Firebase Auth ユーザー管理 ✅
   15      onboarding             … 【保留】初回オンボーディング
   16      shared/i18n, settings  … 16-a i18n ✅（テーマ等は後続）
@@ -516,7 +516,7 @@ Phase 12 — connection 拡張（Google サインイン）
 
 
 --------------------------------------------------------------------------------
-Phase 13 — script_runner 【保留】
+Phase 13 — script_runner（✅ 完了）
 --------------------------------------------------------------------------------
 
   詳細: 001_020_018_script_runner.txt
@@ -530,12 +530,12 @@ Phase 13 — script_runner 【保留】
       進捗を Imp/Exp タブへ
 
   Done:
-    □ コレクションタブ列に Imp/Exp がある
-    □ コレクション内は Simple / Query のまま
-    □ Imp/Exp タブで Collection / Project の Import / Export ができる
-    □ ヘッダーの Import / Export が Imp/Exp タブを開く
-    □ Imp/Exp の処理中にコレクションタブへ戻れる
-    □ Imp/Exp タブで進捗・完了/失敗が確認できる
+    ■ コレクションタブ列に Imp/Exp がある
+    ■ コレクション内は Simple / Query のまま
+    ■ Imp/Exp タブで Collection / Project の Import / Export ができる
+    ■ ヘッダーの Import / Export が Imp/Exp タブを開く
+    ■ Imp/Exp の処理中にコレクションタブへ戻れる
+    ■ Imp/Exp タブで進捗・完了/失敗が確認できる
 
 
 --------------------------------------------------------------------------------

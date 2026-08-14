@@ -1,10 +1,10 @@
 
-script_runner / Imp/Exp タブ 設計（Phase 13）【保留】
+script_runner / Imp/Exp タブ 設計（Phase 13）【完了】
 
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
 関連:
-  001_005 Phase 13（保留）
+  001_005 Phase 13 ✅
   001_003 features/script_runner/
   001_006 UI（コレクションタブの横に Imp/Exp。Simple / Query はコレクション内）
   001_020_011_data_transfer.txt … Phase 11 の export/import（同期）。裏実行は本 Phase
@@ -117,7 +117,7 @@ Query と Imp/Exp の切り分け
     - 結果をテーブルに出す
     - この画面で待つ
 
-  Imp/Exp（Phase 13 … 未）:
+  Imp/Exp（Phase 13 … 済）:
     - ファイルの Import / Export
     - 進捗はこのタブ
     - 裏で走らせて、コレクションタブ（Simple / Query）に戻れる
@@ -195,13 +195,13 @@ Query と Imp/Exp の切り分け
 
 
 ================================================================================
-Done（未了）
+Done
 ================================================================================
 
-  □ コレクションタブ列に Imp/Exp がある
-  □ コレクション内は Simple / Query のまま
-  □ Imp/Exp タブで Collection / Project の Import / Export ができる
-  □ ヘッダーの Import / Export が Imp/Exp タブを開く
-  □ Imp/Exp の処理中にコレクションタブへ戻れる
-  □ Imp/Exp タブで進捗・完了/失敗が確認できる
-  □ 失敗ログは Imp/Exp 画面の下部に出る
+  ■ コレクションタブ列に Imp/Exp がある
+  ■ コレクション内は Simple / Query のまま
+  ■ Imp/Exp タブで Collection / Project の Import / Export ができる
+  ■ ヘッダーの Import / Export が Imp/Exp タブを開く
+  ■ Imp/Exp の処理中にコレクションタブへ戻れる
+  ■ Imp/Exp タブで進捗・完了/失敗が確認できる
+  ■ 失敗ログは Imp/Exp 画面の下部に出る
