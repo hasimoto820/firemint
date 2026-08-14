@@ -14,6 +14,7 @@
   autocomplete    → 001_011_autocomplete.txt（Phase 11.6）
   auth_users      → 001_020_014_auth_users.txt（Phase 14）
   i18n            → 001_020_016_i18n.txt（Phase 16-a）
+  script_runner   → 001_020_018_script_runner.txt（Phase 13・保留）
 
 
 ================================================================================
@@ -489,7 +490,7 @@ Phase 11.6 — autocomplete（詳細: 001_011_autocomplete.txt）
     11.6-a〜b  箱 + catalog + AutocompleteInput  ✅
     11.6-c〜d  explorer / Simple・Query から作成 API で登録  ✅
     11.6-e     Query エディタに接続（最初の Done）  ✅
-    11.6-f     （任意）JSON / フィルタ等へ展開
+    11.6-f     JSON / フィルタ / フィールド一括へ展開  ✅
 
   Done:
     ■ features/autocomplete/ が候補の唯一の所有者になっている
@@ -518,18 +519,23 @@ Phase 12 — connection 拡張（Google サインイン）
 Phase 13 — script_runner 【保留】
 --------------------------------------------------------------------------------
 
+  詳細: 001_020_018_script_runner.txt
+
   作るもの:
+    UI:
+      コレクションタブ列に Imp/Exp（Simple / Query はコレクション内のまま）
+      Imp/Exp タブで Import / Export（Collection / Project）と進捗
     features/script_runner/
-      JS クエリエディタ       … Admin SDK スクリプト実行
-      エディタ UI             … シンタックスハイライト・基本補完
-      Background Tasks        … 長時間処理の非同期実行
-      進捗 UI                 … Tasks ポップアップで状態確認
+      Background 実行          … ファイル I/O を裏で回す
+      進捗を Imp/Exp タブへ
 
   Done:
-    □ JS エディタから Admin SDK スクリプトを実行できる
-    □ シンタックスハイライトが効く
-    □ 長時間 export 等を Background Task として実行できる
-    □ Task の進捗・完了/失敗が UI で確認できる
+    □ コレクションタブ列に Imp/Exp がある
+    □ コレクション内は Simple / Query のまま
+    □ Imp/Exp タブで Collection / Project の Import / Export ができる
+    □ ヘッダーの Import / Export が Imp/Exp タブを開く
+    □ Imp/Exp の処理中にコレクションタブへ戻れる
+    □ Imp/Exp タブで進捗・完了/失敗が確認できる
 
 
 --------------------------------------------------------------------------------

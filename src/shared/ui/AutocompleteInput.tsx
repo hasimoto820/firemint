@@ -77,6 +77,21 @@ function AutocompleteInput({
   const [activeIndex, setActiveIndex] = useState(0)
   const [caret, setCaret] = useState(value.length)
   const [listStyle, setListStyle] = useState<CSSProperties | undefined>(undefined)
+  const ignoreOpenRef = useRef(false)
+
+  const closeList = (): void => {
+    ignoreOpenRef.current = true
+    setOpen(false)
+    window.setTimeout(() => {
+      ignoreOpenRef.current = false
+    }, 0)
+  }
+
+  const requestOpen = (): void => {
+    if (!ignoreOpenRef.current) {
+      setOpen(true)
+    }
+  }
 
   const currentWord = useMemo(() => {
     if (!wordCompletion) {
@@ -220,7 +235,7 @@ function AutocompleteInput({
 
       if (inserted) {
         setCaret(range.start + item.value.length)
-        setOpen(false)
+        closeList()
         return
       }
 
@@ -229,7 +244,7 @@ function AutocompleteInput({
       onChange(next)
       setCaret(nextCaret)
       focusField(nextCaret)
-      setOpen(false)
+      closeList()
       return
     }
 
@@ -241,13 +256,13 @@ function AutocompleteInput({
         document.execCommand('insertText', false, item.value)
 
       if (inserted) {
-        setOpen(false)
+        closeList()
         return
       }
     }
 
     onChange(item.value)
-    setOpen(false)
+    closeList()
   }
 
   const handleKeyDown = (
@@ -326,17 +341,17 @@ function AutocompleteInput({
           aria-autocomplete="list"
           aria-controls={listId}
           aria-expanded={listVisible}
-          onFocus={() => setOpen(true)}
+          onFocus={requestOpen}
           onClick={(event) => {
             syncCaret(event.currentTarget)
-            setOpen(true)
+            requestOpen()
           }}
           onKeyUp={(event) => syncCaret(event.currentTarget)}
           onSelect={(event) => syncCaret(event.currentTarget)}
           onChange={(event) => {
             onChange(event.target.value)
             syncCaret(event.target)
-            setOpen(true)
+            requestOpen()
           }}
           onKeyDown={handleKeyDown}
         />
@@ -355,17 +370,17 @@ function AutocompleteInput({
           aria-autocomplete="list"
           aria-controls={listId}
           aria-expanded={listVisible}
-          onFocus={() => setOpen(true)}
+          onFocus={requestOpen}
           onClick={(event) => {
             syncCaret(event.currentTarget)
-            setOpen(true)
+            requestOpen()
           }}
           onKeyUp={(event) => syncCaret(event.currentTarget)}
           onSelect={(event) => syncCaret(event.currentTarget)}
           onChange={(event) => {
             onChange(event.target.value)
             syncCaret(event.target)
-            setOpen(true)
+            requestOpen()
           }}
           onKeyDown={handleKeyDown}
         />
@@ -389,9 +404,16 @@ function AutocompleteInput({
                 }
                 role="option"
                 aria-selected={index === activeIndex}
-                onMouseDown={(event) => event.preventDefault()}
+                onMouseDown={(event) => {
+                  event.preventDefault()
+                  event.stopPropagation()
+                }}
                 onMouseEnter={() => setActiveIndex(index)}
-                onClick={() => applyItem(item)}
+                onClick={(event) => {
+                  event.preventDefault()
+                  event.stopPropagation()
+                  applyItem(item)
+                }}
               >
                 {item.value}
               </button>

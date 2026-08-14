@@ -398,6 +398,7 @@ function QueryView({
               selectedDocumentPath={queryResultSelectedPath}
               showPath={false}
               tableKey={`js-query:${queryResultCount}:${queryDocuments[0]?.path ?? 'empty'}`}
+              projectId={projectId}
               selectable={!readOnly}
               bulkSelectedPaths={bulkSelectedPaths}
               onBulkToggle={handleBulkToggle}
@@ -419,6 +420,7 @@ function QueryView({
           </div>
           <div className="query-main__json">
             <DocumentJsonPanel
+              projectId={projectId}
               documentPath={queryResultSelectedPath}
               jsonText={jsonText}
               createTime={selectedDocument?.createTime ?? null}

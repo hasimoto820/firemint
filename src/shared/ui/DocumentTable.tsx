@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useFieldAutocompleteItems } from '@features/autocomplete/renderer/hooks'
 import type { DocumentSummary } from '@features/explorer/shared/types'
 import Button from '@shared/ui/Button'
+import AutocompleteInput from '@shared/ui/AutocompleteInput'
 import {
   createEmptyFilterClause,
   filterDocuments,
@@ -24,6 +26,7 @@ type DocumentTableProps = {
   onBulkToggle?: (documentPath: string, checked: boolean) => void
   onBulkToggleAll?: (checked: boolean) => void
   tableKey?: string
+  projectId?: string
 }
 
 function filterValuePlaceholder(operator: TableFilterOperator): string {
@@ -70,7 +73,8 @@ function DocumentTable({
   bulkSelectedPaths,
   onBulkToggle,
   onBulkToggleAll,
-  tableKey
+  tableKey,
+  projectId = ''
 }: DocumentTableProps): React.JSX.Element {
   const [columnOrder, setColumnOrder] = useState<string[]>([])
   const [hiddenColumns, setHiddenColumns] = useState<Set<string>>(new Set())
@@ -144,6 +148,8 @@ function DocumentTable({
     setFilterClauses((current) => current.filter((clause) => clause.id !== id))
   }
 
+  const fieldItems = useFieldAutocompleteItems(projectId, columnOrder)
+
   if (documents.length === 0) {
     return (
       <div className="document-table-panel">
@@ -177,19 +183,15 @@ function DocumentTable({
       <div className="document-filter-bar">
         {filterClauses.map((clause) => (
           <div key={clause.id} className="document-filter-bar__row">
-            <select
-              className="document-filter-bar__field"
+            <AutocompleteInput
+              className="document-filter-bar__field-wrap"
+              fieldClassName="document-filter-bar__field"
               value={clause.field}
-              onChange={(event) => updateFilterClause(clause.id, { field: event.target.value })}
+              items={fieldItems}
+              placeholder="field"
               aria-label="フィルタ対象フィールド"
-            >
-              <option value="">field</option>
-              {columnOrder.map((column) => (
-                <option key={column} value={column}>
-                  {column}
-                </option>
-              ))}
-            </select>
+              onChange={(next) => updateFilterClause(clause.id, { field: next })}
+            />
             <select
               className="document-filter-bar__operator"
               value={clause.operator}

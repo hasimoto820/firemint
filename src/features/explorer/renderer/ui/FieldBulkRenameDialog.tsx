@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
+import { useFieldAutocompleteItems, useOptionalAutocompleteApi } from '@features/autocomplete/renderer/hooks'
 import type { DiffPreviewItem } from '@features/bulk_operations/shared/types'
 import Button from '@shared/ui/Button'
+import AutocompleteInput from '@shared/ui/AutocompleteInput'
 import DiffPreviewPanel from '@shared/ui/DiffPreviewPanel'
-import FieldNameSuggestInput from '@shared/ui/FieldNameSuggestInput'
 import { collectDataColumns } from '@shared/ui/document_table_utils'
 
 type FieldBulkRenameDialogProps = {
@@ -22,6 +23,7 @@ function FieldBulkRenameDialog({
   onClose,
   onCompleted
 }: FieldBulkRenameDialogProps): React.JSX.Element | null {
+  const autocomplete = useOptionalAutocompleteApi()
   const [mode, setMode] = useState<Mode>('rename')
   const [fromField, setFromField] = useState('')
   const [toField, setToField] = useState('')
@@ -30,6 +32,7 @@ function FieldBulkRenameDialog({
   const [fieldCandidates, setFieldCandidates] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const fieldItems = useFieldAutocompleteItems(projectId, fieldCandidates)
 
   useEffect(() => {
     if (!open) {
@@ -61,14 +64,16 @@ function FieldBulkRenameDialog({
       }
 
       if (result.ok) {
-        setFieldCandidates(collectDataColumns(result.data))
+        const columns = collectDataColumns(result.data)
+        setFieldCandidates(columns)
+        autocomplete.addFieldNames(projectId, columns)
       }
     })()
 
     return () => {
       cancelled = true
     }
-  }, [open, projectId, collectionPath])
+  }, [open, projectId, collectionPath, autocomplete.addFieldNames])
 
   const clearPreview = (): void => {
     setPreviewItems(null)
@@ -213,12 +218,15 @@ function FieldBulkRenameDialog({
 
         {mode === 'rename' ? (
           <div className="bulk-actions__update-row">
-            <FieldNameSuggestInput
+            <AutocompleteInput
+              className="bulk-actions__field-wrap"
+              fieldClassName="bulk-actions__input"
               value={fromField}
-              candidates={fieldCandidates}
+              items={fieldItems}
               disabled={busy}
               autoFocus
               placeholder="旧フィールド名"
+              aria-label="旧フィールド名"
               onChange={(nextValue) => {
                 setFromField(nextValue)
                 clearPreview()
@@ -239,12 +247,15 @@ function FieldBulkRenameDialog({
           </div>
         ) : (
           <div className="bulk-actions__update-row">
-            <FieldNameSuggestInput
+            <AutocompleteInput
+              className="bulk-actions__field-wrap"
+              fieldClassName="bulk-actions__input"
               value={deleteFieldName}
-              candidates={fieldCandidates}
+              items={fieldItems}
               disabled={busy}
               autoFocus
               placeholder="削除するフィールド名"
+              aria-label="削除するフィールド名"
               onChange={(nextValue) => {
                 setDeleteFieldName(nextValue)
                 clearPreview()

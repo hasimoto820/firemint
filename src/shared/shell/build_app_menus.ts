@@ -1,3 +1,4 @@
+import type { ImpExpIntent } from '@features/data_transfer/shared/imp_exp'
 import type { AppView } from '@shared/shell/AppNav'
 import type { TranslateFn } from '@shared/i18n/shared/types'
 import type { AppMenuSection } from './app_menu'
@@ -35,12 +36,14 @@ export type AppMenuContextActions = {
 
 export type AppShellMenuActions = {
   openCommandPalette?: () => void
+  openImpExp?: (intent?: ImpExpIntent) => void
   toggleSplit?: () => void
   closeActiveTab?: () => void
   closeOtherTabs?: () => void
   canCloseTab?: boolean
   canCloseOtherTabs?: boolean
   splitEnabled?: boolean
+  impExpActive?: boolean
 }
 
 export type AppMenuHandlers = {
@@ -87,15 +90,21 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
           label: t('menu.project'),
           indent: true,
           disabled: !(handlers.canImportProject ?? handlers.connected),
-          onClick: handlers.onImportProject
+          onClick: () => {
+            if (shell?.openImpExp) {
+              shell.openImpExp({ direction: 'import', target: 'project' })
+              return
+            }
+            handlers.onImportProject?.()
+          }
         },
         {
           type: 'item',
           id: 'file-import',
           label: t('menu.collection'),
           indent: true,
-          disabled: !context?.canImport,
-          onClick: context?.onImport
+          disabled: !handlers.connected,
+          onClick: () => shell?.openImpExp?.({ direction: 'import', target: 'collection' })
         },
         { type: 'header', label: t('menu.export') },
         {
@@ -104,15 +113,15 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
           label: t('menu.project'),
           indent: true,
           disabled: !handlers.connected,
-          onClick: handlers.onExportProject
+          onClick: () => shell?.openImpExp?.({ direction: 'export', target: 'project' })
         },
         {
           type: 'item',
           id: 'file-export',
           label: t('menu.collection'),
           indent: true,
-          disabled: !context?.canExport,
-          onClick: context?.onExport
+          disabled: !handlers.connected,
+          onClick: () => shell?.openImpExp?.({ direction: 'export', target: 'collection' })
         },
         { type: 'separator' },
         { type: 'header', label: t('menu.connection') },
@@ -250,16 +259,24 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
         {
           type: 'item',
           id: 'view-simple',
-          label: handlers.activeView === 'simple' ? 'Simple ✓' : 'Simple',
-          disabled: !handlers.connected,
+          label: !shell?.impExpActive && handlers.activeView === 'simple' ? 'Simple ✓' : 'Simple',
+          disabled: !handlers.connected || Boolean(shell?.impExpActive),
           onClick: () => handlers.onNavigate('simple')
         },
         {
           type: 'item',
           id: 'view-query',
-          label: handlers.activeView === 'query' ? 'Query ✓' : 'Query',
-          disabled: !handlers.connected,
+          label: !shell?.impExpActive && handlers.activeView === 'query' ? 'Query ✓' : 'Query',
+          disabled: !handlers.connected || Boolean(shell?.impExpActive),
           onClick: () => handlers.onNavigate('query')
+        },
+        { type: 'separator' },
+        {
+          type: 'item',
+          id: 'view-imp-exp',
+          label: shell?.impExpActive ? 'Imp/Exp ✓' : 'Imp/Exp',
+          disabled: !handlers.connected,
+          onClick: shell?.openImpExp
         },
         { type: 'separator' },
         {

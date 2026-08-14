@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AutocompleteProvider,
   useAutocompleteApi
@@ -12,6 +12,13 @@ import SubcollectionCreateDialog from '@features/explorer/renderer/ui/Subcollect
 import SubcollectionDeleteDialog from '@features/explorer/renderer/ui/SubcollectionDeleteDialog'
 import ExplorerSidebar from '@features/explorer/renderer/ui/ExplorerSidebar'
 import { parentDocumentPathOfSubcollection } from '@features/explorer/shared/tree'
+import type { ScriptJobSnapshot } from '@features/script_runner/shared/types'
+import {
+  applyImpExpIntent,
+  createImpExpDraft,
+  type ImpExpDraft,
+  type ImpExpIntent
+} from '@features/data_transfer/shared/imp_exp'
 import AppHeader from '@shared/shell/AppHeader'
 import type { AppView } from '@shared/shell/AppNav'
 import AppShell from '@shared/shell/AppShell'
@@ -19,7 +26,10 @@ import CommandPalette, { type CommandPaletteItem } from '@shared/shell/CommandPa
 import TabBar from '@shared/shell/TabBar'
 import WorkspacePane from '@shared/shell/WorkspacePane'
 import {
+  createImpExpTab,
   createWorkspaceTab,
+  isCollectionTab,
+  isImpExpTab,
   parentCollectionPath,
   remapFirestorePath,
   tabsInPane,
@@ -30,12 +40,14 @@ import {
 
 export type ShellCommands = {
   openCommandPalette: () => void
+  openImpExp: (intent?: ImpExpIntent) => void
   toggleSplit: () => void
   closeActiveTab: () => void
   closeOtherTabs: () => void
   canCloseTab: boolean
   canCloseOtherTabs: boolean
   splitEnabled: boolean
+  impExpActive: boolean
 }
 
 type FirestorePageProps = {
@@ -83,6 +95,12 @@ function FirestorePageInner({
   )
   const [deleteSubcollectionPath, setDeleteSubcollectionPath] = useState<string | null>(null)
   const [mainSection, setMainSection] = useState<'firestore' | 'auth'>('firestore')
+  const [impExpJob, setImpExpJob] = useState<ScriptJobSnapshot | null>(null)
+  const [impExpDraft, setImpExpDraft] = useState<ImpExpDraft>(() => createImpExpDraft(projectId))
+  const lastCollectionPathRef = useRef<string | null>(null)
+  const impExpJobRef = useRef<ScriptJobSnapshot | null>(null)
+  impExpJobRef.current = impExpJob
+  const handledImportJobIdRef = useRef<string | null>(null)
 
   const primaryTabs = useMemo(() => tabsInPane(tabs, 'primary'), [tabs])
   const secondaryTabs = useMemo(() => tabsInPane(tabs, 'secondary'), [tabs])
@@ -90,8 +108,16 @@ function FirestorePageInner({
   const secondaryTab = tabs.find((tab) => tab.id === secondaryActiveId) ?? null
   const focusedActiveId = focusedPane === 'primary' ? primaryActiveId : secondaryActiveId
   const focusedTab = tabs.find((tab) => tab.id === focusedActiveId) ?? null
-  const treeCollectionPath = focusedTab?.collectionPath ?? null
-  const treeDocumentPath = focusedTab?.selectedDocumentPath ?? null
+  const treeCollectionPath =
+    focusedTab && isCollectionTab(focusedTab) ? focusedTab.collectionPath : null
+  const treeDocumentPath =
+    focusedTab && isCollectionTab(focusedTab) ? focusedTab.selectedDocumentPath : null
+
+  useEffect(() => {
+    if (focusedTab && isCollectionTab(focusedTab)) {
+      lastCollectionPathRef.current = focusedTab.collectionPath
+    }
+  }, [focusedTab])
 
   const loadRootCollections = useCallback(async (): Promise<void> => {
     setTreeLoading(true)
@@ -122,6 +148,45 @@ function FirestorePageInner({
     void loadRootCollections()
   }, [rootsReloadToken, loadRootCollections])
 
+  useEffect(() => {
+    let cancelled = false
+
+    void window.api.scriptRunner.getSnapshot().then((snapshot) => {
+      if (!cancelled) {
+        setImpExpJob(snapshot)
+      }
+    })
+
+    const unsubscribe = window.api.scriptRunner.onSnapshot(setImpExpJob)
+    return () => {
+      cancelled = true
+      unsubscribe()
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!impExpJob) {
+      return
+    }
+
+    if (impExpJob.status !== 'succeeded') {
+      return
+    }
+
+    if (impExpJob.kind !== 'import_collection' && impExpJob.kind !== 'import_project') {
+      return
+    }
+
+    if (handledImportJobIdRef.current === impExpJob.id) {
+      return
+    }
+
+    handledImportJobIdRef.current = impExpJob.id
+    void loadRootCollections()
+    setTreeReloadToken((token) => token + 1)
+    setCollectionDataReloadToken((token) => token + 1)
+  }, [impExpJob, loadRootCollections])
+
   const updateTab = useCallback((tabId: string, patch: Partial<WorkspaceTab>): void => {
     setTabs((current) => current.map((tab) => (tab.id === tabId ? { ...tab, ...patch } : tab)))
   }, [])
@@ -135,7 +200,7 @@ function FirestorePageInner({
         setSecondaryActiveId(tabId)
       }
       setFocusedPane(pane)
-      if (tab) {
+      if (tab && isCollectionTab(tab)) {
         onNavigate(tab.view)
       }
     },
@@ -155,7 +220,8 @@ function FirestorePageInner({
       setTabs((current) => {
         // 同じペイン内なら既存タブを再利用。左右で同じコレクションを開くのは許可する。
         const existingInPane = current.find(
-          (tab) => tab.collectionPath === collectionPath && tab.pane === targetPane
+          (tab) =>
+            isCollectionTab(tab) && tab.collectionPath === collectionPath && tab.pane === targetPane
         )
         if (existingInPane) {
           const resolvedView = nextView ?? existingInPane.view
@@ -197,6 +263,46 @@ function FirestorePageInner({
     [projectId, view, onNavigate, splitEnabled, focusedPane]
   )
 
+  const openImpExp = useCallback(
+    (intent?: ImpExpIntent): void => {
+      setMainSection('firestore')
+
+      if (intent) {
+        setImpExpDraft((current) =>
+          applyImpExpIntent(current, intent, lastCollectionPathRef.current, rootCollections)
+        )
+      } else {
+        setImpExpDraft((current) => ({
+          ...current,
+          collectionPath: current.collectionPath || lastCollectionPathRef.current || ''
+        }))
+      }
+
+      setTabs((current) => {
+        const existing = current.find(isImpExpTab)
+        if (existing) {
+          if (existing.pane === 'primary') {
+            setPrimaryActiveId(existing.id)
+          } else {
+            setSecondaryActiveId(existing.id)
+          }
+          setFocusedPane(existing.pane)
+          return current
+        }
+
+        const created = createImpExpTab({ projectId, pane: 'primary' })
+        setPrimaryActiveId(created.id)
+        setFocusedPane('primary')
+        return [...current, created]
+      })
+    },
+    [projectId, rootCollections]
+  )
+
+  const handleImpExpDraftChange = useCallback((patch: Partial<ImpExpDraft>): void => {
+    setImpExpDraft((current) => ({ ...current, ...patch }))
+  }, [])
+
   const handleSelectCollection = useCallback(
     (collectionPath: string): void => {
       openCollection(collectionPath, { selectedDocumentPath: null })
@@ -221,30 +327,53 @@ function FirestorePageInner({
       autocomplete.removeCollectionPaths(projectId, [sourceCollectionPath])
       autocomplete.addCollectionPaths(projectId, [targetCollectionPath])
 
+      setImpExpDraft((current) => ({
+        ...current,
+        collectionPath:
+          remapFirestorePath(current.collectionPath, sourceCollectionPath, targetCollectionPath) ??
+          current.collectionPath
+      }))
+
       setTabs((current) => {
-        const remapped = current.map((tab) => ({
-          ...tab,
-          collectionPath:
-            remapFirestorePath(tab.collectionPath, sourceCollectionPath, targetCollectionPath) ??
-            tab.collectionPath,
-          selectedDocumentPath: remapFirestorePath(
-            tab.selectedDocumentPath,
-            sourceCollectionPath,
-            targetCollectionPath
-          ),
-          queryResultSelectedPath: remapFirestorePath(
-            tab.queryResultSelectedPath,
-            sourceCollectionPath,
-            targetCollectionPath
-          )
-        }))
+        const remapped = current.map((tab) => {
+          if (isImpExpTab(tab)) {
+            return tab
+          }
+
+          return {
+            ...tab,
+            collectionPath:
+              remapFirestorePath(tab.collectionPath, sourceCollectionPath, targetCollectionPath) ??
+              tab.collectionPath,
+            selectedDocumentPath: remapFirestorePath(
+              tab.selectedDocumentPath,
+              sourceCollectionPath,
+              targetCollectionPath
+            ),
+            queryResultSelectedPath: remapFirestorePath(
+              tab.queryResultSelectedPath,
+              sourceCollectionPath,
+              targetCollectionPath
+            )
+          }
+        })
 
         const deduped: WorkspaceTab[] = []
         for (const tab of remapped) {
+          if (isImpExpTab(tab)) {
+            if (deduped.some(isImpExpTab)) {
+              continue
+            }
+            deduped.push(tab)
+            continue
+          }
+
           if (
             deduped.some(
               (existing) =>
-                existing.pane === tab.pane && existing.collectionPath === tab.collectionPath
+                isCollectionTab(existing) &&
+                existing.pane === tab.pane &&
+                existing.collectionPath === tab.collectionPath
             )
           ) {
             continue
@@ -335,7 +464,9 @@ function FirestorePageInner({
       setTabs((current) => {
         const filtered = current
           .filter(
-            (tab) => tab.collectionPath !== collectionPath && !tab.collectionPath.startsWith(prefix)
+            (tab) =>
+              isImpExpTab(tab) ||
+              (tab.collectionPath !== collectionPath && !tab.collectionPath.startsWith(prefix))
           )
           .map((tab) => ({
             ...tab,
@@ -393,10 +524,32 @@ function FirestorePageInner({
     [handleCollectionRenamed, renameCollectionPath]
   )
 
+  const confirmStopImpExpJob = useCallback((): boolean => {
+    const job = impExpJobRef.current
+    if (!job || job.status !== 'running') {
+      return true
+    }
+
+    const accepted = window.confirm('Imp/Exp の処理中です。中止してタブを閉じますか？')
+    if (accepted) {
+      void window.api.scriptRunner.cancel()
+    }
+
+    return accepted
+  }, [])
+
+  const handleCancelImpExp = useCallback((): void => {
+    void window.api.scriptRunner.cancel()
+  }, [])
+
   const handleCloseTab = useCallback(
     (tabId: string): void => {
       const closing = tabs.find((tab) => tab.id === tabId)
       if (!closing) {
+        return
+      }
+
+      if (isImpExpTab(closing) && !confirmStopImpExpJob()) {
         return
       }
 
@@ -414,7 +567,7 @@ function FirestorePageInner({
         setSecondaryActiveId((active) => (active === tabId ? (neighbor?.id ?? null) : active))
       }
     },
-    [tabs]
+    [confirmStopImpExpJob, tabs]
   )
 
   const handleCloseOtherTabs = useCallback((): void => {
@@ -423,6 +576,16 @@ function FirestorePageInner({
     }
 
     const pane = focusedTab.pane
+    const wouldCloseRunningImpExp = tabs.some(
+      (tab) =>
+        isImpExpTab(tab) &&
+        tab.id !== focusedActiveId &&
+        (!splitEnabled || tab.pane === pane)
+    )
+    if (wouldCloseRunningImpExp && !confirmStopImpExpJob()) {
+      return
+    }
+
     setTabs((current) =>
       current.filter((tab) => tab.id === focusedActiveId || (splitEnabled && tab.pane !== pane))
     )
@@ -432,7 +595,7 @@ function FirestorePageInner({
     } else {
       setSecondaryActiveId(focusedActiveId)
     }
-  }, [focusedActiveId, focusedTab, splitEnabled])
+  }, [confirmStopImpExpJob, focusedActiveId, focusedTab, splitEnabled, tabs])
 
   const moveTabToPane = useCallback(
     (tabId: string, pane: WorkspacePaneId): void => {
@@ -470,9 +633,9 @@ function FirestorePageInner({
     })
   }, [tabs, primaryActiveId])
 
-  // メニュー等の view 変更 → フォーカス中タブへ
+  // メニュー等の view 変更 → フォーカス中のコレクションタブへ
   useEffect(() => {
-    if (!focusedActiveId || !focusedTab) {
+    if (!focusedActiveId || !focusedTab || isImpExpTab(focusedTab)) {
       return
     }
 
@@ -481,9 +644,13 @@ function FirestorePageInner({
     }
   }, [view, focusedActiveId, focusedTab, updateTab])
 
-  // フォーカス切替時に App 側 view を同期
+  // フォーカス切替時に App 側 view を同期（Imp/Exp は Simple/Query ではない）
   useEffect(() => {
-    if (focusedTab && focusedTab.view !== view) {
+    if (!focusedTab || isImpExpTab(focusedTab)) {
+      return
+    }
+
+    if (focusedTab.view !== view) {
       onNavigate(focusedTab.view)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -514,6 +681,7 @@ function FirestorePageInner({
   const shellCommands = useMemo<ShellCommands>(
     () => ({
       openCommandPalette: () => setPaletteOpen(true),
+      openImpExp,
       toggleSplit: () => handleToggleSplit(),
       closeActiveTab: () => {
         if (focusedActiveId) {
@@ -525,7 +693,8 @@ function FirestorePageInner({
       canCloseOtherTabs:
         Boolean(focusedTab) &&
         tabsInPane(tabs, focusedTab?.pane ?? 'primary').length > 1,
-      splitEnabled
+      splitEnabled,
+      impExpActive: Boolean(focusedTab && isImpExpTab(focusedTab))
     }),
     [
       focusedActiveId,
@@ -533,6 +702,7 @@ function FirestorePageInner({
       handleCloseTab,
       handleCloseOtherTabs,
       handleToggleSplit,
+      openImpExp,
       splitEnabled,
       tabs
     ]
@@ -569,7 +739,10 @@ function FirestorePageInner({
 
       const existingInPane = tabs.find(
         (tab) =>
-          tab.collectionPath === collectionPath && tab.pane === currentTab.pane && tab.id !== tabId
+          isCollectionTab(tab) &&
+          tab.collectionPath === collectionPath &&
+          tab.pane === currentTab.pane &&
+          tab.id !== tabId
       )
       if (existingInPane) {
         activateInPane(existingInPane.id, existingInPane.pane)
@@ -595,6 +768,13 @@ function FirestorePageInner({
         group: '表示',
         label: 'Query モード',
         run: () => onNavigate('query')
+      },
+      {
+        id: 'open-imp-exp',
+        group: 'タブ',
+        label: 'Imp/Exp',
+        detail: 'Import / Export',
+        run: () => openImpExp()
       },
       {
         id: 'toggle-split',
@@ -631,11 +811,14 @@ function FirestorePageInner({
     }
 
     for (const tab of tabs) {
+      const label = workspaceTabLabel(tab)
       items.push({
         id: `focus-tab-${tab.id}`,
         group: '開いているタブ',
-        label: workspaceTabLabel(tab.collectionPath),
-        detail: `${tab.collectionPath}（${tab.pane === 'primary' ? '左' : '右'}）`,
+        label,
+        detail: isImpExpTab(tab)
+          ? 'Import / Export'
+          : `${tab.collectionPath}（${tab.pane === 'primary' ? '左' : '右'}）`,
         run: () => activateInPane(tab.id, tab.pane)
       })
 
@@ -643,8 +826,8 @@ function FirestorePageInner({
         items.push({
           id: `move-right-${tab.id}`,
           group: 'Split',
-          label: `右ペインへ移す: ${workspaceTabLabel(tab.collectionPath)}`,
-          detail: tab.collectionPath,
+          label: `右ペインへ移す: ${label}`,
+          detail: isImpExpTab(tab) ? 'Import / Export' : tab.collectionPath,
           run: () => moveTabToPane(tab.id, 'secondary')
         })
       }
@@ -653,8 +836,8 @@ function FirestorePageInner({
         items.push({
           id: `move-left-${tab.id}`,
           group: 'Split',
-          label: `左ペインへ移す: ${workspaceTabLabel(tab.collectionPath)}`,
-          detail: tab.collectionPath,
+          label: `左ペインへ移す: ${label}`,
+          detail: isImpExpTab(tab) ? 'Import / Export' : tab.collectionPath,
           run: () => moveTabToPane(tab.id, 'primary')
         })
       }
@@ -670,6 +853,7 @@ function FirestorePageInner({
     moveTabToPane,
     onNavigate,
     openCollection,
+    openImpExp,
     rootCollections,
     splitEnabled,
     tabs
@@ -698,6 +882,7 @@ function FirestorePageInner({
         tabs={paneTabs}
         activeTabId={activeId}
         ariaLabel={pane === 'primary' ? '左ペインのタブ' : '右ペインのタブ'}
+        impExpBusy={impExpJob?.status === 'running'}
         onActivate={(tabId) => activateInPane(tabId, pane)}
         onClose={handleCloseTab}
       />
@@ -706,7 +891,15 @@ function FirestorePageInner({
         <WorkspacePane
           status={status}
           tab={active}
-          menuEnabled={focusedPane === pane && active.view === 'simple'}
+          menuEnabled={
+            focusedPane === pane && isCollectionTab(active) && active.view === 'simple'
+          }
+          impExpJob={impExpJob}
+          impExpDraft={impExpDraft}
+          rootCollections={rootCollections}
+          onImpExpDraftChange={handleImpExpDraftChange}
+          onCancelImpExp={handleCancelImpExp}
+          onOpenImpExp={openImpExp}
           onChangeView={(nextView) => handlePaneViewChange(active.id, nextView)}
           onSelectCollection={(path) => handlePaneCollectionChange(active.id, path)}
           onSelectDocument={(path) => handlePaneDocumentChange(active.id, path)}

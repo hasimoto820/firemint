@@ -94,6 +94,8 @@ const api: IpcApi = {
       ipcRenderer.invoke(IPC_CHANNELS.DATA_TRANSFER_EXPORT_DOCUMENTS_CSV, input),
     selectCollectionImportJson: () =>
       ipcRenderer.invoke(IPC_CHANNELS.DATA_TRANSFER_SELECT_COLLECTION_IMPORT_JSON),
+    peekCollectionImportJson: (filePath) =>
+      ipcRenderer.invoke(IPC_CHANNELS.DATA_TRANSFER_PEEK_COLLECTION_IMPORT_JSON, filePath),
     validateCollectionImport: (input) =>
       ipcRenderer.invoke(IPC_CHANNELS.DATA_TRANSFER_VALIDATE_COLLECTION_IMPORT, input),
     importCollectionJson: (input) =>
@@ -140,6 +142,23 @@ const api: IpcApi = {
       ipcRenderer.on(IPC_CHANNELS.DATA_TRANSFER_IMPORT_PROJECT_PROGRESS, handler)
       return () => {
         ipcRenderer.removeListener(IPC_CHANNELS.DATA_TRANSFER_IMPORT_PROJECT_PROGRESS, handler)
+      }
+    }
+  },
+  scriptRunner: {
+    start: (input) => ipcRenderer.invoke(IPC_CHANNELS.SCRIPT_RUNNER_START, input),
+    cancel: () => ipcRenderer.invoke(IPC_CHANNELS.SCRIPT_RUNNER_CANCEL),
+    getSnapshot: () => ipcRenderer.invoke(IPC_CHANNELS.SCRIPT_RUNNER_GET_SNAPSHOT),
+    onSnapshot: (listener) => {
+      const handler = (
+        _event: IpcRendererEvent,
+        snapshot: Parameters<typeof listener>[0]
+      ): void => {
+        listener(snapshot)
+      }
+      ipcRenderer.on(IPC_CHANNELS.SCRIPT_RUNNER_SNAPSHOT, handler)
+      return () => {
+        ipcRenderer.removeListener(IPC_CHANNELS.SCRIPT_RUNNER_SNAPSHOT, handler)
       }
     }
   },

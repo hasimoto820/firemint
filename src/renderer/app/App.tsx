@@ -4,7 +4,6 @@ import type { WorkspaceEntry } from '@features/workspace/shared/types'
 import ConnectionPanel from '@features/connection/renderer/ui/ConnectionPanel'
 import GoogleConnectDialog from '@features/connection/renderer/ui/GoogleConnectDialog'
 import ListConnectDialog from '@features/connection/renderer/ui/ListConnectDialog'
-import ProjectExportDialog from '@features/data_transfer/renderer/ui/ProjectExportDialog'
 import ProjectImportDialog from '@features/data_transfer/renderer/ui/ProjectImportDialog'
 import FirestorePage, { type ShellCommands } from './FirestorePage'
 import type { AppView } from '@shared/shell/AppNav'
@@ -28,7 +27,6 @@ function App(): React.JSX.Element {
   const [refreshKey, setRefreshKey] = useState(0)
   const [menuContext, setMenuContext] = useState<AppMenuContextActions | null>(null)
   const [shellCommands, setShellCommands] = useState<ShellCommands | null>(null)
-  const [projectExportOpen, setProjectExportOpen] = useState(false)
   const [projectImportOpen, setProjectImportOpen] = useState(false)
   const [googleConnectOpen, setGoogleConnectOpen] = useState(false)
   const [listConnectOpen, setListConnectOpen] = useState(false)
@@ -81,13 +79,14 @@ function App(): React.JSX.Element {
   const platform = window.electron.process.platform
   const useWindowMenuActions = platform === 'linux'
 
-  const handleExportProject = useCallback((): void => {
-    setProjectExportOpen(true)
-  }, [])
-
   const handleImportProject = useCallback((): void => {
+    if (shellCommands) {
+      shellCommands.openImpExp({ direction: 'import', target: 'project' })
+      return
+    }
+
     setProjectImportOpen(true)
-  }, [])
+  }, [shellCommands])
 
   const handleListConnect = useCallback((): void => {
     setListConnectOpen(true)
@@ -129,7 +128,6 @@ function App(): React.JSX.Element {
         onQuit: handleQuit,
         onAbout: () => void handleAbout(),
         onOpenDocs: handleOpenDocs,
-        onExportProject: handleExportProject,
         onImportProject: handleImportProject,
         canImportProject,
         onListConnect: handleListConnect,
@@ -140,12 +138,14 @@ function App(): React.JSX.Element {
         shell: shellCommands
           ? {
               openCommandPalette: shellCommands.openCommandPalette,
+              openImpExp: shellCommands.openImpExp,
               toggleSplit: shellCommands.toggleSplit,
               closeActiveTab: shellCommands.closeActiveTab,
               closeOtherTabs: shellCommands.closeOtherTabs,
               canCloseTab: shellCommands.canCloseTab,
               canCloseOtherTabs: shellCommands.canCloseOtherTabs,
-              splitEnabled: shellCommands.splitEnabled
+              splitEnabled: shellCommands.splitEnabled,
+              impExpActive: shellCommands.impExpActive
             }
           : null,
         t,
@@ -169,7 +169,6 @@ function App(): React.JSX.Element {
       handleQuit,
       handleAbout,
       handleOpenDocs,
-      handleExportProject,
       handleImportProject,
       handleListConnect,
       handleGoogleConnect,
@@ -233,13 +232,6 @@ function App(): React.JSX.Element {
           onClose={() => setProjectImportOpen(false)}
           onImported={handleProjectImported}
         />
-        {connectionStatus && (
-          <ProjectExportDialog
-            projectId={connectionStatus.projectId}
-            open={projectExportOpen}
-            onClose={() => setProjectExportOpen(false)}
-          />
-        )}
       </AppChrome>
     </AppMenuRegistryProvider>
   )

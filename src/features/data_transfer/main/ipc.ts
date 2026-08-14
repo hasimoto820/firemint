@@ -13,6 +13,7 @@ import type {
 } from '@features/data_transfer/shared/types'
 import {
   importCollectionJson,
+  peekCollectionImportJson,
   selectCollectionImportJson,
   validateCollectionImport
 } from './import_service'
@@ -61,6 +62,14 @@ export function registerDataTransferHandlers(): void {
     const window = BrowserWindow.fromWebContents(event.sender)
     return selectCollectionImportJson(window)
   })
+
+  ipcMain.handle(
+    IPC_CHANNELS.DATA_TRANSFER_PEEK_COLLECTION_IMPORT_JSON,
+    async (_event, filePath: string) => {
+      logInfo('ipc:data_transfer', `peekCollectionImportJson file=${filePath}`)
+      return peekCollectionImportJson(filePath)
+    }
+  )
 
   ipcMain.handle(
     IPC_CHANNELS.DATA_TRANSFER_VALIDATE_COLLECTION_IMPORT,

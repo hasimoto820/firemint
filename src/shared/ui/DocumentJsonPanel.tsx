@@ -1,9 +1,12 @@
+import { useFieldAutocompleteItems } from '@features/autocomplete/renderer/hooks'
 import Button from '@shared/ui/Button'
+import AutocompleteInput from '@shared/ui/AutocompleteInput'
 import GeopointPreview from '@shared/ui/GeopointPreview'
 import ImagePreview from '@shared/ui/ImagePreview'
 import { findGeopointFields, findImageUrlFields, formatTimestampIso } from '@shared/ui/firestore_display'
 
 type DocumentJsonPanelProps = {
+  projectId?: string
   documentPath: string | null
   jsonText: string
   createTime: string | null
@@ -19,6 +22,7 @@ type DocumentJsonPanelProps = {
 }
 
 function DocumentJsonPanel({
+  projectId = '',
   documentPath,
   jsonText,
   createTime,
@@ -34,6 +38,7 @@ function DocumentJsonPanel({
 }: DocumentJsonPanelProps): React.JSX.Element {
   const geopoints = documentData ? findGeopointFields(documentData) : []
   const imageUrls = documentData ? findImageUrlFields(documentData) : []
+  const fieldItems = useFieldAutocompleteItems(projectId)
 
   return (
     <div className="document-json-panel">
@@ -68,14 +73,27 @@ function DocumentJsonPanel({
       <GeopointPreview points={geopoints} />
       <ImagePreview images={imageUrls} />
       <h3 className="document-json-panel__json-label">JSON</h3>
-      <textarea
-        className="document-json-panel__editor"
-        value={jsonText}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder='{ "field": "value" }'
-        spellCheck={false}
-        readOnly={readOnly}
-      />
+      {readOnly ? (
+        <textarea
+          className="document-json-panel__editor"
+          value={jsonText}
+          onChange={() => undefined}
+          placeholder='{ "field": "value" }'
+          spellCheck={false}
+          readOnly
+        />
+      ) : (
+        <AutocompleteInput
+          value={jsonText}
+          items={fieldItems}
+          multiline
+          wordCompletion
+          placeholder='{ "field": "value" }'
+          fieldClassName="document-json-panel__editor"
+          aria-label="ドキュメント JSON"
+          onChange={onChange}
+        />
+      )}
     </div>
   )
 }

@@ -36,6 +36,14 @@ export type ExportResult =
       canceled?: boolean
     }
 
+export type ExportCollectionProgress = {
+  phase: 'reading' | 'writing' | 'done'
+  documentCount: number
+  currentCollectionPath: string | null
+  /** 総数が分からない読み込み中は 0–90 の目安 */
+  percent: number
+}
+
 /** Import 1 件分（ファイル上）。id / path は省略可 */
 export type ImportDocument = {
   id?: string
@@ -82,6 +90,16 @@ export type ImportCollectionValidationResult =
       canceled?: boolean
     }
 
+export type PeekCollectionImportResult =
+  | {
+      ok: true
+      collectionPath: string | null
+    }
+  | {
+      ok: false
+      error: string
+    }
+
 export type ImportSummary = {
   writtenCount: number
   skippedOutsideCount: number
@@ -106,6 +124,8 @@ export type ExportProjectInput = {
   /** エクスポートするルートコレクション ID。空は不可 */
   rootCollectionIds: string[]
   includeSubcollections: boolean
+  /** 指定時は保存ダイアログを出さない */
+  filePath?: string
 }
 
 export type ExportProjectProgress = {

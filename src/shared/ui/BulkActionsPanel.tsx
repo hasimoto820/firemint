@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useFieldAutocompleteItems } from '@features/autocomplete/renderer/hooks'
 import type { EnvironmentKind } from '@shared/safety/environment'
 import type { DiffPreviewItem } from '@features/bulk_operations/shared/types'
 import {
@@ -10,6 +11,7 @@ import {
   formatCostUsd
 } from '@shared/safety/operations'
 import Button from '@shared/ui/Button'
+import AutocompleteInput from '@shared/ui/AutocompleteInput'
 import DiffPreviewPanel from '@shared/ui/DiffPreviewPanel'
 
 type BulkActionsPanelProps = {
@@ -36,6 +38,8 @@ function BulkActionsPanel({
   const [field, setField] = useState('')
   const [value, setValue] = useState('')
   const [previewItems, setPreviewItems] = useState<DiffPreviewItem[] | null>(null)
+
+  const fieldItems = useFieldAutocompleteItems(projectId)
 
   if (selectedPaths.length === 0) {
     return null
@@ -158,15 +162,18 @@ function BulkActionsPanel({
       <div className="bulk-actions__update">
         <h4 className="bulk-actions__subtitle">フィールド一括更新</h4>
         <div className="bulk-actions__update-row">
-          <input
-            className="bulk-actions__input"
+          <AutocompleteInput
+            className="bulk-actions__field-wrap"
+            fieldClassName="bulk-actions__input"
             value={field}
-            onChange={(event) => {
-              setField(event.target.value)
+            items={fieldItems}
+            disabled={loading}
+            placeholder="field"
+            aria-label="一括更新するフィールド名"
+            onChange={(next) => {
+              setField(next)
               setPreviewItems(null)
             }}
-            placeholder="field"
-            disabled={loading}
           />
           <input
             className="bulk-actions__input bulk-actions__input--value"

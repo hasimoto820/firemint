@@ -3,6 +3,7 @@ import type {
   ImportProjectProgress,
   ImportProjectValidation
 } from '@features/data_transfer/shared/types'
+import type { ScriptJobSnapshot } from '@features/script_runner/shared/types'
 import type { WorkspaceEntry } from '@features/workspace/shared/types'
 import Button from '@shared/ui/Button'
 
@@ -12,6 +13,7 @@ type ProjectImportDialogProps = {
   open: boolean
   onClose: () => void
   onImported?: () => void
+  onJobStarted?: () => void
 }
 
 function ProjectImportDialog({
@@ -19,7 +21,8 @@ function ProjectImportDialog({
   destinations,
   open,
   onClose,
-  onImported
+  onImported,
+  onJobStarted
 }: ProjectImportDialogProps): React.JSX.Element | null {
   const [destinationId, setDestinationId] = useState(projectId ?? '')
   const [filePath, setFilePath] = useState<string | null>(null)
@@ -29,6 +32,7 @@ function ProjectImportDialog({
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [progress, setProgress] = useState<ImportProjectProgress | null>(null)
+  const [watchingJob, setWatchingJob] = useState(false)
 
   const destination = destinations.find((entry) => entry.id === destinationId) ?? destinations[0] ?? null
   const resolvedProjectId = destination?.id ?? ''
@@ -52,20 +56,52 @@ function ProjectImportDialog({
     setError(null)
     setSuccess(null)
     setProgress(null)
+    setWatchingJob(false)
   }, [open, projectId, destinations])
 
   useEffect(() => {
-    if (!open || !busy) {
+    if (!open || !watchingJob) {
       return
     }
 
-    return window.api.dataTransfer.onImportProjectProgress((next) => {
-      setProgress(next)
+    const applySnapshot = (snapshot: ScriptJobSnapshot): void => {
+      setProgress({
+        phase: snapshot.status === 'succeeded' ? 'done' : 'writing',
+        processedCount: snapshot.writtenCount ?? 0,
+        totalCount: 0,
+        percent: snapshot.percent,
+        detail: snapshot.detail
+      })
+
+      if (snapshot.status === 'succeeded') {
+        setSuccess(snapshot.resultSummary ?? 'インポートが完了しました')
+        setWatchingJob(false)
+        onImported?.()
+        return
+      }
+
+      if (snapshot.status === 'failed') {
+        setError(snapshot.error ?? 'インポートに失敗しました')
+        setWatchingJob(false)
+        return
+      }
+
+      if (snapshot.status === 'canceled') {
+        setWatchingJob(false)
+      }
+    }
+
+    void window.api.scriptRunner.getSnapshot().then((snapshot) => {
+      if (snapshot) {
+        applySnapshot(snapshot)
+      }
     })
-  }, [open, busy])
+
+    return window.api.scriptRunner.onSnapshot(applySnapshot)
+  }, [open, watchingJob, onImported])
 
   const canImport = useMemo(() => {
-    if (readOnly || !validation || validation.hasCollisions || Boolean(success) || busy) {
+    if (readOnly || !validation || validation.hasCollisions || Boolean(success) || busy || watchingJob) {
       return false
     }
 
@@ -74,7 +110,7 @@ function ProjectImportDialog({
     }
 
     return true
-  }, [readOnly, validation, acceptMismatch, success, busy])
+  }, [readOnly, validation, acceptMismatch, success, busy, watchingJob])
 
   const progressLabel = useMemo(() => {
     if (!progress) {
@@ -204,18 +240,22 @@ function ProjectImportDialog({
         return
       }
 
-      const result = await window.api.dataTransfer.importProject({
+      const result = await window.api.scriptRunner.start({
+        kind: 'import_project',
         projectId: loadedProjectId,
         filePath,
         acceptProjectIdMismatch: acceptMismatch
       })
 
       if (result.ok) {
-        const scope = result.data.includeSubcollections
-          ? '（サブコレクション含む）'
-          : '（ルート一段）'
-        setSuccess(`${result.data.writtenCount} 件${scope}をインポートしました`)
-        onImported?.()
+        if (onJobStarted) {
+          onJobStarted()
+          onClose()
+          return
+        }
+
+        setWatchingJob(true)
+        setSuccess(null)
         return
       }
 
@@ -229,7 +269,7 @@ function ProjectImportDialog({
 
   return (
     <div className="project-export-dialog" role="dialog" aria-modal="true">
-      <div className="project-export-dialog__backdrop" onClick={busy ? undefined : onClose} />
+      <div className="project-export-dialog__backdrop" onClick={busy || watchingJob ? undefined : onClose} />
       <div className="project-export-dialog__panel">
         <header className="project-export-dialog__header">
           <h2 className="project-export-dialog__title">プロジェクトにインポート</h2>
@@ -332,7 +372,7 @@ function ProjectImportDialog({
         {success && <p className="project-export-dialog__success">{success}</p>}
 
         <footer className="project-export-dialog__actions">
-          <Button onClick={onClose} disabled={busy}>
+          <Button onClick={onClose} disabled={busy || watchingJob}>
             {success ? '閉じる' : 'キャンセル'}
           </Button>
           <Button onClick={() => void handleValidate()} disabled={busy || !filePath || Boolean(success)}>
@@ -343,7 +383,7 @@ function ProjectImportDialog({
             onClick={() => void handleImport()}
             disabled={!canImport}
           >
-            {busy && progress?.phase === 'writing' ? 'インポート中…' : 'インポート実行'}
+            インポート実行
           </Button>
         </footer>
       </div>

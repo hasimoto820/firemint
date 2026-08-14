@@ -9,6 +9,7 @@ import { getDocumentRef } from '@shared/firestore/paths'
 import { getFirestore, isFirestoreConnected } from '@shared/firestore/client'
 import { deserializeDocumentData } from '@shared/firestore/serialize'
 import { FIRESTORE_BATCH_LIMIT } from '@shared/safety/operations'
+import { isCanceledError, throwIfCanceled } from '@shared/safety/canceled'
 import { logError, logInfo } from '@shared/logging/logger'
 import type {
   ExportDocument,
@@ -47,9 +48,10 @@ function toValidationError(error: unknown, canceled = false): ImportProjectValid
 }
 
 function toImportError(error: unknown, canceled = false): ImportProjectResult {
+  const wasCanceled = canceled || isCanceledError(error)
   logError('data_transfer', 'importProject failed', error)
 
-  if (canceled) {
+  if (wasCanceled) {
     return { ok: false, error: 'インポートをキャンセルしました', canceled: true }
   }
 
@@ -171,13 +173,15 @@ async function loadProjectArchive(
 async function findCollisions(
   projectId: string,
   documents: ExportDocument[],
-  onProgress?: ProgressReporter
+  onProgress?: ProgressReporter,
+  signal?: AbortSignal
 ): Promise<{ hasCollisions: boolean; collisionSamples: string[]; checkedCount: number }> {
   const collisionSamples: string[] = []
   let checkedCount = 0
   const totalCount = documents.length
 
   for (const document of documents) {
+    throwIfCanceled(signal)
     checkedCount += 1
 
     if (checkedCount === 1 || checkedCount % 50 === 0 || checkedCount === totalCount) {
@@ -217,13 +221,15 @@ async function findCollisions(
 async function writeDocuments(
   projectId: string,
   documents: ExportDocument[],
-  onProgress?: ProgressReporter
+  onProgress?: ProgressReporter,
+  signal?: AbortSignal
 ): Promise<number> {
   const db = getFirestore(projectId)
   let writtenCount = 0
   const totalCount = documents.length
 
   for (let offset = 0; offset < documents.length; offset += FIRESTORE_BATCH_LIMIT) {
+    throwIfCanceled(signal)
     const chunk = documents.slice(offset, offset + FIRESTORE_BATCH_LIMIT)
     const batch = db.batch()
 
@@ -344,13 +350,15 @@ export async function validateProjectImport(
 
 export async function importProject(
   input: ImportProjectInput,
-  onProgress?: ProgressReporter
+  onProgress?: ProgressReporter,
+  signal?: AbortSignal
 ): Promise<ImportProjectResult> {
   let tempDir: string | null = null
 
   try {
     ensureConnected(input.projectId)
     ensureWritable(input.projectId)
+    throwIfCanceled(signal)
 
     const filePath = input.filePath.trim()
     if (!filePath) {
@@ -362,6 +370,7 @@ export async function importProject(
     const loaded = await loadProjectArchive(filePath, onProgress)
     tempDir = loaded.tempDir
     const { manifest, documents } = loaded.archive
+    throwIfCanceled(signal)
 
     if (documents.length === 0) {
       throw new Error('documents.json にドキュメントがありません')
@@ -373,14 +382,14 @@ export async function importProject(
       )
     }
 
-    const collisions = await findCollisions(input.projectId, documents, onProgress)
+    const collisions = await findCollisions(input.projectId, documents, onProgress, signal)
     if (collisions.hasCollisions) {
       throw new Error(
         `既存ドキュメントと衝突したため中止しました: ${collisions.collisionSamples.join(', ')}`
       )
     }
 
-    const writtenCount = await writeDocuments(input.projectId, documents, onProgress)
+    const writtenCount = await writeDocuments(input.projectId, documents, onProgress, signal)
 
     onProgress?.({
       phase: 'done',

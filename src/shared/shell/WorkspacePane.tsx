@@ -1,13 +1,22 @@
 import type { ConnectionStatus } from '@features/connection/shared/types'
+import ImpExpView from '@features/data_transfer/renderer/ui/ImpExpView'
+import type { ImpExpDraft, ImpExpIntent } from '@features/data_transfer/shared/imp_exp'
 import SimpleView from '@features/explorer/renderer/ui/SimpleView'
 import QueryView from '@features/query/renderer/ui/QueryView'
+import type { ScriptJobSnapshot } from '@features/script_runner/shared/types'
 import type { AppView } from '@shared/shell/AppNav'
-import type { WorkspaceTab, WorkspaceTabQueryDraftPatch } from '@shared/shell/workspace_tab'
+import { isImpExpTab, type WorkspaceTab, type WorkspaceTabQueryDraftPatch } from '@shared/shell/workspace_tab'
 
 type WorkspacePaneProps = {
   status: ConnectionStatus
   tab: WorkspaceTab
   menuEnabled: boolean
+  impExpJob: ScriptJobSnapshot | null
+  impExpDraft: ImpExpDraft
+  rootCollections: string[]
+  onImpExpDraftChange: (patch: Partial<ImpExpDraft>) => void
+  onCancelImpExp: () => void
+  onOpenImpExp: (intent?: ImpExpIntent) => void
   onChangeView: (view: AppView) => void
   onSelectCollection: (collectionPath: string) => void
   onSelectDocument: (documentPath: string | null) => void
@@ -21,13 +30,19 @@ type WorkspacePaneProps = {
 }
 
 /**
- * タブ 1 枚分の中身。Simple / Query を tab.view で切り替える。
+ * タブ 1 枚分の中身。コレクションタブは Simple / Query、Imp/Exp はモードバー無し。
  * Split 時は複数マウントされるため、menuEnabled でメニュー登録を一方に限る。
  */
 function WorkspacePane({
   status,
   tab,
   menuEnabled,
+  impExpJob,
+  impExpDraft,
+  rootCollections,
+  onImpExpDraftChange,
+  onCancelImpExp,
+  onOpenImpExp,
   onChangeView,
   onSelectCollection,
   onSelectDocument,
@@ -39,6 +54,22 @@ function WorkspacePane({
   collectionDataReloadToken = 0,
   onQueryDraftChange
 }: WorkspacePaneProps): React.JSX.Element {
+  if (isImpExpTab(tab)) {
+    return (
+      <div className="workspace-pane">
+        <ImpExpView
+          projectId={status.projectId}
+          readOnly={status.readOnly}
+          rootCollections={rootCollections}
+          draft={impExpDraft}
+          onDraftChange={onImpExpDraftChange}
+          job={impExpJob}
+          onCancel={onCancelImpExp}
+        />
+      </div>
+    )
+  }
+
   return (
     <div className="workspace-pane">
       <div className="workspace-pane__modebar">
@@ -90,6 +121,7 @@ function WorkspacePane({
           onRequestDeleteSubcollection={onRequestDeleteSubcollection}
           collectionDataReloadToken={collectionDataReloadToken}
           menuEnabled={menuEnabled}
+          onOpenImpExp={onOpenImpExp}
         />
       )}
     </div>

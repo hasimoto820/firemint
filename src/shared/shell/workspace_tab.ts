@@ -3,6 +3,11 @@ import type { AppView } from '@shared/shell/AppNav'
 
 export type WorkspacePaneId = 'primary' | 'secondary'
 
+/** 上段タブの種別。Imp/Exp はコレクションに紐づかない。 */
+export type WorkspaceTabKind = 'collection' | 'imp_exp'
+
+export const IMP_EXP_TAB_LABEL = 'Imp/Exp'
+
 /**
  * 作業面 1 枚分。Phase 9 のタブ / Split の単位。
  * pane は左右どちらのエディタグループに属するかを表す。
@@ -10,9 +15,11 @@ export type WorkspacePaneId = 'primary' | 'secondary'
  *
  * query* は Query モードの下書き・直近 Run 結果。Simple ⇄ Query 切替で
  * アンマウントされても、タブが生きている限りメモリ上に残す。
+ * Imp/Exp タブでは query* / collectionPath は使わない。
  */
 export type WorkspaceTab = {
   id: string
+  kind: WorkspaceTabKind
   projectId: string
   collectionPath: string
   view: AppView
@@ -61,6 +68,7 @@ export function createWorkspaceTab(input: {
 }): WorkspaceTab {
   return {
     id: createWorkspaceTabId(),
+    kind: 'collection',
     projectId: input.projectId,
     collectionPath: input.collectionPath,
     view: input.view ?? 'simple',
@@ -77,10 +85,37 @@ export function createWorkspaceTab(input: {
   }
 }
 
-/** タブ見出し用。パス末尾セグメントを短く見せる。 */
-export function workspaceTabLabel(collectionPath: string): string {
-  const segments = collectionPath.split('/').filter(Boolean)
-  return segments[segments.length - 1] ?? collectionPath
+/** ウィンドウに 1 つだけの Imp/Exp タブ。コレクションには紐づけない。 */
+export function createImpExpTab(input: {
+  projectId: string
+  pane?: WorkspacePaneId
+}): WorkspaceTab {
+  return {
+    ...createWorkspaceTab({
+      projectId: input.projectId,
+      collectionPath: '',
+      pane: input.pane ?? 'primary'
+    }),
+    kind: 'imp_exp'
+  }
+}
+
+export function isCollectionTab(tab: WorkspaceTab): boolean {
+  return tab.kind === 'collection'
+}
+
+export function isImpExpTab(tab: WorkspaceTab): boolean {
+  return tab.kind === 'imp_exp'
+}
+
+/** タブ見出し。コレクションはパス末尾、Imp/Exp は固定名。 */
+export function workspaceTabLabel(tab: WorkspaceTab): string {
+  if (tab.kind === 'imp_exp') {
+    return IMP_EXP_TAB_LABEL
+  }
+
+  const segments = tab.collectionPath.split('/').filter(Boolean)
+  return segments[segments.length - 1] ?? tab.collectionPath
 }
 
 /** ドキュメント path の親コレクション path。 */

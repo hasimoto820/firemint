@@ -54,8 +54,16 @@ import type {
   ImportProjectProgress,
   ImportProjectResult,
   ImportProjectValidationResult,
-  ImportResult
+  ImportResult,
+  PeekCollectionImportResult
 } from '@features/data_transfer/shared/types'
+
+import type {
+  CancelScriptJobResult,
+  ScriptJobSnapshot,
+  StartScriptJobInput,
+  StartScriptJobResult
+} from '@features/script_runner/shared/types'
 
 import type {
   AddWorkspaceEntryInput,
@@ -164,6 +172,7 @@ export type DataTransferIpcApi = {
   exportDocumentsJson: (input: ExportDocumentsInput) => Promise<ExportResult>
   exportDocumentsCsv: (input: ExportDocumentsInput) => Promise<ExportResult>
   selectCollectionImportJson: () => Promise<{ canceled: boolean; filePath: string | null }>
+  peekCollectionImportJson: (filePath: string) => Promise<PeekCollectionImportResult>
   validateCollectionImport: (
     input: ImportCollectionJsonInput
   ) => Promise<ImportCollectionValidationResult>
@@ -183,6 +192,13 @@ export type DataTransferIpcApi = {
   onImportProjectProgress: (
     listener: (progress: ImportProjectProgress) => void
   ) => () => void
+}
+
+export type ScriptRunnerIpcApi = {
+  start: (input: StartScriptJobInput) => Promise<StartScriptJobResult>
+  cancel: () => Promise<CancelScriptJobResult>
+  getSnapshot: () => Promise<ScriptJobSnapshot | null>
+  onSnapshot: (listener: (snapshot: ScriptJobSnapshot) => void) => () => void
 }
 
 export type WorkspaceIpcApi = {
@@ -234,6 +250,7 @@ export interface IpcApi {
   query: QueryIpcApi
   bulk: BulkOperationsIpcApi
   dataTransfer: DataTransferIpcApi
+  scriptRunner: ScriptRunnerIpcApi
   authUsers: AuthUsersIpcApi
   settings: SettingsIpcApi
 }

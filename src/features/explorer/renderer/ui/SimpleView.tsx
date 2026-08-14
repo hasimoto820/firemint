@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useOptionalAutocompleteApi } from '@features/autocomplete/renderer/hooks'
 import type { ConnectionStatus } from '@features/connection/shared/types'
-import CollectionImportDialog from '@features/data_transfer/renderer/ui/CollectionImportDialog'
+import type { ImpExpIntent } from '@features/data_transfer/shared/imp_exp'
 import type { DocumentSummary } from '@features/explorer/shared/types'
 import { isSubcollectionPath } from '@features/explorer/shared/tree'
 import { useI18n } from '@shared/i18n/renderer/I18nProvider'
@@ -25,6 +25,7 @@ type SimpleViewProps = {
   collectionDataReloadToken?: number
   /** Split 時など、メニュー登録を行うのはフォーカス側のペインのみ */
   menuEnabled?: boolean
+  onOpenImpExp?: (intent?: ImpExpIntent) => void
 }
 
 /**
@@ -44,7 +45,8 @@ function SimpleView({
   onRequestCreateSubcollection,
   onRequestDeleteSubcollection,
   collectionDataReloadToken = 0,
-  menuEnabled = true
+  menuEnabled = true,
+  onOpenImpExp
 }: SimpleViewProps): React.JSX.Element {
   const { t } = useI18n()
   const projectId = status.projectId
@@ -61,7 +63,6 @@ function SimpleView({
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [bulkSelectedPaths, setBulkSelectedPaths] = useState<Set<string>>(new Set())
-  const [collectionImportOpen, setCollectionImportOpen] = useState(false)
 
   const loadDocuments = useCallback(
     async (collectionPath: string): Promise<void> => {
@@ -311,55 +312,12 @@ function SimpleView({
     }
   }
 
-  const handleExportCollection = async (): Promise<void> => {
-    if (!activeCollectionPath) {
-      return
-    }
-
-    setLoading(true)
-    setError(null)
-
-    try {
-      const result = await window.api.dataTransfer.exportCollectionJson({
-        projectId,
-        collectionPath: activeCollectionPath
-      })
-
-      if (result.ok) {
-        const scope = result.data.includeSubcollections
-          ? '（サブコレクション含む）'
-          : '（コレクション一段）'
-        setSuccessMessage(
-          `${result.data.documentCount} 件${scope}を ${result.data.filePath} に保存しました`
-        )
-        return
-      }
-
-      if (!result.canceled) {
-        setError(result.error)
-      }
-    } finally {
-      setLoading(false)
-    }
+  const handleExportCollection = (): void => {
+    onOpenImpExp?.({ direction: 'export', target: 'collection' })
   }
 
   const handleImportCollection = (): void => {
-    if (!activeCollectionPath || readOnly) {
-      return
-    }
-
-    setError(null)
-    setSuccessMessage(null)
-    setCollectionImportOpen(true)
-  }
-
-  const handleCollectionImported = async (): Promise<void> => {
-    if (!activeCollectionPath) {
-      return
-    }
-
-    await loadDocuments(activeCollectionPath)
-    onRootCollectionsChanged()
+    onOpenImpExp?.({ direction: 'import', target: 'collection' })
   }
 
   const handleDuplicateCollection = async (): Promise<void> => {
@@ -450,7 +408,7 @@ function SimpleView({
           canDuplicate: !readOnly && Boolean(selectedDocumentPath),
           canDelete: !readOnly && Boolean(selectedDocumentPath),
           canExport: Boolean(activeCollectionPath),
-          canImport: !readOnly && Boolean(activeCollectionPath),
+          canImport: Boolean(activeCollectionPath),
           canDuplicateCollection: !readOnly && Boolean(activeCollectionPath),
           canRenameCollection: !readOnly && Boolean(activeCollectionPath),
           canRenameFieldBulk: !readOnly && Boolean(activeCollectionPath),
@@ -463,8 +421,8 @@ function SimpleView({
           onSave: () => void handleSave(),
           onDuplicate: () => void handleDuplicateDocument(),
           onDelete: () => void handleDelete(),
-          onExport: () => void handleExportCollection(),
-          onImport: () => handleImportCollection(),
+          onExport: handleExportCollection,
+          onImport: handleImportCollection,
           onDuplicateCollection: () => void handleDuplicateCollection(),
           onRenameCollection: () => handleRenameCollection(),
           onRenameFieldBulk: () => handleRenameFieldBulk(),
@@ -484,7 +442,7 @@ function SimpleView({
           canCreateSubcollection: false,
           canDeleteSubcollection: false
         },
-    [menuEnabled, readOnly, activeCollectionPath, selectedDocumentPath, jsonText]
+    [menuEnabled, readOnly, activeCollectionPath, selectedDocumentPath, jsonText, onOpenImpExp]
   )
 
   if (!activeCollectionPath) {
@@ -500,14 +458,6 @@ function SimpleView({
 
   return (
     <div className="simple-main">
-      <CollectionImportDialog
-        projectId={projectId}
-        collectionPath={activeCollectionPath}
-        readOnly={readOnly}
-        open={collectionImportOpen}
-        onClose={() => setCollectionImportOpen(false)}
-        onImported={() => void handleCollectionImported()}
-      />
       {(error || successMessage || loading) && (
         <div className="simple-main__status">
           {error && <p className="simple-main__error">{error}</p>}
@@ -521,6 +471,7 @@ function SimpleView({
           documents={documents}
           selectedDocumentPath={selectedDocumentPath}
           tableKey={activeCollectionPath}
+          projectId={projectId}
           selectable={!readOnly}
           bulkSelectedPaths={bulkSelectedPaths}
           onBulkToggle={handleBulkToggle}
@@ -543,6 +494,7 @@ function SimpleView({
 
       <div className="simple-main__json">
         <DocumentJsonPanel
+          projectId={projectId}
           documentPath={selectedDocumentPath}
           jsonText={jsonText}
           createTime={selectedCreateTime}

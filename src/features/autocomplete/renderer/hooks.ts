@@ -4,6 +4,8 @@ export {
   useOptionalAutocompleteApi
 } from './AutocompleteProvider'
 
+export { useFieldAutocompleteItems } from './useFieldAutocompleteItems'
+
 export {
   getWordRange,
   replaceRange,

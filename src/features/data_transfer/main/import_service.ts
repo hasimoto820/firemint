@@ -6,6 +6,7 @@ import { getCollectionRef, getDocumentRef, joinDocumentPath } from '@shared/fire
 import { getFirestore, isFirestoreConnected } from '@shared/firestore/client'
 import { deserializeDocumentData } from '@shared/firestore/serialize'
 import { FIRESTORE_BATCH_LIMIT } from '@shared/safety/operations'
+import { isCanceledError, throwIfCanceled } from '@shared/safety/canceled'
 import { logError, logInfo } from '@shared/logging/logger'
 import type {
   ImportCollectionJsonInput,
@@ -13,7 +14,8 @@ import type {
   ImportCollectionValidation,
   ImportCollectionValidationResult,
   ImportDocument,
-  ImportResult
+  ImportResult,
+  PeekCollectionImportResult
 } from '@features/data_transfer/shared/types'
 
 type ProgressReporter = (progress: ImportCollectionProgress) => void
@@ -53,9 +55,10 @@ function toValidationError(
 }
 
 function toImportError(error: unknown, canceled = false): ImportResult {
+  const wasCanceled = canceled || isCanceledError(error)
   logError('data_transfer', 'importCollectionJson failed', error)
 
-  if (canceled) {
+  if (wasCanceled) {
     return { ok: false, error: 'インポートをキャンセルしました', canceled: true }
   }
 
@@ -114,6 +117,53 @@ function parseImportDocuments(raw: string): ImportDocument[] {
       data: record.data as Record<string, unknown>
     }
   })
+}
+
+function collectionParentOfDocument(documentPath: string): string | null {
+  const segments = documentPath.split('/').filter(Boolean)
+  if (segments.length < 2 || segments.length % 2 !== 0) {
+    return null
+  }
+
+  return segments.slice(0, -1).join('/')
+}
+
+function commonCollectionPrefix(collectionPaths: string[]): string | null {
+  if (collectionPaths.length === 0) {
+    return null
+  }
+
+  const split = collectionPaths.map((path) => path.split('/').filter(Boolean))
+  const minLen = Math.min(...split.map((segments) => segments.length))
+  let count = 0
+
+  while (count < minLen && split.every((segments) => segments[count] === split[0][count])) {
+    count += 1
+  }
+
+  const collectionCount = count % 2 === 1 ? count : count - 1
+  if (collectionCount <= 0) {
+    return null
+  }
+
+  return split[0].slice(0, collectionCount).join('/')
+}
+
+function inferCollectionPath(documents: ImportDocument[]): string | null {
+  const parents: string[] = []
+
+  for (const document of documents) {
+    if (!document.path) {
+      continue
+    }
+
+    const parent = collectionParentOfDocument(document.path)
+    if (parent) {
+      parents.push(parent)
+    }
+  }
+
+  return commonCollectionPrefix(parents)
 }
 
 /**
@@ -196,7 +246,8 @@ function planWrites(
 async function findCollisions(
   projectId: string,
   planned: PlannedWrite[],
-  onProgress?: ProgressReporter
+  onProgress?: ProgressReporter,
+  signal?: AbortSignal
 ): Promise<{ hasCollisions: boolean; collisionSamples: string[]; checkedCount: number }> {
   const existingIdWrites = planned.filter(
     (write): write is Extract<PlannedWrite, { kind: 'existingId' }> => write.kind === 'existingId'
@@ -206,6 +257,7 @@ async function findCollisions(
   const totalCount = existingIdWrites.length
 
   for (const write of existingIdWrites) {
+    throwIfCanceled(signal)
     checkedCount += 1
 
     if (checkedCount === 1 || checkedCount % 50 === 0 || checkedCount === totalCount) {
@@ -244,13 +296,15 @@ async function findCollisions(
 async function writePlannedDocuments(
   projectId: string,
   planned: PlannedWrite[],
-  onProgress?: ProgressReporter
+  onProgress?: ProgressReporter,
+  signal?: AbortSignal
 ): Promise<number> {
   const db = getFirestore(projectId)
   let writtenCount = 0
   const totalCount = planned.length
 
   for (let offset = 0; offset < planned.length; offset += FIRESTORE_BATCH_LIMIT) {
+    throwIfCanceled(signal)
     const chunk = planned.slice(offset, offset + FIRESTORE_BATCH_LIMIT)
     const batch = db.batch()
 
@@ -370,6 +424,25 @@ export async function selectCollectionImportJson(
   return { canceled: false, filePath: result.filePaths[0] }
 }
 
+export async function peekCollectionImportJson(
+  filePath: string
+): Promise<PeekCollectionImportResult> {
+  try {
+    const raw = await readFile(filePath, 'utf8')
+    const documents = parseImportDocuments(raw)
+    return {
+      ok: true,
+      collectionPath: inferCollectionPath(documents)
+    }
+  } catch (error) {
+    logError('data_transfer', 'peekCollectionImportJson failed', error)
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'JSON を読み取れませんでした'
+    }
+  }
+}
+
 export async function validateCollectionImport(
   input: ImportCollectionJsonInput,
   onProgress?: ProgressReporter
@@ -404,11 +477,13 @@ export async function validateCollectionImport(
 
 export async function importCollectionJson(
   input: ImportCollectionJsonInput,
-  onProgress?: ProgressReporter
+  onProgress?: ProgressReporter,
+  signal?: AbortSignal
 ): Promise<ImportResult> {
   try {
     ensureConnected(input.projectId)
     ensureWritable(input.projectId)
+    throwIfCanceled(signal)
 
     logInfo(
       'data_transfer',
@@ -416,7 +491,8 @@ export async function importCollectionJson(
     )
 
     const loaded = await loadAndPlan(input, onProgress)
-    const collisions = await findCollisions(input.projectId, loaded.planned, onProgress)
+    throwIfCanceled(signal)
+    const collisions = await findCollisions(input.projectId, loaded.planned, onProgress, signal)
 
     if (collisions.hasCollisions) {
       throw new Error(
@@ -424,7 +500,12 @@ export async function importCollectionJson(
       )
     }
 
-    const writtenCount = await writePlannedDocuments(input.projectId, loaded.planned, onProgress)
+    const writtenCount = await writePlannedDocuments(
+      input.projectId,
+      loaded.planned,
+      onProgress,
+      signal
+    )
 
     onProgress?.({
       phase: 'done',

@@ -25,7 +25,7 @@ autocomplete（Phase 11.6）
 
   - 用語・フォルダ・型はすべて autocomplete に統一する
   - suggestion / SuggestInput / suggestions カタログ名は使わない
-  - UI 部品名も AutocompleteInput とする（FieldNameSuggestInput は後で寄せる任意）
+  - UI 部品名も AutocompleteInput とする
 
 
 ================================================================================
@@ -65,9 +65,9 @@ UX（軽量補完）
     - Query エディタで単語単位の補完を実現する
 
   広げてよい（後から）:
-    - Simple の JSON 編集
-    - テーブルフィルタの field
-    - フィールド一括の旧フィールド名 等
+    - Simple の JSON 編集 ✅
+    - テーブルフィルタの field ✅
+    - フィールド一括の旧フィールド名 等 ✅
     - 同じ AutocompleteInput / 同じプールを他ページにも入れていく
 
   ドキュメント ID 入力補完は対象外
@@ -159,8 +159,8 @@ UX（軽量補完）
       ui/
         AutocompleteInput.tsx      … 汎用入力 UI
 
-  既存の寄せ（任意・後回し可）:
-    shared/ui/FieldNameSuggestInput.tsx → AutocompleteInput 利用に置換
+  既存の寄せ:
+    shared/ui/FieldNameSuggestInput.tsx → AutocompleteInput に置換済み（削除）
 
 
 ================================================================================
@@ -196,7 +196,7 @@ UX（軽量補完）
   11.6-c  Provider を Firestore 作業画面に載せ、explorer から path 登録  ✅
   11.6-d  Simple / Query 結果から field 登録  ✅
   11.6-e  Query エディタに単語単位の補完を接続 ← 最初の Done  ✅
-  11.6-f  （任意）JSON / フィルタ / フィールド一括など他ページへ展開
+  11.6-f  JSON / フィルタ / フィールド一括など他ページへ展開  ✅
   11.6-g  001_005 Done を ■ に更新。違和感があれば使用箇所を減らす（撤去可の精神は維持）  ✅
 
 
