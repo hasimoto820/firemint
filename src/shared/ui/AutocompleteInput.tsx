@@ -341,10 +341,12 @@ function AutocompleteInput({
           aria-autocomplete="list"
           aria-controls={listId}
           aria-expanded={listVisible}
-          onFocus={requestOpen}
+          onFocus={multiline ? undefined : requestOpen}
           onClick={(event) => {
             syncCaret(event.currentTarget)
-            requestOpen()
+            if (!multiline) {
+              requestOpen()
+            }
           }}
           onKeyUp={(event) => syncCaret(event.currentTarget)}
           onSelect={(event) => syncCaret(event.currentTarget)}

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { WorkspaceEntry, WorkspaceState } from '@features/workspace/shared/types'
 import Button from '@shared/ui/Button'
+import { confirmAction } from '@shared/ui/confirmAction'
 
 type WorkspacePanelProps = {
   onChanged: () => void
@@ -92,9 +93,9 @@ function WorkspacePanel({ onChanged, disabled = false }: WorkspacePanelProps): R
 
   const handleRemove = async (projectId: string): Promise<void> => {
     if (
-      !window.confirm(
+      !(await confirmAction(
         'このプロジェクトの登録を解除しますか？（Firestore 上のデータは消えません）'
-      )
+      ))
     ) {
       return
     }

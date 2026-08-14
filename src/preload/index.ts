@@ -15,7 +15,8 @@ const api: IpcApi = {
     minimize: () => ipcRenderer.invoke(IPC_CHANNELS.WINDOW_MINIMIZE),
     maximizeToggle: () => ipcRenderer.invoke(IPC_CHANNELS.WINDOW_MAXIMIZE_TOGGLE),
     close: () => ipcRenderer.invoke(IPC_CHANNELS.WINDOW_CLOSE),
-    isMaximized: () => ipcRenderer.invoke(IPC_CHANNELS.WINDOW_IS_MAXIMIZED)
+    isMaximized: () => ipcRenderer.invoke(IPC_CHANNELS.WINDOW_IS_MAXIMIZED),
+    confirm: (input) => ipcRenderer.invoke(IPC_CHANNELS.WINDOW_CONFIRM, input)
   },
   connection: {
     selectServiceAccountFile: () => ipcRenderer.invoke(IPC_CHANNELS.CONNECTION_SELECT_FILE),

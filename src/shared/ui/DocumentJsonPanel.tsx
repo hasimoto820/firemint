@@ -84,6 +84,7 @@ function DocumentJsonPanel({
         />
       ) : (
         <AutocompleteInput
+          key={documentPath ?? 'new-document'}
           value={jsonText}
           items={fieldItems}
           multiline

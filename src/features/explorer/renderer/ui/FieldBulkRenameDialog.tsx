@@ -3,6 +3,7 @@ import { useFieldAutocompleteItems, useOptionalAutocompleteApi } from '@features
 import type { DiffPreviewItem } from '@features/bulk_operations/shared/types'
 import Button from '@shared/ui/Button'
 import AutocompleteInput from '@shared/ui/AutocompleteInput'
+import { confirmAction } from '@shared/ui/confirmAction'
 import DiffPreviewPanel from '@shared/ui/DiffPreviewPanel'
 import { collectDataColumns } from '@shared/ui/document_table_utils'
 
@@ -131,7 +132,7 @@ function FieldBulkRenameDialog({
         ? `コレクション「${collectionPath}」全体でフィールド「${fromField.trim()}」を「${toField.trim()}」にリネームします。よろしいですか？`
         : `コレクション「${collectionPath}」全体からフィールド「${deleteFieldName.trim()}」を削除します。よろしいですか？`
 
-    if (!window.confirm(confirmMessage)) {
+    if (!(await confirmAction(confirmMessage))) {
       return
     }
 

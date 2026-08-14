@@ -7,6 +7,7 @@ export const IPC_CHANNELS = {
   WINDOW_MAXIMIZE_TOGGLE: 'window:maximize_toggle',
   WINDOW_CLOSE: 'window:close',
   WINDOW_IS_MAXIMIZED: 'window:is_maximized',
+  WINDOW_CONFIRM: 'window:confirm',
   CONNECTION_SELECT_FILE: 'connection:select_service_account_file',
   CONNECTION_CONNECT: 'connection:connect',
   CONNECTION_GOOGLE_SIGN_IN: 'connection:google_sign_in',

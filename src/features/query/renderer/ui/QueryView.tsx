@@ -10,6 +10,7 @@ import type { WorkspaceTabQueryDraftPatch } from '@shared/shell/workspace_tab'
 import DocumentJsonPanel from '@shared/ui/DocumentJsonPanel'
 import DocumentTable from '@shared/ui/DocumentTable'
 import BulkActionsPanel from '@shared/ui/BulkActionsPanel'
+import { confirmAction } from '@shared/ui/confirmAction'
 import { collectDataColumns } from '@shared/ui/document_table_utils'
 import QueryEditor from './QueryEditor'
 import SavedQueriesBar from './SavedQueriesBar'
@@ -328,7 +329,7 @@ function QueryView({
     }
 
     const selected = savedQueries.find((query) => query.id === querySelectedSavedId)
-    if (!window.confirm(`「${selected?.name ?? querySelectedSavedId}」を削除しますか？`)) {
+    if (!(await confirmAction(`「${selected?.name ?? querySelectedSavedId}」を削除しますか？`))) {
       return
     }
 

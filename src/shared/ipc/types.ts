@@ -106,11 +106,18 @@ export type AppIpcApi = {
   openExternal: (url: string) => Promise<void>
 }
 
+export type WindowConfirmInput = {
+  message: string
+  confirmLabel?: string
+  cancelLabel?: string
+}
+
 export type WindowIpcApi = {
   minimize: () => Promise<void>
   maximizeToggle: () => Promise<boolean>
   close: () => Promise<void>
   isMaximized: () => Promise<boolean>
+  confirm: (input: WindowConfirmInput) => Promise<boolean>
 }
 
 export type ConnectionIpcApi = {

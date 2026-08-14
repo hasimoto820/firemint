@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { WorkspaceEntry, WorkspaceState } from '@features/workspace/shared/types'
 import Button from '@shared/ui/Button'
+import { confirmAction } from '@shared/ui/confirmAction'
 import { useT } from '@shared/i18n/renderer/I18nProvider'
 
 type WorkspaceProjectListProps = {
@@ -150,7 +151,7 @@ function WorkspaceProjectList({
   }
 
   const handleDisconnect = async (projectId: string): Promise<void> => {
-    if (!window.confirm(t('workspace.disconnect_confirm'))) {
+    if (!(await confirmAction(t('workspace.disconnect_confirm')))) {
       return
     }
 
@@ -174,7 +175,7 @@ function WorkspaceProjectList({
   }
 
   const handleRemove = async (projectId: string): Promise<void> => {
-    if (!window.confirm(t('workspace.unregister_confirm'))) {
+    if (!(await confirmAction(t('workspace.unregister_confirm')))) {
       return
     }
 

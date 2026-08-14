@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { AuthUser } from '@features/auth_users/shared/types'
 import Button from '@shared/ui/Button'
+import { confirmAction } from '@shared/ui/confirmAction'
 import { useT } from '@shared/i18n/renderer/I18nProvider'
 
 type AuthUsersViewProps = {
@@ -219,7 +220,7 @@ function AuthUsersView({ projectId, readOnly }: AuthUsersViewProps): React.JSX.E
     }
 
     const label = disabled ? '無効化' : '有効化'
-    if (!window.confirm(`選択した ${selected.size} 件を${label}しますか？`)) {
+    if (!(await confirmAction(`選択した ${selected.size} 件を${label}しますか？`))) {
       return
     }
 
@@ -254,9 +255,9 @@ function AuthUsersView({ projectId, readOnly }: AuthUsersViewProps): React.JSX.E
     }
 
     if (
-      !window.confirm(
+      !(await confirmAction(
         `選択した ${selected.size} 件のユーザーを削除しますか？（取り消せません）`
-      )
+      ))
     ) {
       return
     }

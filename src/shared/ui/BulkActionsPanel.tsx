@@ -12,6 +12,7 @@ import {
 } from '@shared/safety/operations'
 import Button from '@shared/ui/Button'
 import AutocompleteInput from '@shared/ui/AutocompleteInput'
+import { confirmAction } from '@shared/ui/confirmAction'
 import DiffPreviewPanel from '@shared/ui/DiffPreviewPanel'
 
 type BulkActionsPanelProps = {
@@ -80,7 +81,7 @@ function BulkActionsPanel({
     }
 
     const message = buildDestructiveConfirmMessage('update', selectedPaths.length, environment)
-    if (!window.confirm(message)) {
+    if (!(await confirmAction(message))) {
       return
     }
 
@@ -112,7 +113,7 @@ function BulkActionsPanel({
 
   const handleDelete = async (): Promise<void> => {
     const message = buildDestructiveConfirmMessage('delete', selectedPaths.length, environment)
-    if (!window.confirm(message)) {
+    if (!(await confirmAction(message))) {
       return
     }
 

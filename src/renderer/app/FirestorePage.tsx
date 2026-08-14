@@ -6,6 +6,7 @@ import {
 import AuthUsersView from '@features/auth_users/renderer/ui/AuthUsersView'
 import type { ConnectionStatus } from '@features/connection/shared/types'
 import { useT } from '@shared/i18n/renderer/I18nProvider'
+import { confirmAction } from '@shared/ui/confirmAction'
 import CollectionRenameDialog from '@features/explorer/renderer/ui/CollectionRenameDialog'
 import FieldBulkRenameDialog from '@features/explorer/renderer/ui/FieldBulkRenameDialog'
 import SubcollectionCreateDialog from '@features/explorer/renderer/ui/SubcollectionCreateDialog'
@@ -88,6 +89,7 @@ function FirestorePageInner({
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [treeLoading, setTreeLoading] = useState(false)
   const [treeReloadToken, setTreeReloadToken] = useState(0)
+  const [treeContentReloadToken, setTreeContentReloadToken] = useState(0)
   const [collectionDataReloadToken, setCollectionDataReloadToken] = useState(0)
   const [renameCollectionPath, setRenameCollectionPath] = useState<string | null>(null)
   const [fieldBulkRenamePath, setFieldBulkRenamePath] = useState<string | null>(null)
@@ -525,13 +527,13 @@ function FirestorePageInner({
     [handleCollectionRenamed, renameCollectionPath]
   )
 
-  const confirmStopImpExpJob = useCallback((): boolean => {
+  const confirmStopImpExpJob = useCallback(async (): Promise<boolean> => {
     const job = impExpJobRef.current
     if (!job || job.status !== 'running') {
       return true
     }
 
-    const accepted = window.confirm('Imp/Exp の処理中です。中止してタブを閉じますか？')
+    const accepted = await confirmAction('Imp/Exp の処理中です。中止してタブを閉じますか？')
     if (accepted) {
       void window.api.scriptRunner.cancel()
     }
@@ -544,13 +546,13 @@ function FirestorePageInner({
   }, [])
 
   const handleCloseTab = useCallback(
-    (tabId: string): void => {
+    async (tabId: string): Promise<void> => {
       const closing = tabs.find((tab) => tab.id === tabId)
       if (!closing) {
         return
       }
 
-      if (isImpExpTab(closing) && !confirmStopImpExpJob()) {
+      if (isImpExpTab(closing) && !(await confirmStopImpExpJob())) {
         return
       }
 
@@ -571,7 +573,7 @@ function FirestorePageInner({
     [confirmStopImpExpJob, tabs]
   )
 
-  const handleCloseOtherTabs = useCallback((): void => {
+  const handleCloseOtherTabs = useCallback(async (): Promise<void> => {
     if (!focusedActiveId || !focusedTab) {
       return
     }
@@ -583,7 +585,7 @@ function FirestorePageInner({
         tab.id !== focusedActiveId &&
         (!splitEnabled || tab.pane === pane)
     )
-    if (wouldCloseRunningImpExp && !confirmStopImpExpJob()) {
+    if (wouldCloseRunningImpExp && !(await confirmStopImpExpJob())) {
       return
     }
 
@@ -905,6 +907,9 @@ function FirestorePageInner({
           onRequestCreateSubcollection={handleRequestCreateSubcollection}
           onRequestDeleteSubcollection={handleRequestDeleteSubcollection}
           collectionDataReloadToken={collectionDataReloadToken}
+          onCollectionDocumentsChanged={() =>
+            setTreeContentReloadToken((token) => token + 1)
+          }
           onQueryDraftChange={(patch) => updateTab(active.id, patch)}
         />
       ) : (
@@ -944,6 +949,7 @@ function FirestorePageInner({
             canManageSubcollections={!status.readOnly}
             onWorkspaceChanged={onWorkspaceChanged}
             treeReloadToken={treeReloadToken}
+            treeContentReloadToken={treeContentReloadToken}
             workspaceRefreshToken={workspaceRefreshToken}
             disabled={treeLoading}
           />

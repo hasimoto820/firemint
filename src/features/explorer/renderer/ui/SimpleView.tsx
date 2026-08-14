@@ -6,6 +6,7 @@ import type { DocumentSummary } from '@features/explorer/shared/types'
 import { isSubcollectionPath } from '@features/explorer/shared/tree'
 import { useI18n } from '@shared/i18n/renderer/I18nProvider'
 import { useRegisterAppMenu } from '@shared/shell/AppMenuContext'
+import { confirmAction } from '@shared/ui/confirmAction'
 import DocumentJsonPanel from '@shared/ui/DocumentJsonPanel'
 import DocumentTable from '@shared/ui/DocumentTable'
 import BulkActionsPanel from '@shared/ui/BulkActionsPanel'
@@ -23,6 +24,8 @@ type SimpleViewProps = {
   onRequestCreateSubcollection: (documentPath: string) => void
   onRequestDeleteSubcollection: (collectionPath: string) => void
   collectionDataReloadToken?: number
+  /** ドキュメントの増減後に左ツリーを更新する */
+  onCollectionDocumentsChanged?: () => void
   /** Split 時など、メニュー登録を行うのはフォーカス側のペインのみ */
   menuEnabled?: boolean
   onOpenImpExp?: (intent?: ImpExpIntent) => void
@@ -45,6 +48,7 @@ function SimpleView({
   onRequestCreateSubcollection,
   onRequestDeleteSubcollection,
   collectionDataReloadToken = 0,
+  onCollectionDocumentsChanged,
   menuEnabled = true,
   onOpenImpExp
 }: SimpleViewProps): React.JSX.Element {
@@ -158,12 +162,12 @@ function SimpleView({
         if (result.code === 'conflict') {
           setLoading(false)
           setError(t('explorer.conflict.message'))
-          const overwrite = window.confirm(t('explorer.conflict.overwrite_confirm'))
+          const overwrite = await confirmAction(t('explorer.conflict.overwrite_confirm'))
           if (overwrite) {
             await handleSave(true)
             return
           }
-          const reload = window.confirm(t('explorer.conflict.reload_confirm'))
+          const reload = await confirmAction(t('explorer.conflict.reload_confirm'))
           if (reload) {
             await loadDocument(selectedDocumentPath)
           }
@@ -192,8 +196,12 @@ function SimpleView({
       return
     }
 
-    if (!window.confirm('このドキュメントを削除しますか？')) {
+    if (!(await confirmAction('このドキュメントを削除しますか？'))) {
       return
+    }
+
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur()
     }
 
     setLoading(true)
@@ -208,6 +216,7 @@ function SimpleView({
 
       await loadDocuments(activeCollectionPath)
       onSelectDocument(null)
+      onCollectionDocumentsChanged?.()
     } finally {
       setLoading(false)
     }
@@ -239,6 +248,7 @@ function SimpleView({
 
       await loadDocuments(activeCollectionPath)
       onSelectDocument(`${activeCollectionPath}/${result.data}`)
+      onCollectionDocumentsChanged?.()
     } catch (parseError) {
       setError(parseError instanceof Error ? parseError.message : 'JSON の形式が正しくありません')
     } finally {
@@ -275,6 +285,7 @@ function SimpleView({
     }
 
     await loadDocuments(activeCollectionPath)
+    onCollectionDocumentsChanged?.()
   }
 
   const handleDuplicateDocument = async (): Promise<void> => {
@@ -306,6 +317,7 @@ function SimpleView({
       await loadDocuments(activeCollectionPath)
       const newPath = `${activeCollectionPath}/${result.data}`
       onSelectDocument(newPath)
+      onCollectionDocumentsChanged?.()
       setSuccessMessage(`ドキュメントを複製しました: ${newPath}`)
     } finally {
       setLoading(false)

@@ -26,6 +26,7 @@ type WorkspacePaneProps = {
   onRequestCreateSubcollection: (documentPath: string) => void
   onRequestDeleteSubcollection: (collectionPath: string) => void
   collectionDataReloadToken?: number
+  onCollectionDocumentsChanged?: () => void
   onQueryDraftChange: (patch: WorkspaceTabQueryDraftPatch) => void
 }
 
@@ -52,6 +53,7 @@ function WorkspacePane({
   onRequestCreateSubcollection,
   onRequestDeleteSubcollection,
   collectionDataReloadToken = 0,
+  onCollectionDocumentsChanged,
   onQueryDraftChange
 }: WorkspacePaneProps): React.JSX.Element {
   if (isImpExpTab(tab)) {
@@ -120,6 +122,7 @@ function WorkspacePane({
           onRequestCreateSubcollection={onRequestCreateSubcollection}
           onRequestDeleteSubcollection={onRequestDeleteSubcollection}
           collectionDataReloadToken={collectionDataReloadToken}
+          onCollectionDocumentsChanged={onCollectionDocumentsChanged}
           menuEnabled={menuEnabled}
           onOpenImpExp={onOpenImpExp}
         />

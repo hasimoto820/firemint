@@ -21,6 +21,7 @@ type ExplorerSidebarProps = {
   canManageSubcollections?: boolean
   onWorkspaceChanged: () => void
   treeReloadToken?: number
+  treeContentReloadToken?: number
   workspaceRefreshToken?: number
   disabled?: boolean
 }
@@ -47,6 +48,7 @@ function ExplorerSidebar({
   canManageSubcollections = false,
   onWorkspaceChanged,
   treeReloadToken = 0,
+  treeContentReloadToken = 0,
   workspaceRefreshToken = 0,
   disabled = false
 }: ExplorerSidebarProps): React.JSX.Element {
@@ -85,6 +87,7 @@ function ExplorerSidebar({
               canRename={canRename}
               canManageSubcollections={canManageSubcollections}
               reloadToken={treeReloadToken}
+              contentReloadToken={treeContentReloadToken}
               disabled={disabled}
             />
             <AuthNavSection

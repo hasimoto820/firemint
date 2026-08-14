@@ -23,6 +23,8 @@ type CollectionTreeProps = {
   canRename?: boolean
   canManageSubcollections?: boolean
   reloadToken?: number
+  /** 展開は維持したまま、キャッシュ済みの子だけ再取得する */
+  contentReloadToken?: number
   disabled?: boolean
   title?: string
 }
@@ -55,6 +57,7 @@ function CollectionTree({
   canManageSubcollections = false,
   canRename = false,
   reloadToken = 0,
+  contentReloadToken = 0,
   disabled = false,
   title = 'コレクション'
 }: CollectionTreeProps): React.JSX.Element {
@@ -85,14 +88,6 @@ function CollectionTree({
 
     resetTree()
   }, [reloadToken, resetTree])
-
-  useEffect(() => {
-    if (rootCollections.length === 0) {
-      return
-    }
-
-    autocomplete.addCollectionPaths(projectId, rootCollections)
-  }, [autocomplete, projectId, rootCollections])
 
   const registerCollectionPaths = useCallback(
     (nodes: TreeNode[]): void => {
@@ -137,6 +132,59 @@ function CollectionTree({
     },
     [projectId]
   )
+
+  const refreshChildren = useCallback(
+    async (path: string, kind: TreeNodeKind): Promise<void> => {
+      const node: TreeNode = { kind, name: path.split('/').pop() ?? path, path }
+
+      setLoadingPaths((current) => new Set(current).add(path))
+      setError(null)
+
+      try {
+        const children = await loadChildren(node)
+        childrenRef.current[path] = children
+        setChildrenByPath((current) => ({ ...current, [path]: children }))
+        registerCollectionPaths(children)
+      } catch (loadError) {
+        delete childrenRef.current[path]
+        setChildrenByPath((current) => {
+          const next = { ...current }
+          delete next[path]
+          return next
+        })
+        setError(loadError instanceof Error ? loadError.message : 'ツリーの読み込みに失敗しました')
+      } finally {
+        setLoadingPaths((current) => {
+          const next = new Set(current)
+          next.delete(path)
+          return next
+        })
+      }
+    },
+    [loadChildren, registerCollectionPaths]
+  )
+
+  useEffect(() => {
+    if (contentReloadToken <= 0) {
+      return
+    }
+
+    const paths = Object.keys(childrenRef.current)
+
+    for (const path of paths) {
+      const segmentCount = path.split('/').filter(Boolean).length
+      const kind: TreeNodeKind = segmentCount % 2 === 1 ? 'collection' : 'document'
+      void refreshChildren(path, kind)
+    }
+  }, [contentReloadToken, refreshChildren])
+
+  useEffect(() => {
+    if (rootCollections.length === 0) {
+      return
+    }
+
+    autocomplete.addCollectionPaths(projectId, rootCollections)
+  }, [autocomplete, projectId, rootCollections])
 
   const ensureExpandedWithChildren = useCallback(
     async (path: string, kind: TreeNodeKind): Promise<void> => {

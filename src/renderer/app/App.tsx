@@ -15,6 +15,7 @@ import {
   type AppMenuContextActions
 } from '@shared/shell/build_app_menus'
 import { useI18n } from '@shared/i18n/renderer/I18nProvider'
+import { confirmAction } from '@shared/ui/confirmAction'
 
 function App(): React.JSX.Element {
   const { t, ready } = useI18n()
@@ -49,7 +50,7 @@ function App(): React.JSX.Element {
   }, [])
 
   const handleDisconnect = useCallback(async (): Promise<void> => {
-    if (!window.confirm(t('workspace.disconnect_confirm'))) {
+    if (!(await confirmAction(t('workspace.disconnect_confirm')))) {
       return
     }
 
