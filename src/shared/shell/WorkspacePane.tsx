@@ -1,3 +1,4 @@
+import type { BulkFieldMode } from '@features/bulk_operations/shared/types'
 import type { ConnectionStatus } from '@features/connection/shared/types'
 import ImpExpView from '@features/data_transfer/renderer/ui/ImpExpView'
 import type { ImpExpDraft, ImpExpIntent } from '@features/data_transfer/shared/imp_exp'
@@ -21,12 +22,14 @@ type WorkspacePaneProps = {
   onSelectCollection: (collectionPath: string) => void
   onSelectDocument: (documentPath: string | null) => void
   onRootCollectionsChanged: () => void
+  onRequestCreateCollection: () => void
   onRequestRenameCollection: (collectionPath: string) => void
-  onRequestFieldBulkRename: (collectionPath: string) => void
   onRequestCreateSubcollection: (documentPath: string) => void
   onRequestDeleteSubcollection: (collectionPath: string) => void
+  onRequestFieldBulk?: (mode: BulkFieldMode) => void
   collectionDataReloadToken?: number
   onCollectionDocumentsChanged?: () => void
+  onCollectionBecameEmpty?: (collectionPath: string) => void
   onQueryDraftChange: (patch: WorkspaceTabQueryDraftPatch) => void
 }
 
@@ -48,12 +51,14 @@ function WorkspacePane({
   onSelectCollection,
   onSelectDocument,
   onRootCollectionsChanged,
+  onRequestCreateCollection,
   onRequestRenameCollection,
-  onRequestFieldBulkRename,
   onRequestCreateSubcollection,
   onRequestDeleteSubcollection,
+  onRequestFieldBulk,
   collectionDataReloadToken = 0,
   onCollectionDocumentsChanged,
+  onCollectionBecameEmpty,
   onQueryDraftChange
 }: WorkspacePaneProps): React.JSX.Element {
   if (isImpExpTab(tab)) {
@@ -117,12 +122,14 @@ function WorkspacePane({
           onSelectCollection={onSelectCollection}
           onSelectDocument={onSelectDocument}
           onRootCollectionsChanged={onRootCollectionsChanged}
+          onRequestCreateCollection={onRequestCreateCollection}
           onRequestRenameCollection={onRequestRenameCollection}
-          onRequestFieldBulkRename={onRequestFieldBulkRename}
           onRequestCreateSubcollection={onRequestCreateSubcollection}
           onRequestDeleteSubcollection={onRequestDeleteSubcollection}
+          onRequestFieldBulk={onRequestFieldBulk}
           collectionDataReloadToken={collectionDataReloadToken}
           onCollectionDocumentsChanged={onCollectionDocumentsChanged}
+          onCollectionBecameEmpty={onCollectionBecameEmpty}
           menuEnabled={menuEnabled}
           onOpenImpExp={onOpenImpExp}
         />

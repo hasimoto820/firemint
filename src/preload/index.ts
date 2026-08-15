@@ -63,6 +63,8 @@ const api: IpcApi = {
       ipcRenderer.invoke(IPC_CHANNELS.EXPLORER_DUPLICATE_COLLECTION, input),
     renameCollection: (input) =>
       ipcRenderer.invoke(IPC_CHANNELS.EXPLORER_RENAME_COLLECTION, input),
+    createCollection: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.EXPLORER_CREATE_COLLECTION, input),
     createSubcollection: (input) =>
       ipcRenderer.invoke(IPC_CHANNELS.EXPLORER_CREATE_SUBCOLLECTION, input),
     deleteCollection: (input) =>
@@ -78,6 +80,9 @@ const api: IpcApi = {
   bulk: {
     previewUpdate: (input) => ipcRenderer.invoke(IPC_CHANNELS.BULK_PREVIEW_UPDATE, input),
     updateField: (input) => ipcRenderer.invoke(IPC_CHANNELS.BULK_UPDATE_FIELD, input),
+    previewCreateField: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.BULK_PREVIEW_CREATE_FIELD, input),
+    createField: (input) => ipcRenderer.invoke(IPC_CHANNELS.BULK_CREATE_FIELD, input),
     previewRenameField: (input) =>
       ipcRenderer.invoke(IPC_CHANNELS.BULK_PREVIEW_RENAME_FIELD, input),
     renameField: (input) => ipcRenderer.invoke(IPC_CHANNELS.BULK_RENAME_FIELD, input),

@@ -1,26 +1,20 @@
-import { useEffect, useMemo, useState } from 'react'
-import { collectionKindLabel } from '@features/explorer/shared/tree'
+import { useEffect, useState } from 'react'
 import Button from '@shared/ui/Button'
 
-type CollectionRenameDialogProps = {
+type CollectionCreateDialogProps = {
   projectId: string
-  collectionPath: string
   open: boolean
   onClose: () => void
-  onRenamed: (targetCollectionPath: string, movedCount: number) => void
+  onCreated: (collectionPath: string, documentId: string) => void
 }
 
-function CollectionRenameDialog({
+function CollectionCreateDialog({
   projectId,
-  collectionPath,
   open,
   onClose,
-  onRenamed
-}: CollectionRenameDialogProps): React.JSX.Element | null {
-  const segments = useMemo(() => collectionPath.split('/').filter(Boolean), [collectionPath])
-  const currentName = segments[segments.length - 1] ?? ''
-
-  const [newName, setNewName] = useState(currentName)
+  onCreated
+}: CollectionCreateDialogProps): React.JSX.Element | null {
+  const [collectionId, setCollectionId] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -29,25 +23,12 @@ function CollectionRenameDialog({
       return
     }
 
-    setNewName(currentName)
+    setCollectionId('')
     setBusy(false)
     setError(null)
-  }, [open, currentName])
+  }, [open])
 
-  const targetCollectionPath = useMemo(() => {
-    const trimmed = newName.trim()
-    if (!trimmed) {
-      return ''
-    }
-
-    return [...segments.slice(0, -1), trimmed].join('/')
-  }, [newName, segments])
-
-  const canSubmit =
-    !busy &&
-    Boolean(newName.trim()) &&
-    newName.trim() !== currentName &&
-    Boolean(targetCollectionPath)
+  const canSubmit = !busy && Boolean(collectionId.trim())
 
   const handleSubmit = async (): Promise<void> => {
     if (!canSubmit) {
@@ -58,10 +39,29 @@ function CollectionRenameDialog({
     setError(null)
 
     try {
-      const result = await window.api.explorer.renameCollection({
+      const name = collectionId.trim()
+
+      if (name.includes('/')) {
+        setError('コレクション名に / は使えません')
+        return
+      }
+
+      const existing = await window.api.explorer.listRootCollections(projectId)
+
+      if (!existing.ok) {
+        setError(existing.error)
+        return
+      }
+
+      if (existing.data.includes(name)) {
+        setError('同名のコレクションが既に存在します')
+        return
+      }
+
+      const result = await window.api.explorer.createDocument({
         projectId,
-        sourceCollectionPath: collectionPath,
-        targetCollectionPath
+        collectionPath: name,
+        data: {}
       })
 
       if (!result.ok) {
@@ -69,14 +69,14 @@ function CollectionRenameDialog({
         return
       }
 
-      onRenamed(result.data.targetCollectionPath, result.data.movedCount)
+      onCreated(name, result.data)
       onClose()
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'コレクションの作成に失敗しました')
     } finally {
       setBusy(false)
     }
   }
-
-  const kindLabel = collectionKindLabel(collectionPath)
 
   if (!open) {
     return null
@@ -87,25 +87,22 @@ function CollectionRenameDialog({
       <div className="project-export-dialog__backdrop" onClick={busy ? undefined : onClose} />
       <div className="project-export-dialog__panel">
         <header className="project-export-dialog__header">
-          <h2 className="project-export-dialog__title">{kindLabel}をリネーム</h2>
+          <h2 className="project-export-dialog__title">コレクションを作成</h2>
           <p className="project-export-dialog__lead">
-            {kindLabel}自体の名前を変更します。配下ドキュメントとサブコレも移動し、元は削除されます。
+            ルートコレクションを追加します。空のドキュメント 1 件を作成して表示します。
           </p>
         </header>
 
-        <p className="project-export-dialog__hint">
-          現在: <code>{collectionPath}</code>
-        </p>
-
         <label className="project-export-dialog__option">
-          新しい名前
+          コレクション名
           <input
             className="bulk-actions__input"
-            value={newName}
+            value={collectionId}
             disabled={busy}
             autoFocus
+            placeholder="例: users"
             onChange={(event) => {
-              setNewName(event.target.value)
+              setCollectionId(event.target.value)
               setError(null)
             }}
             onKeyDown={(event) => {
@@ -116,9 +113,9 @@ function CollectionRenameDialog({
           />
         </label>
 
-        {targetCollectionPath && targetCollectionPath !== collectionPath && (
+        {collectionId.trim() && (
           <p className="project-export-dialog__hint">
-            変更後: <code>{targetCollectionPath}</code>
+            作成後: <code>{collectionId.trim()}</code>
           </p>
         )}
 
@@ -129,7 +126,7 @@ function CollectionRenameDialog({
             キャンセル
           </Button>
           <Button variant="primary" onClick={() => void handleSubmit()} disabled={!canSubmit}>
-            {busy ? '実行中…' : 'リネーム'}
+            {busy ? '作成中…' : '作成'}
           </Button>
         </div>
       </div>
@@ -137,4 +134,4 @@ function CollectionRenameDialog({
   )
 }
 
-export default CollectionRenameDialog
+export default CollectionCreateDialog

@@ -1,15 +1,19 @@
 import type { QueryDocumentSnapshot, WriteBatch } from 'firebase-admin/firestore'
 import { FieldValue } from 'firebase-admin/firestore'
 import { getFirestore, isFirestoreConnected } from '@shared/firestore/client'
-import { getCollectionRef, getDocumentRef, joinDocumentPath } from '@shared/firestore/paths'
+import { getCollectionRef, getDocumentRef, joinCollectionPath, joinDocumentPath } from '@shared/firestore/paths'
 import { deserializeFirestoreValue } from '@shared/firestore/serialize'
 import { parseQueryLiteral } from '@shared/firestore/value_parse'
 import { calculateBatchCount, FIRESTORE_BATCH_LIMIT } from '@shared/safety/operations'
 import { logError, logInfo } from '@shared/logging/logger'
 import { ensureWritable } from '@features/workspace/main/guard'
 import type {
+  BulkCreateFieldInput,
   BulkDeleteFieldInput,
   BulkDeleteInput,
+  BulkFieldPreview,
+  BulkFieldValueType,
+  BulkFieldWriteResult,
   BulkOperationSummary,
   BulkRenameFieldInput,
   BulkResult,
@@ -19,6 +23,7 @@ import type {
 
 const PAGE_SIZE = 500
 const PREVIEW_LIMIT = 50
+const COLLISION_PATH_LIMIT = 80
 
 function ensureConnected(projectId: string): void {
   if (!isFirestoreConnected(projectId)) {
@@ -135,6 +140,92 @@ async function* iterateCollectionDocs(
   }
 }
 
+async function walkScopedDocuments(
+  projectId: string,
+  collectionPath: string,
+  includeSubcollections: boolean,
+  visit: (documentPath: string, data: Record<string, unknown>) => Promise<void> | void
+): Promise<void> {
+  for await (const doc of iterateCollectionDocs(projectId, collectionPath)) {
+    const documentPath = joinDocumentPath(collectionPath, doc.id)
+    await visit(documentPath, doc.data() as Record<string, unknown>)
+
+    if (!includeSubcollections) {
+      continue
+    }
+
+    const subcollections = await getDocumentRef(documentPath, projectId).listCollections()
+
+    for (const subcollection of subcollections) {
+      await walkScopedDocuments(
+        projectId,
+        joinCollectionPath(documentPath, subcollection.id),
+        true,
+        visit
+      )
+    }
+  }
+}
+
+function rememberCollision(paths: string[], documentPath: string): void {
+  if (paths.length < COLLISION_PATH_LIMIT) {
+    paths.push(documentPath)
+  }
+}
+
+function parseTypedFieldValue(valueType: BulkFieldValueType, rawValue: string): unknown {
+  if (valueType === 'null') {
+    return null
+  }
+
+  const trimmed = rawValue.trim()
+
+  if (valueType === 'string') {
+    return rawValue
+  }
+
+  if (valueType === 'boolean') {
+    if (trimmed === 'true') {
+      return true
+    }
+
+    if (trimmed === 'false') {
+      return false
+    }
+
+    throw new Error('boolean は true または false を指定してください')
+  }
+
+  if (valueType === 'number') {
+    if (trimmed === '' || Number.isNaN(Number(trimmed))) {
+      throw new Error('number の値が不正です')
+    }
+
+    return Number(trimmed)
+  }
+
+  const timestamp = new Date(trimmed)
+
+  if (Number.isNaN(timestamp.getTime())) {
+    throw new Error('timestamp の値が不正です')
+  }
+
+  return timestamp
+}
+
+function toWriteResult(affectedCount: number, collisionPaths: string[], skippedCount: number): BulkFieldWriteResult {
+  if (affectedCount === 0 && skippedCount === 0) {
+    throw new Error('対象ドキュメントがありません')
+  }
+
+  return {
+    affectedCount,
+    batchCount: calculateBatchCount(affectedCount),
+    skippedCount,
+    collisionPaths
+  }
+}
+
 export async function previewBulkUpdateField(
   input: BulkUpdateFieldInput
 ): Promise<BulkResult<DiffPreviewItem[]>> {
@@ -234,51 +325,165 @@ export async function bulkDelete(
   }
 }
 
+export async function previewBulkCreateField(
+  input: BulkCreateFieldInput
+): Promise<BulkResult<BulkFieldPreview>> {
+  try {
+    ensureConnected(input.projectId)
+
+    const collectionPath = validateCollectionPath(input.collectionPath)
+    const field = validateField(input.field)
+    const parsedValue = parseTypedFieldValue(input.valueType, input.value)
+    const includeSubcollections = input.includeSubcollections === true
+    const previewItems: DiffPreviewItem[] = []
+    const collisionPaths: string[] = []
+    let skippedCount = 0
+
+    logInfo(
+      'bulk_operations',
+      `previewBulkCreateField projectId=${input.projectId} path=${collectionPath} field=${field} includeSubcollections=${includeSubcollections}`
+    )
+
+    await walkScopedDocuments(input.projectId, collectionPath, includeSubcollections, (documentPath, data) => {
+      if (field in data) {
+        skippedCount += 1
+        rememberCollision(collisionPaths, documentPath)
+        return
+      }
+
+      if (previewItems.length < PREVIEW_LIMIT) {
+        previewItems.push({
+          documentPath,
+          field,
+          before: null,
+          after: formatPreviewValue(parsedValue)
+        })
+      }
+    })
+
+    if (previewItems.length === 0 && skippedCount === 0) {
+      throw new Error('対象ドキュメントがありません')
+    }
+
+    return { ok: true, data: { items: previewItems, skippedCount, collisionPaths } }
+  } catch (error) {
+    return toBulkError(error)
+  }
+}
+
+export async function bulkCreateField(
+  input: BulkCreateFieldInput
+): Promise<BulkResult<BulkFieldWriteResult>> {
+  try {
+    ensureConnected(input.projectId)
+    ensureWritable(input.projectId)
+
+    const collectionPath = validateCollectionPath(input.collectionPath)
+    const field = validateField(input.field)
+    const parsedValue = parseTypedFieldValue(input.valueType, input.value)
+    const includeSubcollections = input.includeSubcollections === true
+    const collisionPaths: string[] = []
+    let skippedCount = 0
+    let pendingPaths: string[] = []
+    let affectedCount = 0
+
+    logInfo(
+      'bulk_operations',
+      `bulkCreateField projectId=${input.projectId} path=${collectionPath} field=${field} includeSubcollections=${includeSubcollections}`
+    )
+
+    const flush = async (): Promise<void> => {
+      if (pendingPaths.length === 0) {
+        return
+      }
+
+      const batch = getFirestore(input.projectId).batch()
+
+      for (const documentPath of pendingPaths) {
+        batch.set(
+          getDocumentRef(documentPath, input.projectId),
+          { [field]: parsedValue },
+          { merge: true }
+        )
+      }
+
+      await batch.commit()
+      affectedCount += pendingPaths.length
+      pendingPaths = []
+    }
+
+    await walkScopedDocuments(input.projectId, collectionPath, includeSubcollections, async (documentPath, data) => {
+      if (field in data) {
+        skippedCount += 1
+        rememberCollision(collisionPaths, documentPath)
+        return
+      }
+
+      pendingPaths.push(documentPath)
+
+      if (pendingPaths.length >= FIRESTORE_BATCH_LIMIT) {
+        await flush()
+      }
+    })
+
+    await flush()
+
+    return { ok: true, data: toWriteResult(affectedCount, collisionPaths, skippedCount) }
+  } catch (error) {
+    return toBulkError(error)
+  }
+}
+
 export async function previewBulkRenameField(
   input: BulkRenameFieldInput
-): Promise<BulkResult<DiffPreviewItem[]>> {
+): Promise<BulkResult<BulkFieldPreview>> {
   try {
     ensureConnected(input.projectId)
 
     const collectionPath = validateCollectionPath(input.collectionPath)
     const fromField = validateField(input.fromField)
     const toField = validateField(input.toField)
+    const includeSubcollections = input.includeSubcollections === true
 
     if (fromField === toField) {
       throw new Error('変更先フィールド名は別の名前を指定してください')
     }
 
     const previewItems: DiffPreviewItem[] = []
+    const collisionPaths: string[] = []
+    let skippedCount = 0
 
     logInfo(
       'bulk_operations',
-      `previewBulkRenameField projectId=${input.projectId} path=${collectionPath} from=${fromField} to=${toField}`
+      `previewBulkRenameField projectId=${input.projectId} path=${collectionPath} from=${fromField} to=${toField} includeSubcollections=${includeSubcollections}`
     )
 
-    for await (const doc of iterateCollectionDocs(input.projectId, collectionPath)) {
-      const data = doc.data() as Record<string, unknown>
-
+    await walkScopedDocuments(input.projectId, collectionPath, includeSubcollections, (documentPath, data) => {
       if (!(fromField in data)) {
-        continue
+        return
       }
 
-      previewItems.push({
-        documentPath: joinDocumentPath(collectionPath, doc.id),
-        field: `${fromField} → ${toField}`,
-        before: formatPreviewValue(data[fromField]),
-        after: formatPreviewValue(data[fromField])
-      })
-
-      if (previewItems.length >= PREVIEW_LIMIT) {
-        break
+      if (toField in data) {
+        skippedCount += 1
+        rememberCollision(collisionPaths, documentPath)
+        return
       }
-    }
 
-    if (previewItems.length === 0) {
+      if (previewItems.length < PREVIEW_LIMIT) {
+        previewItems.push({
+          documentPath,
+          field: `${fromField} → ${toField}`,
+          before: formatPreviewValue(data[fromField]),
+          after: formatPreviewValue(data[fromField])
+        })
+      }
+    })
+
+    if (previewItems.length === 0 && skippedCount === 0) {
       throw new Error('リネーム対象のフィールドを持つドキュメントがありません')
     }
 
-    return { ok: true, data: previewItems }
+    return { ok: true, data: { items: previewItems, skippedCount, collisionPaths } }
   } catch (error) {
     return toBulkError(error)
   }
@@ -286,7 +491,7 @@ export async function previewBulkRenameField(
 
 export async function bulkRenameField(
   input: BulkRenameFieldInput
-): Promise<BulkResult<BulkOperationSummary>> {
+): Promise<BulkResult<BulkFieldWriteResult>> {
   try {
     ensureConnected(input.projectId)
     ensureWritable(input.projectId)
@@ -294,6 +499,7 @@ export async function bulkRenameField(
     const collectionPath = validateCollectionPath(input.collectionPath)
     const fromField = validateField(input.fromField)
     const toField = validateField(input.toField)
+    const includeSubcollections = input.includeSubcollections === true
 
     if (fromField === toField) {
       throw new Error('変更先フィールド名は別の名前を指定してください')
@@ -301,9 +507,11 @@ export async function bulkRenameField(
 
     logInfo(
       'bulk_operations',
-      `bulkRenameField projectId=${input.projectId} path=${collectionPath} from=${fromField} to=${toField}`
+      `bulkRenameField projectId=${input.projectId} path=${collectionPath} from=${fromField} to=${toField} includeSubcollections=${includeSubcollections}`
     )
 
+    const collisionPaths: string[] = []
+    let skippedCount = 0
     let affectedCount = 0
     let pending: Array<{ path: string; value: unknown }> = []
 
@@ -326,36 +534,30 @@ export async function bulkRenameField(
       pending = []
     }
 
-    for await (const doc of iterateCollectionDocs(input.projectId, collectionPath)) {
-      const data = doc.data() as Record<string, unknown>
-
+    await walkScopedDocuments(input.projectId, collectionPath, includeSubcollections, async (documentPath, data) => {
       if (!(fromField in data)) {
-        continue
+        return
+      }
+
+      if (toField in data) {
+        skippedCount += 1
+        rememberCollision(collisionPaths, documentPath)
+        return
       }
 
       pending.push({
-        path: joinDocumentPath(collectionPath, doc.id),
+        path: documentPath,
         value: data[fromField]
       })
 
       if (pending.length >= FIRESTORE_BATCH_LIMIT) {
         await flush()
       }
-    }
+    })
 
     await flush()
 
-    if (affectedCount === 0) {
-      throw new Error('リネーム対象のフィールドを持つドキュメントがありません')
-    }
-
-    return {
-      ok: true,
-      data: {
-        affectedCount,
-        batchCount: calculateBatchCount(affectedCount)
-      }
-    }
+    return { ok: true, data: toWriteResult(affectedCount, collisionPaths, skippedCount) }
   } catch (error) {
     return toBulkError(error)
   }
@@ -363,43 +565,38 @@ export async function bulkRenameField(
 
 export async function previewBulkDeleteField(
   input: BulkDeleteFieldInput
-): Promise<BulkResult<DiffPreviewItem[]>> {
+): Promise<BulkResult<BulkFieldPreview>> {
   try {
     ensureConnected(input.projectId)
 
     const collectionPath = validateCollectionPath(input.collectionPath)
     const field = validateField(input.field)
+    const includeSubcollections = input.includeSubcollections === true
     const previewItems: DiffPreviewItem[] = []
 
     logInfo(
       'bulk_operations',
-      `previewBulkDeleteField projectId=${input.projectId} path=${collectionPath} field=${field}`
+      `previewBulkDeleteField projectId=${input.projectId} path=${collectionPath} field=${field} includeSubcollections=${includeSubcollections}`
     )
 
-    for await (const doc of iterateCollectionDocs(input.projectId, collectionPath)) {
-      const data = doc.data() as Record<string, unknown>
-
-      if (!(field in data)) {
-        continue
+    await walkScopedDocuments(input.projectId, collectionPath, includeSubcollections, (documentPath, data) => {
+      if (!(field in data) || previewItems.length >= PREVIEW_LIMIT) {
+        return
       }
 
       previewItems.push({
-        documentPath: joinDocumentPath(collectionPath, doc.id),
+        documentPath,
         field,
         before: formatPreviewValue(data[field]),
         after: null
       })
-
-      if (previewItems.length >= PREVIEW_LIMIT) {
-        break
-      }
-    }
+    })
 
     if (previewItems.length === 0) {
       throw new Error('削除対象のフィールドを持つドキュメントがありません')
     }
 
-    return { ok: true, data: previewItems }
+    return { ok: true, data: { items: previewItems, skippedCount: 0, collisionPaths: [] } }
   } catch (error) {
     return toBulkError(error)
   }
@@ -407,17 +604,18 @@ export async function previewBulkDeleteField(
 
 export async function bulkDeleteField(
   input: BulkDeleteFieldInput
-): Promise<BulkResult<BulkOperationSummary>> {
+): Promise<BulkResult<BulkFieldWriteResult>> {
   try {
     ensureConnected(input.projectId)
     ensureWritable(input.projectId)
 
     const collectionPath = validateCollectionPath(input.collectionPath)
     const field = validateField(input.field)
+    const includeSubcollections = input.includeSubcollections === true
 
     logInfo(
       'bulk_operations',
-      `bulkDeleteField projectId=${input.projectId} path=${collectionPath} field=${field}`
+      `bulkDeleteField projectId=${input.projectId} path=${collectionPath} field=${field} includeSubcollections=${includeSubcollections}`
     )
 
     let affectedCount = 0
@@ -441,19 +639,17 @@ export async function bulkDeleteField(
       pendingPaths = []
     }
 
-    for await (const doc of iterateCollectionDocs(input.projectId, collectionPath)) {
-      const data = doc.data() as Record<string, unknown>
-
+    await walkScopedDocuments(input.projectId, collectionPath, includeSubcollections, async (documentPath, data) => {
       if (!(field in data)) {
-        continue
+        return
       }
 
-      pendingPaths.push(joinDocumentPath(collectionPath, doc.id))
+      pendingPaths.push(documentPath)
 
       if (pendingPaths.length >= FIRESTORE_BATCH_LIMIT) {
         await flush()
       }
-    }
+    })
 
     await flush()
 
@@ -465,7 +661,9 @@ export async function bulkDeleteField(
       ok: true,
       data: {
         affectedCount,
-        batchCount: calculateBatchCount(affectedCount)
+        batchCount: calculateBatchCount(affectedCount),
+        skippedCount: 0,
+        collisionPaths: []
       }
     }
   } catch (error) {

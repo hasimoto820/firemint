@@ -50,11 +50,11 @@ function DocumentJsonPanel({
               <Button onClick={onCreate} disabled={loading}>
                 新規
               </Button>
-              <Button onClick={onDuplicate} disabled={loading || !documentPath || !onDuplicate}>
-                複製
-              </Button>
               <Button onClick={onSave} disabled={loading || !documentPath}>
                 保存
+              </Button>
+              <Button onClick={onDuplicate} disabled={loading || !documentPath || !onDuplicate}>
+                複製
               </Button>
               <Button variant="danger" onClick={onDelete} disabled={loading || !documentPath}>
                 削除

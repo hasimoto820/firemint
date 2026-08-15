@@ -6,6 +6,8 @@ import type {
   GoogleSignInResult
 } from '@features/connection/shared/types'
 import type {
+  CreateCollectionInput,
+  CreateCollectionResult,
   CreateDocumentInput,
   DocumentDetail,
   DocumentSummary,
@@ -31,8 +33,11 @@ import type {
 } from '@features/query/shared/types'
 
 import type {
+  BulkCreateFieldInput,
   BulkDeleteFieldInput,
   BulkDeleteInput,
+  BulkFieldPreview,
+  BulkFieldWriteResult,
   BulkOperationSummary,
   BulkRenameFieldInput,
   BulkResult,
@@ -110,6 +115,14 @@ export type WindowConfirmInput = {
   message: string
   confirmLabel?: string
   cancelLabel?: string
+  detail?: string
+  checkboxLabel?: string
+  checkboxChecked?: boolean
+}
+
+export type WindowConfirmResult = {
+  confirmed: boolean
+  checkboxChecked: boolean
 }
 
 export type WindowIpcApi = {
@@ -117,7 +130,7 @@ export type WindowIpcApi = {
   maximizeToggle: () => Promise<boolean>
   close: () => Promise<void>
   isMaximized: () => Promise<boolean>
-  confirm: (input: WindowConfirmInput) => Promise<boolean>
+  confirm: (input: WindowConfirmInput) => Promise<WindowConfirmResult>
 }
 
 export type ConnectionIpcApi = {
@@ -149,6 +162,9 @@ export type ExplorerIpcApi = {
   renameCollection: (
     input: RenameCollectionInput
   ) => Promise<ExplorerResult<RenameCollectionResult>>
+  createCollection: (
+    input: CreateCollectionInput
+  ) => Promise<ExplorerResult<CreateCollectionResult>>
   createSubcollection: (
     input: CreateSubcollectionInput
   ) => Promise<ExplorerResult<CreateSubcollectionResult>>
@@ -167,10 +183,12 @@ export type QueryIpcApi = {
 export type BulkOperationsIpcApi = {
   previewUpdate: (input: BulkUpdateFieldInput) => Promise<BulkResult<DiffPreviewItem[]>>
   updateField: (input: BulkUpdateFieldInput) => Promise<BulkResult<BulkOperationSummary>>
-  previewRenameField: (input: BulkRenameFieldInput) => Promise<BulkResult<DiffPreviewItem[]>>
-  renameField: (input: BulkRenameFieldInput) => Promise<BulkResult<BulkOperationSummary>>
-  previewDeleteField: (input: BulkDeleteFieldInput) => Promise<BulkResult<DiffPreviewItem[]>>
-  deleteField: (input: BulkDeleteFieldInput) => Promise<BulkResult<BulkOperationSummary>>
+  previewCreateField: (input: BulkCreateFieldInput) => Promise<BulkResult<BulkFieldPreview>>
+  createField: (input: BulkCreateFieldInput) => Promise<BulkResult<BulkFieldWriteResult>>
+  previewRenameField: (input: BulkRenameFieldInput) => Promise<BulkResult<BulkFieldPreview>>
+  renameField: (input: BulkRenameFieldInput) => Promise<BulkResult<BulkFieldWriteResult>>
+  previewDeleteField: (input: BulkDeleteFieldInput) => Promise<BulkResult<BulkFieldPreview>>
+  deleteField: (input: BulkDeleteFieldInput) => Promise<BulkResult<BulkFieldWriteResult>>
   delete: (input: BulkDeleteInput) => Promise<BulkResult<BulkOperationSummary>>
 }
 

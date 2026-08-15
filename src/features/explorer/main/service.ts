@@ -15,6 +15,8 @@ import {
 import { logError, logInfo } from '@shared/logging/logger'
 import { ensureWritable } from '@features/workspace/main/guard'
 import type {
+  CreateCollectionInput,
+  CreateCollectionResult,
   CreateDocumentInput,
   CreateSubcollectionInput,
   CreateSubcollectionResult,
@@ -30,7 +32,6 @@ import type {
   RenameCollectionResult,
   UpdateDocumentInput
 } from '@features/explorer/shared/types'
-import { isSubcollectionPath } from '@features/explorer/shared/tree'
 
 function ensureConnected(projectId: string): void {
   if (!isFirestoreConnected(projectId)) {
@@ -38,21 +39,24 @@ function ensureConnected(projectId: string): void {
   }
 }
 
-function assertSubcollectionId(subcollectionId: string): string {
-  const trimmed = subcollectionId.trim()
+function assertCollectionId(collectionId: string, label: string): string {
+  const trimmed = collectionId.trim()
 
   if (!trimmed) {
-    throw new Error('サブコレクション名を入力してください')
+    throw new Error(`${label}を入力してください`)
   }
 
   if (trimmed.includes('/')) {
-    throw new Error('サブコレクション名に / は使えません')
+    throw new Error(`${label}に / は使えません`)
   }
 
   return trimmed
 }
 
-const DUPLICATE_COLLECTION_LIMIT = 500
+function assertSubcollectionId(subcollectionId: string): string {
+  return assertCollectionId(subcollectionId, 'サブコレクション名')
+}
+
 const BATCH_LIMIT = 500
 const PAGE_SIZE = 500
 
@@ -272,7 +276,12 @@ export async function duplicateDocument(
     ensureConnected(input.projectId)
     ensureWritable(input.projectId)
 
-    logInfo('explorer', `duplicateDocument projectId=${input.projectId} path=${input.documentPath}`)
+    const includeSubcollections = input.includeSubcollections === true
+
+    logInfo(
+      'explorer',
+      `duplicateDocument projectId=${input.projectId} path=${input.documentPath} includeSubcollections=${includeSubcollections}`
+    )
 
     const snapshot = await getDocumentRef(input.documentPath, input.projectId).get()
 
@@ -294,6 +303,14 @@ export async function duplicateDocument(
     }
 
     await targetRef.set(snapshot.data() as Record<string, unknown>)
+
+    if (includeSubcollections) {
+      await copyDocumentSubcollections(
+        input.projectId,
+        input.documentPath,
+        joinDocumentPath(collectionPath, targetRef.id)
+      )
+    }
 
     return { ok: true, data: targetRef.id }
   } catch (error) {
@@ -319,38 +336,30 @@ export async function duplicateCollection(
       throw new Error('複製先は別のコレクション path を指定してください')
     }
 
+    const includeSubcollections = input.includeSubcollections === true
+
     logInfo(
       'explorer',
-      `duplicateCollection projectId=${input.projectId} from=${sourceCollectionPath} to=${targetCollectionPath}`
+      `duplicateCollection projectId=${input.projectId} from=${sourceCollectionPath} to=${targetCollectionPath} includeSubcollections=${includeSubcollections}`
     )
 
-    const snapshot = await getCollectionRef(sourceCollectionPath, input.projectId)
-      .limit(DUPLICATE_COLLECTION_LIMIT)
+    const targetSnapshot = await getCollectionRef(targetCollectionPath, input.projectId)
+      .limit(1)
       .get()
-
-    if (snapshot.empty) {
-      throw new Error('複製元のコレクションにドキュメントがありません')
-    }
-
-    const targetRef = getCollectionRef(targetCollectionPath, input.projectId)
-    const targetSnapshot = await targetRef.limit(1).get()
 
     if (!targetSnapshot.empty) {
       throw new Error('複製先コレクションは空である必要があります')
     }
 
-    let copiedCount = 0
+    const copiedCount = await copyCollectionRecursive(
+      input.projectId,
+      sourceCollectionPath,
+      targetCollectionPath,
+      includeSubcollections
+    )
 
-    for (let index = 0; index < snapshot.docs.length; index += BATCH_LIMIT) {
-      const chunk = snapshot.docs.slice(index, index + BATCH_LIMIT)
-      const batch = getFirestore(input.projectId).batch()
-
-      for (const doc of chunk) {
-        batch.set(targetRef.doc(doc.id), doc.data())
-        copiedCount += 1
-      }
-
-      await batch.commit()
+    if (copiedCount === 0) {
+      throw new Error('複製元のコレクションにドキュメントがありません')
     }
 
     return {
@@ -365,10 +374,31 @@ export async function duplicateCollection(
   }
 }
 
+async function copyDocumentSubcollections(
+  projectId: string,
+  sourceDocumentPath: string,
+  targetDocumentPath: string
+): Promise<number> {
+  const subcollections = await getDocumentRef(sourceDocumentPath, projectId).listCollections()
+  let copiedCount = 0
+
+  for (const subcollection of subcollections) {
+    copiedCount += await copyCollectionRecursive(
+      projectId,
+      joinCollectionPath(sourceDocumentPath, subcollection.id),
+      joinCollectionPath(targetDocumentPath, subcollection.id),
+      true
+    )
+  }
+
+  return copiedCount
+}
+
 async function copyCollectionRecursive(
   projectId: string,
   sourceCollectionPath: string,
-  targetCollectionPath: string
+  targetCollectionPath: string,
+  includeSubcollections = true
 ): Promise<number> {
   const sourceRef = getCollectionRef(sourceCollectionPath, projectId)
   const targetRef = getCollectionRef(targetCollectionPath, projectId)
@@ -400,16 +430,12 @@ async function copyCollectionRecursive(
       await batch.commit()
     }
 
-    for (const doc of snapshot.docs) {
-      const sourceDocumentPath = joinDocumentPath(sourceCollectionPath, doc.id)
-      const targetDocumentPath = joinDocumentPath(targetCollectionPath, doc.id)
-      const subcollections = await getDocumentRef(sourceDocumentPath, projectId).listCollections()
-
-      for (const subcollection of subcollections) {
-        movedCount += await copyCollectionRecursive(
+    if (includeSubcollections) {
+      for (const doc of snapshot.docs) {
+        movedCount += await copyDocumentSubcollections(
           projectId,
-          joinCollectionPath(sourceDocumentPath, subcollection.id),
-          joinCollectionPath(targetDocumentPath, subcollection.id)
+          joinDocumentPath(sourceCollectionPath, doc.id),
+          joinDocumentPath(targetCollectionPath, doc.id)
         )
       }
     }
@@ -539,6 +565,46 @@ export async function renameCollection(
   }
 }
 
+export async function createCollection(
+  input: CreateCollectionInput
+): Promise<ExplorerResult<CreateCollectionResult>> {
+  try {
+    ensureConnected(input.projectId)
+    ensureWritable(input.projectId)
+
+    const collectionId = assertCollectionId(input.collectionId, 'コレクション名')
+    assertCollectionPath(collectionId)
+
+    logInfo('explorer', `createCollection projectId=${input.projectId} id=${collectionId}`)
+
+    const existing = await getCollectionRef(collectionId, input.projectId).limit(1).get()
+
+    if (!existing.empty) {
+      throw new Error('同名のコレクションが既に存在します')
+    }
+
+    const createResult = await createDocument({
+      projectId: input.projectId,
+      collectionPath: collectionId,
+      data: {}
+    })
+
+    if (!createResult.ok) {
+      throw new Error(createResult.error)
+    }
+
+    return {
+      ok: true,
+      data: {
+        collectionPath: collectionId,
+        documentId: createResult.data
+      }
+    }
+  } catch (error) {
+    return toExplorerError(error)
+  }
+}
+
 export async function createSubcollection(
   input: CreateSubcollectionInput
 ): Promise<ExplorerResult<CreateSubcollectionResult>> {
@@ -608,11 +674,10 @@ export async function deleteCollection(
 
     assertCollectionPath(collectionPath)
 
-    if (!isSubcollectionPath(collectionPath)) {
-      throw new Error('ルートコレクションは削除できません')
-    }
-
-    logInfo('explorer', `deleteCollection projectId=${input.projectId} path=${collectionPath}`)
+    logInfo(
+      'explorer',
+      `deleteCollection projectId=${input.projectId} path=${collectionPath} recursive=true`
+    )
 
     const deletedDocumentCount = await deleteCollectionRecursive(input.projectId, collectionPath)
 

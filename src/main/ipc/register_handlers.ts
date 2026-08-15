@@ -22,7 +22,7 @@ export function registerIpcHandlers(): void {
   registerWindowHandlers()
   registerConnectionHandlers()
   registerWorkspaceHandlers()
-  registerExplorerHandlers()
+  registerExplorerHandlers() // コレクション削除はルートも含む
   registerQueryHandlers()
   registerBulkOperationsHandlers()
   registerDataTransferHandlers()

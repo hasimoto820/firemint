@@ -2,16 +2,19 @@ import { ipcMain } from 'electron'
 import { IPC_CHANNELS } from '@shared/ipc/channels'
 import { logInfo } from '@shared/logging/logger'
 import type {
+  BulkCreateFieldInput,
   BulkDeleteFieldInput,
   BulkDeleteInput,
   BulkRenameFieldInput,
   BulkUpdateFieldInput
 } from '@features/bulk_operations/shared/types'
 import {
+  bulkCreateField,
   bulkDelete,
   bulkDeleteField,
   bulkRenameField,
   bulkUpdateField,
+  previewBulkCreateField,
   previewBulkDeleteField,
   previewBulkRenameField,
   previewBulkUpdateField
@@ -26,6 +29,19 @@ export function registerBulkOperationsHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.BULK_UPDATE_FIELD, async (_event, input: BulkUpdateFieldInput) => {
     logInfo('ipc:bulk_operations', `updateField invoked count=${input.documentPaths.length}`)
     return bulkUpdateField(input)
+  })
+
+  ipcMain.handle(
+    IPC_CHANNELS.BULK_PREVIEW_CREATE_FIELD,
+    async (_event, input: BulkCreateFieldInput) => {
+      logInfo('ipc:bulk_operations', `previewCreateField invoked path=${input.collectionPath}`)
+      return previewBulkCreateField(input)
+    }
+  )
+
+  ipcMain.handle(IPC_CHANNELS.BULK_CREATE_FIELD, async (_event, input: BulkCreateFieldInput) => {
+    logInfo('ipc:bulk_operations', `createField invoked path=${input.collectionPath}`)
+    return bulkCreateField(input)
   })
 
   ipcMain.handle(

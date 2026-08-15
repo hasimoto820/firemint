@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import type { BulkFieldMode } from '@features/bulk_operations/shared/types'
 import { useOptionalAutocompleteApi } from '@features/autocomplete/renderer/hooks'
 import {
   buildSubcollectionPath,
+  collectionKindLabel,
   getExpandableAncestorPaths,
   getTreeDepth,
-  isSubcollectionPath,
   type TreeNode,
   type TreeNodeKind
 } from '@features/explorer/shared/tree'
@@ -17,9 +18,12 @@ type CollectionTreeProps = {
   onSelectCollection: (collectionPath: string) => void
   onSelectDocument: (documentPath: string) => void
   onRenameCollection?: (collectionPath: string) => void
-  onRenameFieldBulk?: (collectionPath: string) => void
+  onDuplicateCollection?: (collectionPath: string) => void
+  onDeleteCollection?: (collectionPath: string) => void
+  onFieldBulk?: (collectionPath: string, mode: BulkFieldMode) => void
+  onDuplicateDocument?: (documentPath: string) => void
+  onDeleteDocument?: (documentPath: string) => void
   onCreateSubcollection?: (documentPath: string) => void
-  onDeleteSubcollection?: (collectionPath: string) => void
   canRename?: boolean
   canManageSubcollections?: boolean
   reloadToken?: number
@@ -51,9 +55,12 @@ function CollectionTree({
   onSelectCollection,
   onSelectDocument,
   onRenameCollection,
-  onRenameFieldBulk,
+  onDuplicateCollection,
+  onDeleteCollection,
+  onFieldBulk,
+  onDuplicateDocument,
+  onDeleteDocument,
   onCreateSubcollection,
-  onDeleteSubcollection,
   canManageSubcollections = false,
   canRename = false,
   reloadToken = 0,
@@ -237,6 +244,8 @@ function CollectionTree({
           await ensureExpandedWithChildren(parentCollection, 'collection')
         }
       }
+
+      await ensureExpandedWithChildren(targetPath, kind)
     },
     [ensureExpandedWithChildren]
   )
@@ -275,10 +284,19 @@ function CollectionTree({
 
     if (node.kind === 'collection') {
       onSelectCollection(node.path)
+
+      if (activeCollectionPath === node.path) {
+        void ensureExpandedWithChildren(node.path, 'collection')
+      }
+
       return
     }
 
     onSelectDocument(node.path)
+
+    if (selectedDocumentPath === node.path) {
+      void ensureExpandedWithChildren(node.path, 'document')
+    }
   }
 
   const handleCollectionContextMenu = (
@@ -292,7 +310,12 @@ function CollectionTree({
       return
     }
 
-    if (!onRenameCollection && !onRenameFieldBulk && !onDeleteSubcollection) {
+    if (
+      !onRenameCollection &&
+      !onDuplicateCollection &&
+      !onDeleteCollection &&
+      !onFieldBulk
+    ) {
       return
     }
 
@@ -309,7 +332,14 @@ function CollectionTree({
     event.preventDefault()
     event.stopPropagation()
 
-    if (disabled || !canManageSubcollections || !onCreateSubcollection) {
+    if (
+      disabled ||
+      (!canRename && !canManageSubcollections)
+    ) {
+      return
+    }
+
+    if (!onDuplicateDocument && !onDeleteDocument && !onCreateSubcollection) {
       return
     }
 
@@ -423,6 +453,35 @@ function CollectionTree({
         >
           {contextMenu.kind === 'document' ? (
             <>
+              <div className="collection-tree__context-header">ドキュメント</div>
+              <button
+                type="button"
+                className="collection-tree__context-item collection-tree__context-item--indent"
+                role="menuitem"
+                disabled={!onDuplicateDocument}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  const path = contextMenu.documentPath
+                  setContextMenu(null)
+                  onDuplicateDocument?.(path)
+                }}
+              >
+                複製
+              </button>
+              <button
+                type="button"
+                className="collection-tree__context-item collection-tree__context-item--indent"
+                role="menuitem"
+                disabled={!onDeleteDocument}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  const path = contextMenu.documentPath
+                  setContextMenu(null)
+                  onDeleteDocument?.(path)
+                }}
+              >
+                削除
+              </button>
               <div className="collection-tree__context-header">サブコレクション</div>
               <button
                 type="button"
@@ -441,58 +500,94 @@ function CollectionTree({
             </>
           ) : (
             <>
-              {isSubcollectionPath(contextMenu.collectionPath) && (
-                <>
-                  <div className="collection-tree__context-header">サブコレクション</div>
-                  <button
-                    type="button"
-                    className="collection-tree__context-item collection-tree__context-item--indent"
-                    role="menuitem"
-                    disabled={!onDeleteSubcollection}
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      const path = contextMenu.collectionPath
-                      setContextMenu(null)
-                      onDeleteSubcollection?.(path)
-                    }}
-                  >
-                    削除
-                  </button>
-                </>
-              )}
-              {(onRenameCollection || onRenameFieldBulk) && (
-                <>
-                  <div className="collection-tree__context-header">リネーム</div>
-                  <button
-                    type="button"
-                    className="collection-tree__context-item collection-tree__context-item--indent"
-                    role="menuitem"
-                    disabled={!onRenameCollection}
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      const path = contextMenu.collectionPath
-                      setContextMenu(null)
-                      onRenameCollection?.(path)
-                    }}
-                  >
-                    コレクション
-                  </button>
-                  <button
-                    type="button"
-                    className="collection-tree__context-item collection-tree__context-item--indent"
-                    role="menuitem"
-                    disabled={!onRenameFieldBulk}
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      const path = contextMenu.collectionPath
-                      setContextMenu(null)
-                      onRenameFieldBulk?.(path)
-                    }}
-                  >
-                    フィールド一括
-                  </button>
-                </>
-              )}
+              <div className="collection-tree__context-header">
+                {collectionKindLabel(contextMenu.collectionPath)}
+              </div>
+              <button
+                type="button"
+                className="collection-tree__context-item collection-tree__context-item--indent"
+                role="menuitem"
+                disabled={!onRenameCollection}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  const path = contextMenu.collectionPath
+                  setContextMenu(null)
+                  onRenameCollection?.(path)
+                }}
+              >
+                リネーム
+              </button>
+              <button
+                type="button"
+                className="collection-tree__context-item collection-tree__context-item--indent"
+                role="menuitem"
+                disabled={!onDuplicateCollection}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  const path = contextMenu.collectionPath
+                  setContextMenu(null)
+                  onDuplicateCollection?.(path)
+                }}
+              >
+                複製
+              </button>
+              <button
+                type="button"
+                className="collection-tree__context-item collection-tree__context-item--indent"
+                role="menuitem"
+                disabled={!onDeleteCollection}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  const path = contextMenu.collectionPath
+                  setContextMenu(null)
+                  onDeleteCollection?.(path)
+                }}
+              >
+                削除
+              </button>
+              <div className="collection-tree__context-header">フィールド一括</div>
+              <button
+                type="button"
+                className="collection-tree__context-item collection-tree__context-item--indent"
+                role="menuitem"
+                disabled={!onFieldBulk}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  const path = contextMenu.collectionPath
+                  setContextMenu(null)
+                  onFieldBulk?.(path, 'create')
+                }}
+              >
+                新規
+              </button>
+              <button
+                type="button"
+                className="collection-tree__context-item collection-tree__context-item--indent"
+                role="menuitem"
+                disabled={!onFieldBulk}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  const path = contextMenu.collectionPath
+                  setContextMenu(null)
+                  onFieldBulk?.(path, 'rename')
+                }}
+              >
+                リネーム
+              </button>
+              <button
+                type="button"
+                className="collection-tree__context-item collection-tree__context-item--indent"
+                role="menuitem"
+                disabled={!onFieldBulk}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  const path = contextMenu.collectionPath
+                  setContextMenu(null)
+                  onFieldBulk?.(path, 'delete')
+                }}
+              >
+                削除
+              </button>
             </>
           )}
         </div>

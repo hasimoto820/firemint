@@ -1623,6 +1623,13 @@ code {
   font-size: 12px;
 }
 
+.collection-tree__toggle:focus,
+.collection-tree__toggle:focus-visible,
+.collection-tree__label:focus,
+.collection-tree__label:focus-visible {
+  outline: none;
+}
+
 .collection-tree__toggle {
   width: 20px;
   flex-shrink: 0;

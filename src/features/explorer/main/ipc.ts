@@ -2,6 +2,7 @@ import { ipcMain } from 'electron'
 import { IPC_CHANNELS } from '@shared/ipc/channels'
 import { logInfo } from '@shared/logging/logger'
 import type {
+  CreateCollectionInput,
   CreateDocumentInput,
   CreateSubcollectionInput,
   DeleteCollectionInput,
@@ -11,6 +12,7 @@ import type {
   UpdateDocumentInput
 } from '@features/explorer/shared/types'
 import {
+  createCollection,
   createDocument,
   createSubcollection,
   deleteCollection,
@@ -90,6 +92,14 @@ export function registerExplorerHandlers(): void {
     logInfo('ipc:explorer', `renameCollection invoked projectId=${input.projectId}`)
     return renameCollection(input)
   })
+
+  ipcMain.handle(
+    IPC_CHANNELS.EXPLORER_CREATE_COLLECTION,
+    async (_event, input: CreateCollectionInput) => {
+      logInfo('ipc:explorer', `createCollection invoked projectId=${input.projectId}`)
+      return createCollection(input)
+    }
+  )
 
   ipcMain.handle(
     IPC_CHANNELS.EXPLORER_CREATE_SUBCOLLECTION,

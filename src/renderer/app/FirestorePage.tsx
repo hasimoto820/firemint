@@ -3,16 +3,25 @@ import {
   AutocompleteProvider,
   useAutocompleteApi
 } from '@features/autocomplete/renderer/hooks'
+import type { BulkFieldMode } from '@features/bulk_operations/shared/types'
 import AuthUsersView from '@features/auth_users/renderer/ui/AuthUsersView'
 import type { ConnectionStatus } from '@features/connection/shared/types'
 import { useT } from '@shared/i18n/renderer/I18nProvider'
 import { confirmAction } from '@shared/ui/confirmAction'
+import CollectionCreateDialog from '@features/explorer/renderer/ui/CollectionCreateDialog'
 import CollectionRenameDialog from '@features/explorer/renderer/ui/CollectionRenameDialog'
 import FieldBulkRenameDialog from '@features/explorer/renderer/ui/FieldBulkRenameDialog'
 import SubcollectionCreateDialog from '@features/explorer/renderer/ui/SubcollectionCreateDialog'
 import SubcollectionDeleteDialog from '@features/explorer/renderer/ui/SubcollectionDeleteDialog'
 import ExplorerSidebar from '@features/explorer/renderer/ui/ExplorerSidebar'
-import { parentDocumentPathOfSubcollection } from '@features/explorer/shared/tree'
+import {
+  collectionKindLabel,
+  parentDocumentPathOfSubcollection
+} from '@features/explorer/shared/tree'
+import {
+  runDuplicateCollection,
+  runDuplicateDocument
+} from '@features/explorer/renderer/duplicateCollection'
 import type { ScriptJobSnapshot } from '@features/script_runner/shared/types'
 import {
   applyImpExpIntent,
@@ -92,7 +101,8 @@ function FirestorePageInner({
   const [treeContentReloadToken, setTreeContentReloadToken] = useState(0)
   const [collectionDataReloadToken, setCollectionDataReloadToken] = useState(0)
   const [renameCollectionPath, setRenameCollectionPath] = useState<string | null>(null)
-  const [fieldBulkRenamePath, setFieldBulkRenamePath] = useState<string | null>(null)
+  const [fieldBulk, setFieldBulk] = useState<{ path: string; mode: BulkFieldMode } | null>(null)
+  const [createCollectionOpen, setCreateCollectionOpen] = useState(false)
   const [createSubcollectionDocumentPath, setCreateSubcollectionDocumentPath] = useState<string | null>(
     null
   )
@@ -325,6 +335,251 @@ function FirestorePageInner({
     [openCollection]
   )
 
+  const handleRequestDuplicateDocument = useCallback(
+    async (documentPath: string): Promise<void> => {
+      if (status.readOnly) {
+        return
+      }
+
+      const collectionPath = parentCollectionPath(documentPath)
+      if (!collectionPath) {
+        return
+      }
+
+      openCollection(collectionPath, { selectedDocumentPath: documentPath })
+
+      const outcome = await runDuplicateDocument(projectId, documentPath)
+
+      if (outcome.status === 'canceled') {
+        return
+      }
+
+      if (outcome.status === 'error') {
+        await confirmAction(outcome.error, { confirmLabel: '閉じる' })
+        return
+      }
+
+      const newPath = `${collectionPath}/${outcome.documentId}`
+      setTreeContentReloadToken((token) => token + 1)
+      setCollectionDataReloadToken((token) => token + 1)
+      openCollection(collectionPath, { selectedDocumentPath: newPath })
+    },
+    [openCollection, projectId, status.readOnly]
+  )
+
+  const handleRequestRenameCollection = useCallback(
+    (collectionPath: string): void => {
+      if (status.readOnly) {
+        return
+      }
+
+      openCollection(collectionPath, { selectedDocumentPath: null })
+      setRenameCollectionPath(collectionPath)
+    },
+    [openCollection, status.readOnly]
+  )
+
+  const handleRequestFieldBulk = useCallback(
+    (collectionPath: string, mode: BulkFieldMode): void => {
+      if (status.readOnly) {
+        return
+      }
+
+      openCollection(collectionPath, { selectedDocumentPath: null })
+      setFieldBulk({ path: collectionPath, mode })
+    },
+    [openCollection, status.readOnly]
+  )
+
+  const handleRequestCreateCollection = useCallback((): void => {
+    if (status.readOnly) {
+      return
+    }
+
+    setCreateCollectionOpen(true)
+  }, [status.readOnly])
+
+  const handleRequestCreateSubcollection = useCallback(
+    (documentPath: string): void => {
+      if (status.readOnly) {
+        return
+      }
+
+      const collectionPath = parentCollectionPath(documentPath)
+      if (!collectionPath) {
+        return
+      }
+
+      openCollection(collectionPath, { selectedDocumentPath: documentPath })
+      setCreateSubcollectionDocumentPath(documentPath)
+    },
+    [openCollection, status.readOnly]
+  )
+
+  const handleRequestDuplicateCollection = useCallback(
+    async (collectionPath: string): Promise<void> => {
+      if (status.readOnly) {
+        return
+      }
+
+      openCollection(collectionPath, { selectedDocumentPath: null })
+
+      const outcome = await runDuplicateCollection(projectId, collectionPath)
+
+      if (outcome.status === 'canceled') {
+        return
+      }
+
+      if (outcome.status === 'error') {
+        await confirmAction(outcome.error, { confirmLabel: '閉じる' })
+        return
+      }
+
+      autocomplete.addCollectionPaths(projectId, [outcome.targetCollectionPath])
+      void loadRootCollections()
+      setTreeContentReloadToken((token) => token + 1)
+      openCollection(outcome.targetCollectionPath, { selectedDocumentPath: null })
+    },
+    [autocomplete, loadRootCollections, openCollection, projectId, status.readOnly]
+  )
+
+  const handleRequestDeleteSubcollection = useCallback(
+    (collectionPath: string): void => {
+      if (status.readOnly) {
+        return
+      }
+
+      openCollection(collectionPath, { selectedDocumentPath: null })
+      setDeleteSubcollectionPath(collectionPath)
+    },
+    [openCollection, status.readOnly]
+  )
+
+  const handleSubcollectionCreated = useCallback(
+    (subcollectionPath: string, documentId: string): void => {
+      autocomplete.addCollectionPaths(projectId, [subcollectionPath])
+      setTreeReloadToken((token) => token + 1)
+      openCollection(subcollectionPath, {
+        selectedDocumentPath: `${subcollectionPath}/${documentId}`
+      })
+    },
+    [autocomplete, openCollection, projectId]
+  )
+
+  const handleSubcollectionDeleted = useCallback(
+    (collectionPath: string): void => {
+      autocomplete.removeCollectionPaths(projectId, [collectionPath])
+      const prefix = `${collectionPath}/`
+
+      setTabs((current) => {
+        const filtered = current
+          .filter(
+            (tab) =>
+              isImpExpTab(tab) ||
+              (tab.collectionPath !== collectionPath && !tab.collectionPath.startsWith(prefix))
+          )
+          .map((tab) => ({
+            ...tab,
+            selectedDocumentPath:
+              tab.selectedDocumentPath?.startsWith(prefix) ||
+              tab.selectedDocumentPath === collectionPath
+                ? null
+                : tab.selectedDocumentPath,
+            queryResultSelectedPath: tab.queryResultSelectedPath?.startsWith(prefix)
+              ? null
+              : tab.queryResultSelectedPath
+          }))
+
+        setPrimaryActiveId((active) =>
+          active && filtered.some((tab) => tab.id === active)
+            ? active
+            : (filtered.find((tab) => tab.pane === 'primary')?.id ?? null)
+        )
+        setSecondaryActiveId((active) =>
+          active && filtered.some((tab) => tab.id === active)
+            ? active
+            : (filtered.find((tab) => tab.pane === 'secondary')?.id ?? null)
+        )
+
+        return filtered
+      })
+
+      setTreeReloadToken((token) => token + 1)
+      void loadRootCollections()
+
+      const parentDocument = parentDocumentPathOfSubcollection(collectionPath)
+      if (parentDocument) {
+        openCollection(parentCollectionPath(parentDocument), {
+          selectedDocumentPath: parentDocument
+        })
+      }
+    },
+    [autocomplete, loadRootCollections, openCollection, projectId]
+  )
+
+  const handleCollectionBecameEmpty = useCallback(
+    async (collectionPath: string): Promise<void> => {
+      const segments = collectionPath.split('/').filter(Boolean)
+      const collectionName = segments[segments.length - 1] ?? collectionPath
+      const kindLabel = collectionKindLabel(collectionPath)
+
+      await confirmAction(
+        `ドキュメントが無くなったため、${kindLabel}「${collectionName}」はツリーから外れました`,
+        { confirmLabel: '閉じる' }
+      )
+
+      handleSubcollectionDeleted(collectionPath)
+    },
+    [handleSubcollectionDeleted]
+  )
+
+  const handleRequestDeleteDocument = useCallback(
+    async (documentPath: string): Promise<void> => {
+      if (status.readOnly) {
+        return
+      }
+
+      if (!(await confirmAction('このドキュメントを削除しますか？'))) {
+        return
+      }
+
+      const collectionPath = parentCollectionPath(documentPath)
+      if (!collectionPath) {
+        return
+      }
+
+      const result = await window.api.explorer.deleteDocument(projectId, documentPath)
+
+      if (!result.ok) {
+        await confirmAction(result.error, { confirmLabel: '閉じる' })
+        return
+      }
+
+      const listed = await window.api.explorer.listDocuments(projectId, collectionPath)
+      if (listed.ok && listed.data.length === 0) {
+        await handleCollectionBecameEmpty(collectionPath)
+        return
+      }
+
+      setTreeContentReloadToken((token) => token + 1)
+      setCollectionDataReloadToken((token) => token + 1)
+      openCollection(collectionPath, { selectedDocumentPath: null })
+    },
+    [handleCollectionBecameEmpty, openCollection, projectId, status.readOnly]
+  )
+
+  const handleCollectionCreated = useCallback(
+    (collectionPath: string, documentId: string): void => {
+      autocomplete.addCollectionPaths(projectId, [collectionPath])
+      void loadRootCollections().then(() => {
+        openCollection(collectionPath, {
+          selectedDocumentPath: `${collectionPath}/${documentId}`
+        })
+      })
+    },
+    [autocomplete, loadRootCollections, openCollection, projectId]
+  )
+
   const handleCollectionRenamed = useCallback(
     (sourceCollectionPath: string, targetCollectionPath: string): void => {
       autocomplete.removeCollectionPaths(projectId, [sourceCollectionPath])
@@ -395,126 +650,6 @@ function FirestorePageInner({
     [autocomplete, loadRootCollections, openCollection, projectId]
   )
 
-  const handleRequestRenameCollection = useCallback(
-    (collectionPath: string): void => {
-      if (status.readOnly) {
-        return
-      }
-
-      openCollection(collectionPath, { selectedDocumentPath: null })
-      setRenameCollectionPath(collectionPath)
-    },
-    [openCollection, status.readOnly]
-  )
-
-  const handleRequestFieldBulkRename = useCallback(
-    (collectionPath: string): void => {
-      if (status.readOnly) {
-        return
-      }
-
-      openCollection(collectionPath, { selectedDocumentPath: null })
-      setFieldBulkRenamePath(collectionPath)
-    },
-    [openCollection, status.readOnly]
-  )
-
-  const handleRequestCreateSubcollection = useCallback(
-    (documentPath: string): void => {
-      if (status.readOnly) {
-        return
-      }
-
-      const collectionPath = parentCollectionPath(documentPath)
-      if (!collectionPath) {
-        return
-      }
-
-      openCollection(collectionPath, { selectedDocumentPath: documentPath })
-      setCreateSubcollectionDocumentPath(documentPath)
-    },
-    [openCollection, status.readOnly]
-  )
-
-  const handleRequestDeleteSubcollection = useCallback(
-    (collectionPath: string): void => {
-      if (status.readOnly) {
-        return
-      }
-
-      openCollection(collectionPath, { selectedDocumentPath: null })
-      setDeleteSubcollectionPath(collectionPath)
-    },
-    [openCollection, status.readOnly]
-  )
-
-  const handleSubcollectionCreated = useCallback(
-    (subcollectionPath: string, documentId: string): void => {
-      autocomplete.addCollectionPaths(projectId, [subcollectionPath])
-      setTreeReloadToken((token) => token + 1)
-      openCollection(subcollectionPath, {
-        selectedDocumentPath: `${subcollectionPath}/${documentId}`
-      })
-    },
-    [autocomplete, openCollection, projectId]
-  )
-
-  const handleSubcollectionDeleted = useCallback(
-    (collectionPath: string): void => {
-      autocomplete.removeCollectionPaths(projectId, [collectionPath])
-      const prefix = `${collectionPath}/`
-
-      setTabs((current) => {
-        const filtered = current
-          .filter(
-            (tab) =>
-              isImpExpTab(tab) ||
-              (tab.collectionPath !== collectionPath && !tab.collectionPath.startsWith(prefix))
-          )
-          .map((tab) => ({
-            ...tab,
-            selectedDocumentPath:
-              tab.selectedDocumentPath?.startsWith(prefix) ||
-              tab.selectedDocumentPath === collectionPath
-                ? null
-                : tab.selectedDocumentPath,
-            queryResultSelectedPath: tab.queryResultSelectedPath?.startsWith(prefix)
-              ? null
-              : tab.queryResultSelectedPath
-          }))
-
-        setPrimaryActiveId((active) =>
-          active && filtered.some((tab) => tab.id === active)
-            ? active
-            : (filtered.find((tab) => tab.pane === 'primary')?.id ?? null)
-        )
-        setSecondaryActiveId((active) =>
-          active && filtered.some((tab) => tab.id === active)
-            ? active
-            : (filtered.find((tab) => tab.pane === 'secondary')?.id ?? null)
-        )
-
-        return filtered
-      })
-
-      setTreeReloadToken((token) => token + 1)
-
-      const parentDocument = parentDocumentPathOfSubcollection(collectionPath)
-      if (parentDocument) {
-        openCollection(parentCollectionPath(parentDocument), {
-          selectedDocumentPath: parentDocument
-        })
-      }
-    },
-    [autocomplete, openCollection, projectId]
-  )
-
-  const handleFieldBulkRenameCompleted = useCallback((): void => {
-    setFieldBulkRenamePath(null)
-    setTreeReloadToken((token) => token + 1)
-    setCollectionDataReloadToken((token) => token + 1)
-  }, [])
-
   const handleRenameDialogCompleted = useCallback(
     (targetCollectionPath: string, _movedCount: number): void => {
       if (!renameCollectionPath) {
@@ -526,6 +661,12 @@ function FirestorePageInner({
     },
     [handleCollectionRenamed, renameCollectionPath]
   )
+
+  const handleFieldBulkCompleted = useCallback((): void => {
+    setFieldBulk(null)
+    setTreeReloadToken((token) => token + 1)
+    setCollectionDataReloadToken((token) => token + 1)
+  }, [])
 
   const confirmStopImpExpJob = useCallback(async (): Promise<boolean> => {
     const job = impExpJobRef.current
@@ -902,14 +1043,20 @@ function FirestorePageInner({
           onSelectCollection={(path) => handlePaneCollectionChange(active.id, path)}
           onSelectDocument={(path) => handlePaneDocumentChange(active.id, path)}
           onRootCollectionsChanged={() => void loadRootCollections()}
+          onRequestCreateCollection={handleRequestCreateCollection}
           onRequestRenameCollection={handleRequestRenameCollection}
-          onRequestFieldBulkRename={handleRequestFieldBulkRename}
           onRequestCreateSubcollection={handleRequestCreateSubcollection}
           onRequestDeleteSubcollection={handleRequestDeleteSubcollection}
+          onRequestFieldBulk={(mode) => {
+            if (isCollectionTab(active) && active.collectionPath) {
+              handleRequestFieldBulk(active.collectionPath, mode)
+            }
+          }}
           collectionDataReloadToken={collectionDataReloadToken}
           onCollectionDocumentsChanged={() =>
             setTreeContentReloadToken((token) => token + 1)
           }
+          onCollectionBecameEmpty={(path) => void handleCollectionBecameEmpty(path)}
           onQueryDraftChange={(patch) => updateTab(active.id, patch)}
         />
       ) : (
@@ -942,9 +1089,12 @@ function FirestorePageInner({
             onSelectCollection={handleSelectCollection}
             onSelectDocument={handleSelectDocument}
             onRenameCollection={handleRequestRenameCollection}
-            onRenameFieldBulk={handleRequestFieldBulkRename}
+            onDuplicateCollection={(path) => void handleRequestDuplicateCollection(path)}
+            onDeleteCollection={handleRequestDeleteSubcollection}
+            onFieldBulk={handleRequestFieldBulk}
+            onDuplicateDocument={(path) => void handleRequestDuplicateDocument(path)}
+            onDeleteDocument={(path) => void handleRequestDeleteDocument(path)}
             onCreateSubcollection={handleRequestCreateSubcollection}
-            onDeleteSubcollection={handleRequestDeleteSubcollection}
             canRename={!status.readOnly}
             canManageSubcollections={!status.readOnly}
             onWorkspaceChanged={onWorkspaceChanged}
@@ -986,13 +1136,23 @@ function FirestorePageInner({
         />
       )}
 
-      {fieldBulkRenamePath && (
+      {fieldBulk && (
         <FieldBulkRenameDialog
           projectId={projectId}
-          collectionPath={fieldBulkRenamePath}
+          collectionPath={fieldBulk.path}
+          initialMode={fieldBulk.mode}
           open
-          onClose={() => setFieldBulkRenamePath(null)}
-          onCompleted={handleFieldBulkRenameCompleted}
+          onClose={() => setFieldBulk(null)}
+          onCompleted={handleFieldBulkCompleted}
+        />
+      )}
+
+      {createCollectionOpen && (
+        <CollectionCreateDialog
+          projectId={projectId}
+          open
+          onClose={() => setCreateCollectionOpen(false)}
+          onCreated={handleCollectionCreated}
         />
       )}
 

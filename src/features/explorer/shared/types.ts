@@ -29,12 +29,14 @@ export type DuplicateDocumentInput = {
   projectId: string
   documentPath: string
   targetDocumentId?: string
+  includeSubcollections?: boolean
 }
 
 export type DuplicateCollectionInput = {
   projectId: string
   sourceCollectionPath: string
   targetCollectionPath: string
+  includeSubcollections?: boolean
 }
 
 export type DuplicateCollectionResult = {
@@ -51,6 +53,16 @@ export type RenameCollectionInput = {
 export type RenameCollectionResult = {
   movedCount: number
   targetCollectionPath: string
+}
+
+export type CreateCollectionInput = {
+  projectId: string
+  collectionId: string
+}
+
+export type CreateCollectionResult = {
+  collectionPath: string
+  documentId: string
 }
 
 export type CreateSubcollectionInput = {

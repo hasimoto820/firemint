@@ -3,6 +3,17 @@ export type BulkOperationSummary = {
   batchCount: number
 }
 
+export type BulkFieldWriteResult = BulkOperationSummary & {
+  skippedCount: number
+  collisionPaths: string[]
+}
+
+export type BulkFieldPreview = {
+  items: DiffPreviewItem[]
+  skippedCount: number
+  collisionPaths: string[]
+}
+
 export type BulkResult<T> =
   | {
       ok: true
@@ -25,19 +36,33 @@ export type BulkUpdateFieldInput = {
   value: string
 }
 
-/** コレクション一段の全ドキュメントが対象（サブコレは含まない） */
+export type BulkFieldValueType = 'string' | 'number' | 'boolean' | 'null' | 'timestamp'
+
+export type BulkFieldMode = 'create' | 'rename' | 'delete'
+
+export type BulkCreateFieldInput = {
+  projectId: string
+  collectionPath: string
+  field: string
+  valueType: BulkFieldValueType
+  value: string
+  includeSubcollections?: boolean
+}
+
+/** コレクション一段。includeSubcollections で配下も再帰 */
 export type BulkRenameFieldInput = {
   projectId: string
   collectionPath: string
   fromField: string
   toField: string
+  includeSubcollections?: boolean
 }
 
-/** コレクション一段の全ドキュメントが対象（サブコレは含まない） */
 export type BulkDeleteFieldInput = {
   projectId: string
   collectionPath: string
   field: string
+  includeSubcollections?: boolean
 }
 
 export type DiffPreviewItem = {
@@ -46,3 +71,4 @@ export type DiffPreviewItem = {
   before: unknown
   after: unknown
 }
+

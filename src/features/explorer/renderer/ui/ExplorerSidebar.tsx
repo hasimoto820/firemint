@@ -1,3 +1,4 @@
+import type { BulkFieldMode } from '@features/bulk_operations/shared/types'
 import AuthNavSection from '@features/auth_users/renderer/ui/AuthNavSection'
 import WorkspaceProjectList from '@features/workspace/renderer/ui/WorkspaceProjectList'
 import { useT } from '@shared/i18n/renderer/I18nProvider'
@@ -14,9 +15,12 @@ type ExplorerSidebarProps = {
   onSelectCollection: (collectionPath: string) => void
   onSelectDocument: (documentPath: string) => void
   onRenameCollection?: (collectionPath: string) => void
-  onRenameFieldBulk?: (collectionPath: string) => void
+  onDuplicateCollection?: (collectionPath: string) => void
+  onDeleteCollection?: (collectionPath: string) => void
+  onFieldBulk?: (collectionPath: string, mode: BulkFieldMode) => void
+  onDuplicateDocument?: (documentPath: string) => void
+  onDeleteDocument?: (documentPath: string) => void
   onCreateSubcollection?: (documentPath: string) => void
-  onDeleteSubcollection?: (collectionPath: string) => void
   canRename?: boolean
   canManageSubcollections?: boolean
   onWorkspaceChanged: () => void
@@ -41,9 +45,12 @@ function ExplorerSidebar({
   onSelectCollection,
   onSelectDocument,
   onRenameCollection,
-  onRenameFieldBulk,
+  onDuplicateCollection,
+  onDeleteCollection,
+  onFieldBulk,
+  onDuplicateDocument,
+  onDeleteDocument,
   onCreateSubcollection,
-  onDeleteSubcollection,
   canRename = false,
   canManageSubcollections = false,
   onWorkspaceChanged,
@@ -81,9 +88,12 @@ function ExplorerSidebar({
                 onSelectDocument(documentPath)
               }}
               onRenameCollection={onRenameCollection}
-              onRenameFieldBulk={onRenameFieldBulk}
+              onDuplicateCollection={onDuplicateCollection}
+              onDeleteCollection={onDeleteCollection}
+              onFieldBulk={onFieldBulk}
+              onDuplicateDocument={onDuplicateDocument}
+              onDeleteDocument={onDeleteDocument}
               onCreateSubcollection={onCreateSubcollection}
-              onDeleteSubcollection={onDeleteSubcollection}
               canRename={canRename}
               canManageSubcollections={canManageSubcollections}
               reloadToken={treeReloadToken}

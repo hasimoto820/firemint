@@ -2,8 +2,13 @@ import { useCallback, useEffect, useState } from 'react'
 import { useOptionalAutocompleteApi } from '@features/autocomplete/renderer/hooks'
 import type { ConnectionStatus } from '@features/connection/shared/types'
 import type { ImpExpIntent } from '@features/data_transfer/shared/imp_exp'
+import type { BulkFieldMode } from '@features/bulk_operations/shared/types'
 import type { DocumentSummary } from '@features/explorer/shared/types'
 import { isSubcollectionPath } from '@features/explorer/shared/tree'
+import {
+  runDuplicateCollection,
+  runDuplicateDocument
+} from '@features/explorer/renderer/duplicateCollection'
 import { useI18n } from '@shared/i18n/renderer/I18nProvider'
 import { useRegisterAppMenu } from '@shared/shell/AppMenuContext'
 import { confirmAction } from '@shared/ui/confirmAction'
@@ -19,13 +24,16 @@ type SimpleViewProps = {
   onSelectCollection: (collectionPath: string) => void
   onSelectDocument: (documentPath: string | null) => void
   onRootCollectionsChanged: () => void
+  onRequestCreateCollection: () => void
   onRequestRenameCollection: (collectionPath: string) => void
-  onRequestFieldBulkRename: (collectionPath: string) => void
   onRequestCreateSubcollection: (documentPath: string) => void
   onRequestDeleteSubcollection: (collectionPath: string) => void
+  onRequestFieldBulk?: (mode: BulkFieldMode) => void
   collectionDataReloadToken?: number
   /** ドキュメントの増減後に左ツリーを更新する */
   onCollectionDocumentsChanged?: () => void
+  /** ドキュメント削除などでコレクションが空になった（Firestore 上は消滅） */
+  onCollectionBecameEmpty?: (collectionPath: string) => void
   /** Split 時など、メニュー登録を行うのはフォーカス側のペインのみ */
   menuEnabled?: boolean
   onOpenImpExp?: (intent?: ImpExpIntent) => void
@@ -43,12 +51,14 @@ function SimpleView({
   onSelectCollection,
   onSelectDocument,
   onRootCollectionsChanged,
+  onRequestCreateCollection,
   onRequestRenameCollection,
-  onRequestFieldBulkRename,
   onRequestCreateSubcollection,
   onRequestDeleteSubcollection,
+  onRequestFieldBulk,
   collectionDataReloadToken = 0,
   onCollectionDocumentsChanged,
+  onCollectionBecameEmpty,
   menuEnabled = true,
   onOpenImpExp
 }: SimpleViewProps): React.JSX.Element {
@@ -69,7 +79,7 @@ function SimpleView({
   const [bulkSelectedPaths, setBulkSelectedPaths] = useState<Set<string>>(new Set())
 
   const loadDocuments = useCallback(
-    async (collectionPath: string): Promise<void> => {
+    async (collectionPath: string): Promise<DocumentSummary[] | null> => {
       setLoading(true)
       setError(null)
 
@@ -78,7 +88,7 @@ function SimpleView({
         if (!result.ok) {
           setError(result.error)
           setDocuments([])
-          return
+          return null
         }
 
         setDocuments(result.data)
@@ -87,6 +97,8 @@ function SimpleView({
         if (fields.length > 0) {
           autocomplete.addFieldNames(projectId, fields)
         }
+
+        return result.data
       } finally {
         setLoading(false)
       }
@@ -214,7 +226,12 @@ function SimpleView({
         return
       }
 
-      await loadDocuments(activeCollectionPath)
+      const documentsAfterDelete = await loadDocuments(activeCollectionPath)
+      if (documentsAfterDelete && documentsAfterDelete.length === 0) {
+        onCollectionBecameEmpty?.(activeCollectionPath)
+        return
+      }
+
       onSelectDocument(null)
       onCollectionDocumentsChanged?.()
     } finally {
@@ -232,11 +249,10 @@ function SimpleView({
     setError(null)
 
     try {
-      const parsed = JSON.parse(jsonText) as Record<string, unknown>
       const result = await window.api.explorer.createDocument({
         projectId,
         collectionPath: activeCollectionPath,
-        data: parsed
+        data: {}
       })
 
       if (!result.ok) {
@@ -244,13 +260,11 @@ function SimpleView({
         return
       }
 
-      autocomplete.addFieldNames(projectId, Object.keys(parsed))
-
       await loadDocuments(activeCollectionPath)
       onSelectDocument(`${activeCollectionPath}/${result.data}`)
       onCollectionDocumentsChanged?.()
-    } catch (parseError) {
-      setError(parseError instanceof Error ? parseError.message : 'JSON の形式が正しくありません')
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'ドキュメントの作成に失敗しました')
     } finally {
       setLoading(false)
     }
@@ -284,7 +298,12 @@ function SimpleView({
       return
     }
 
-    await loadDocuments(activeCollectionPath)
+    const documentsAfterDelete = await loadDocuments(activeCollectionPath)
+    if (documentsAfterDelete && documentsAfterDelete.length === 0) {
+      onCollectionBecameEmpty?.(activeCollectionPath)
+      return
+    }
+
     onCollectionDocumentsChanged?.()
   }
 
@@ -293,35 +312,22 @@ function SimpleView({
       return
     }
 
-    const targetDocumentId = window.prompt('複製先ドキュメント ID（空欄で自動生成）', '')
+    const outcome = await runDuplicateDocument(projectId, selectedDocumentPath)
 
-    if (targetDocumentId === null) {
+    if (outcome.status === 'canceled') {
       return
     }
 
-    setLoading(true)
-    setError(null)
-
-    try {
-      const result = await window.api.explorer.duplicateDocument({
-        projectId,
-        documentPath: selectedDocumentPath,
-        targetDocumentId: targetDocumentId.trim() || undefined
-      })
-
-      if (!result.ok) {
-        setError(result.error)
-        return
-      }
-
-      await loadDocuments(activeCollectionPath)
-      const newPath = `${activeCollectionPath}/${result.data}`
-      onSelectDocument(newPath)
-      onCollectionDocumentsChanged?.()
-      setSuccessMessage(`ドキュメントを複製しました: ${newPath}`)
-    } finally {
-      setLoading(false)
+    if (outcome.status === 'error') {
+      setError(outcome.error)
+      return
     }
+
+    await loadDocuments(activeCollectionPath)
+    const newPath = `${activeCollectionPath}/${outcome.documentId}`
+    onSelectDocument(newPath)
+    onCollectionDocumentsChanged?.()
+    setSuccessMessage(`ドキュメントを複製しました: ${newPath}`)
   }
 
   const handleExportCollection = (): void => {
@@ -332,48 +338,51 @@ function SimpleView({
     onOpenImpExp?.({ direction: 'import', target: 'collection' })
   }
 
-  const handleDuplicateCollection = async (): Promise<void> => {
+  const duplicateOpenCollection = async (): Promise<void> => {
     if (!activeCollectionPath) {
       setError('コレクションを選択してください')
       return
     }
 
-    const targetCollectionPath = window.prompt(
-      '複製先コレクション path（空のコレクションである必要があります）',
-      `${activeCollectionPath}_copy`
-    )
+    const outcome = await runDuplicateCollection(projectId, activeCollectionPath)
 
-    if (!targetCollectionPath?.trim()) {
+    if (outcome.status === 'canceled') {
       return
     }
 
-    setLoading(true)
-    setError(null)
-
-    try {
-      const result = await window.api.explorer.duplicateCollection({
-        projectId,
-        sourceCollectionPath: activeCollectionPath,
-        targetCollectionPath: targetCollectionPath.trim()
-      })
-
-      if (!result.ok) {
-        setError(result.error)
-        return
-      }
-
-      onRootCollectionsChanged()
-      onSelectCollection(result.data.targetCollectionPath)
-      setSuccessMessage(
-        `${result.data.copiedCount} 件を ${result.data.targetCollectionPath} に複製しました`
-      )
-    } finally {
-      setLoading(false)
+    if (outcome.status === 'error') {
+      setError(outcome.error)
+      return
     }
+
+    onRootCollectionsChanged()
+    onCollectionDocumentsChanged?.()
+    onSelectCollection(outcome.targetCollectionPath)
+    setSuccessMessage(
+      `${outcome.copiedCount} 件を ${outcome.targetCollectionPath} に複製しました`
+    )
+  }
+
+  const handleDuplicateCollection = async (): Promise<void> => {
+    if (!activeCollectionPath || isSubcollectionPath(activeCollectionPath)) {
+      return
+    }
+
+    await duplicateOpenCollection()
+  }
+
+  const handleCreateCollection = (): void => {
+    if (readOnly) {
+      return
+    }
+
+    setError(null)
+    setSuccessMessage(null)
+    onRequestCreateCollection()
   }
 
   const handleRenameCollection = (): void => {
-    if (!activeCollectionPath || readOnly) {
+    if (!activeCollectionPath || readOnly || isSubcollectionPath(activeCollectionPath)) {
       return
     }
 
@@ -382,14 +391,32 @@ function SimpleView({
     onRequestRenameCollection(activeCollectionPath)
   }
 
-  const handleRenameFieldBulk = (): void => {
-    if (!activeCollectionPath || readOnly) {
+  const handleDeleteCollection = (): void => {
+    if (!activeCollectionPath || readOnly || isSubcollectionPath(activeCollectionPath)) {
       return
     }
 
     setError(null)
     setSuccessMessage(null)
-    onRequestFieldBulkRename(activeCollectionPath)
+    onRequestDeleteSubcollection(activeCollectionPath)
+  }
+
+  const handleRenameSubcollection = (): void => {
+    if (!activeCollectionPath || readOnly || !isSubcollectionPath(activeCollectionPath)) {
+      return
+    }
+
+    setError(null)
+    setSuccessMessage(null)
+    onRequestRenameCollection(activeCollectionPath)
+  }
+
+  const handleDuplicateSubcollection = async (): Promise<void> => {
+    if (!activeCollectionPath || !isSubcollectionPath(activeCollectionPath)) {
+      return
+    }
+
+    await duplicateOpenCollection()
   }
 
   const handleCreateSubcollection = (): void => {
@@ -412,6 +439,10 @@ function SimpleView({
     onRequestDeleteSubcollection(activeCollectionPath)
   }
 
+  const isNestedCollection =
+    activeCollectionPath !== null && isSubcollectionPath(activeCollectionPath)
+  const isRootCollection = Boolean(activeCollectionPath) && !isNestedCollection
+
   useRegisterAppMenu(
     menuEnabled
       ? {
@@ -421,25 +452,34 @@ function SimpleView({
           canDelete: !readOnly && Boolean(selectedDocumentPath),
           canExport: Boolean(activeCollectionPath),
           canImport: Boolean(activeCollectionPath),
-          canDuplicateCollection: !readOnly && Boolean(activeCollectionPath),
-          canRenameCollection: !readOnly && Boolean(activeCollectionPath),
-          canRenameFieldBulk: !readOnly && Boolean(activeCollectionPath),
+          canCreateCollection: !readOnly,
+          canRenameCollection: !readOnly && isRootCollection,
+          canDuplicateCollection: !readOnly && isRootCollection,
+          canDeleteCollection: !readOnly && isRootCollection,
           canCreateSubcollection: !readOnly && Boolean(selectedDocumentPath),
-          canDeleteSubcollection:
-            !readOnly &&
-            activeCollectionPath !== null &&
-            isSubcollectionPath(activeCollectionPath),
+          canRenameSubcollection: !readOnly && isNestedCollection,
+          canDuplicateSubcollection: !readOnly && isNestedCollection,
+          canDeleteSubcollection: !readOnly && isNestedCollection,
+          canCreateFieldBulk: !readOnly && Boolean(activeCollectionPath),
+          canRenameFieldBulk: !readOnly && Boolean(activeCollectionPath),
+          canDeleteFieldBulk: !readOnly && Boolean(activeCollectionPath),
           onCreate: () => void handleCreate(),
           onSave: () => void handleSave(),
           onDuplicate: () => void handleDuplicateDocument(),
           onDelete: () => void handleDelete(),
           onExport: handleExportCollection,
           onImport: handleImportCollection,
-          onDuplicateCollection: () => void handleDuplicateCollection(),
+          onCreateCollection: () => handleCreateCollection(),
           onRenameCollection: () => handleRenameCollection(),
-          onRenameFieldBulk: () => handleRenameFieldBulk(),
+          onDuplicateCollection: () => void handleDuplicateCollection(),
+          onDeleteCollection: () => handleDeleteCollection(),
           onCreateSubcollection: () => handleCreateSubcollection(),
-          onDeleteSubcollection: () => handleDeleteSubcollection()
+          onRenameSubcollection: () => handleRenameSubcollection(),
+          onDuplicateSubcollection: () => void handleDuplicateSubcollection(),
+          onDeleteSubcollection: () => handleDeleteSubcollection(),
+          onCreateFieldBulk: () => onRequestFieldBulk?.('create'),
+          onRenameFieldBulk: () => onRequestFieldBulk?.('rename'),
+          onDeleteFieldBulk: () => onRequestFieldBulk?.('delete')
         }
       : {
           canCreate: false,
@@ -448,13 +488,19 @@ function SimpleView({
           canDelete: false,
           canExport: false,
           canImport: false,
-          canDuplicateCollection: false,
+          canCreateCollection: false,
           canRenameCollection: false,
-          canRenameFieldBulk: false,
+          canDuplicateCollection: false,
+          canDeleteCollection: false,
           canCreateSubcollection: false,
-          canDeleteSubcollection: false
+          canRenameSubcollection: false,
+          canDuplicateSubcollection: false,
+          canDeleteSubcollection: false,
+          canCreateFieldBulk: false,
+          canRenameFieldBulk: false,
+          canDeleteFieldBulk: false
         },
-    [menuEnabled, readOnly, activeCollectionPath, selectedDocumentPath, jsonText, onOpenImpExp]
+    [menuEnabled, readOnly, activeCollectionPath, selectedDocumentPath, jsonText, onOpenImpExp, onRequestFieldBulk]
   )
 
   if (!activeCollectionPath) {

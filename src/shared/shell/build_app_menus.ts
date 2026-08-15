@@ -16,22 +16,34 @@ export type AppMenuContextActions = {
   canDelete: boolean
   canExport: boolean
   canImport: boolean
-  canDuplicateCollection: boolean
+  canCreateCollection: boolean
   canRenameCollection: boolean
-  canRenameFieldBulk: boolean
+  canDuplicateCollection: boolean
+  canDeleteCollection: boolean
   canCreateSubcollection: boolean
+  canRenameSubcollection: boolean
+  canDuplicateSubcollection: boolean
   canDeleteSubcollection: boolean
+  canCreateFieldBulk: boolean
+  canRenameFieldBulk: boolean
+  canDeleteFieldBulk: boolean
   onCreate?: () => void
   onSave?: () => void
   onDuplicate?: () => void
   onDelete?: () => void
   onExport?: () => void
   onImport?: () => void
-  onDuplicateCollection?: () => void
+  onCreateCollection?: () => void
   onRenameCollection?: () => void
-  onRenameFieldBulk?: () => void
+  onDuplicateCollection?: () => void
+  onDeleteCollection?: () => void
   onCreateSubcollection?: () => void
+  onRenameSubcollection?: () => void
+  onDuplicateSubcollection?: () => void
   onDeleteSubcollection?: () => void
+  onCreateFieldBulk?: () => void
+  onRenameFieldBulk?: () => void
+  onDeleteFieldBulk?: () => void
 }
 
 export type AppShellMenuActions = {
@@ -171,6 +183,72 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
       id: 'edit',
       label: t('menu.edit'),
       items: [
+        { type: 'header', label: t('menu.collection') },
+        {
+          type: 'item',
+          id: 'edit-create-collection',
+          label: t('menu.new'),
+          indent: true,
+          disabled: !context?.canCreateCollection,
+          onClick: context?.onCreateCollection
+        },
+        {
+          type: 'item',
+          id: 'edit-rename-collection',
+          label: t('menu.rename'),
+          indent: true,
+          disabled: !context?.canRenameCollection,
+          onClick: context?.onRenameCollection
+        },
+        {
+          type: 'item',
+          id: 'edit-duplicate-collection',
+          label: t('menu.duplicate'),
+          indent: true,
+          disabled: !context?.canDuplicateCollection,
+          onClick: context?.onDuplicateCollection
+        },
+        {
+          type: 'item',
+          id: 'edit-delete-collection',
+          label: t('common.delete'),
+          indent: true,
+          disabled: !context?.canDeleteCollection,
+          onClick: context?.onDeleteCollection
+        },
+        { type: 'header', label: t('menu.subcollection') },
+        {
+          type: 'item',
+          id: 'edit-subcollection-create',
+          label: t('menu.new'),
+          indent: true,
+          disabled: !context?.canCreateSubcollection,
+          onClick: context?.onCreateSubcollection
+        },
+        {
+          type: 'item',
+          id: 'edit-subcollection-rename',
+          label: t('menu.rename'),
+          indent: true,
+          disabled: !context?.canRenameSubcollection,
+          onClick: context?.onRenameSubcollection
+        },
+        {
+          type: 'item',
+          id: 'edit-subcollection-duplicate',
+          label: t('menu.duplicate'),
+          indent: true,
+          disabled: !context?.canDuplicateSubcollection,
+          onClick: context?.onDuplicateSubcollection
+        },
+        {
+          type: 'item',
+          id: 'edit-subcollection-delete',
+          label: t('common.delete'),
+          indent: true,
+          disabled: !context?.canDeleteSubcollection,
+          onClick: context?.onDeleteSubcollection
+        },
         { type: 'header', label: t('menu.documents') },
         {
           type: 'item',
@@ -207,48 +285,30 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
           disabled: !context?.canDelete,
           onClick: context?.onDelete
         },
-        { type: 'header', label: t('menu.collection') },
+        { type: 'header', label: t('menu.rename_field_bulk') },
         {
           type: 'item',
-          id: 'edit-duplicate-collection',
-          label: t('menu.duplicate'),
+          id: 'edit-field-bulk-create',
+          label: t('menu.new'),
           indent: true,
-          disabled: !context?.canDuplicateCollection,
-          onClick: context?.onDuplicateCollection
-        },
-        { type: 'header', label: t('menu.subcollection') },
-        {
-          type: 'item',
-          id: 'edit-subcollection-create',
-          label: t('menu.create'),
-          indent: true,
-          disabled: !context?.canCreateSubcollection,
-          onClick: context?.onCreateSubcollection
+          disabled: !context?.canCreateFieldBulk,
+          onClick: context?.onCreateFieldBulk
         },
         {
           type: 'item',
-          id: 'edit-subcollection-delete',
-          label: t('common.delete'),
-          indent: true,
-          disabled: !context?.canDeleteSubcollection,
-          onClick: context?.onDeleteSubcollection
-        },
-        { type: 'header', label: t('menu.rename') },
-        {
-          type: 'item',
-          id: 'edit-rename-collection',
-          label: t('menu.rename_collection'),
-          indent: true,
-          disabled: !context?.canRenameCollection,
-          onClick: context?.onRenameCollection
-        },
-        {
-          type: 'item',
-          id: 'edit-rename-field-bulk',
-          label: t('menu.rename_field_bulk'),
+          id: 'edit-field-bulk-rename',
+          label: t('menu.rename'),
           indent: true,
           disabled: !context?.canRenameFieldBulk,
           onClick: context?.onRenameFieldBulk
+        },
+        {
+          type: 'item',
+          id: 'edit-field-bulk-delete',
+          label: t('common.delete'),
+          indent: true,
+          disabled: !context?.canDeleteFieldBulk,
+          onClick: context?.onDeleteFieldBulk
         }
       ]
     },
