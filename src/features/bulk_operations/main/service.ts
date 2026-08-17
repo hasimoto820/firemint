@@ -18,6 +18,7 @@ import type {
   BulkRenameFieldInput,
   BulkResult,
   BulkUpdateFieldInput,
+  BulkUpdateFieldValueInput,
   DiffPreviewItem
 } from '@features/bulk_operations/shared/types'
 
@@ -226,6 +227,114 @@ function toWriteResult(affectedCount: number, collisionPaths: string[], skippedC
   }
 }
 
+export async function previewBulkUpdateFieldValue(
+  input: BulkUpdateFieldValueInput
+): Promise<BulkResult<BulkFieldPreview>> {
+  try {
+    ensureConnected(input.projectId)
+
+    const collectionPath = validateCollectionPath(input.collectionPath)
+    const field = validateField(input.field)
+    const parsedValue = parseTypedFieldValue(input.valueType, input.value)
+    const includeSubcollections = input.includeSubcollections === true
+    const previewItems: DiffPreviewItem[] = []
+    let matchedCount = 0
+
+    logInfo(
+      'bulk_operations',
+      `previewBulkUpdateFieldValue projectId=${input.projectId} path=${collectionPath} field=${field} includeSubcollections=${includeSubcollections}`
+    )
+
+    await walkScopedDocuments(
+      input.projectId,
+      collectionPath,
+      includeSubcollections,
+      (documentPath, data) => {
+        matchedCount += 1
+        if (previewItems.length < PREVIEW_LIMIT) {
+          previewItems.push({
+            documentPath,
+            field,
+            before: formatPreviewValue(data[field]),
+            after: formatPreviewValue(parsedValue)
+          })
+        }
+      }
+    )
+
+    if (matchedCount === 0) {
+      throw new Error('対象ドキュメントがありません')
+    }
+
+    return {
+      ok: true,
+      data: { items: previewItems, matchedCount, skippedCount: 0, collisionPaths: [] }
+    }
+  } catch (error) {
+    return toBulkError(error)
+  }
+}
+
+export async function bulkUpdateFieldValue(
+  input: BulkUpdateFieldValueInput
+): Promise<BulkResult<BulkFieldWriteResult>> {
+  try {
+    ensureConnected(input.projectId)
+    ensureWritable(input.projectId)
+
+    const collectionPath = validateCollectionPath(input.collectionPath)
+    const field = validateField(input.field)
+    const parsedValue = parseTypedFieldValue(input.valueType, input.value)
+    const includeSubcollections = input.includeSubcollections === true
+    let pendingPaths: string[] = []
+    let affectedCount = 0
+
+    logInfo(
+      'bulk_operations',
+      `bulkUpdateFieldValue projectId=${input.projectId} path=${collectionPath} field=${field} includeSubcollections=${includeSubcollections}`
+    )
+
+    const flush = async (): Promise<void> => {
+      if (pendingPaths.length === 0) {
+        return
+      }
+
+      const batch = getFirestore(input.projectId).batch()
+
+      for (const documentPath of pendingPaths) {
+        batch.set(
+          getDocumentRef(documentPath, input.projectId),
+          { [field]: parsedValue },
+          { merge: true }
+        )
+      }
+
+      await batch.commit()
+      affectedCount += pendingPaths.length
+      pendingPaths = []
+    }
+
+    await walkScopedDocuments(
+      input.projectId,
+      collectionPath,
+      includeSubcollections,
+      async (documentPath) => {
+        pendingPaths.push(documentPath)
+
+        if (pendingPaths.length >= FIRESTORE_BATCH_LIMIT) {
+          await flush()
+        }
+      }
+    )
+
+    await flush()
+
+    return { ok: true, data: toWriteResult(affectedCount, [], 0) }
+  } catch (error) {
+    return toBulkError(error)
+  }
+}
+
 export async function previewBulkUpdateField(
   input: BulkUpdateFieldInput
 ): Promise<BulkResult<DiffPreviewItem[]>> {
@@ -338,6 +447,7 @@ export async function previewBulkCreateField(
     const previewItems: DiffPreviewItem[] = []
     const collisionPaths: string[] = []
     let skippedCount = 0
+    let matchedCount = 0
 
     logInfo(
       'bulk_operations',
@@ -351,6 +461,7 @@ export async function previewBulkCreateField(
         return
       }
 
+      matchedCount += 1
       if (previewItems.length < PREVIEW_LIMIT) {
         previewItems.push({
           documentPath,
@@ -361,11 +472,11 @@ export async function previewBulkCreateField(
       }
     })
 
-    if (previewItems.length === 0 && skippedCount === 0) {
+    if (matchedCount === 0 && skippedCount === 0) {
       throw new Error('対象ドキュメントがありません')
     }
 
-    return { ok: true, data: { items: previewItems, skippedCount, collisionPaths } }
+    return { ok: true, data: { items: previewItems, matchedCount, skippedCount, collisionPaths } }
   } catch (error) {
     return toBulkError(error)
   }
@@ -452,6 +563,7 @@ export async function previewBulkRenameField(
     const previewItems: DiffPreviewItem[] = []
     const collisionPaths: string[] = []
     let skippedCount = 0
+    let matchedCount = 0
 
     logInfo(
       'bulk_operations',
@@ -469,6 +581,7 @@ export async function previewBulkRenameField(
         return
       }
 
+      matchedCount += 1
       if (previewItems.length < PREVIEW_LIMIT) {
         previewItems.push({
           documentPath,
@@ -479,11 +592,11 @@ export async function previewBulkRenameField(
       }
     })
 
-    if (previewItems.length === 0 && skippedCount === 0) {
+    if (matchedCount === 0 && skippedCount === 0) {
       throw new Error('リネーム対象のフィールドを持つドキュメントがありません')
     }
 
-    return { ok: true, data: { items: previewItems, skippedCount, collisionPaths } }
+    return { ok: true, data: { items: previewItems, matchedCount, skippedCount, collisionPaths } }
   } catch (error) {
     return toBulkError(error)
   }
@@ -573,6 +686,7 @@ export async function previewBulkDeleteField(
     const field = validateField(input.field)
     const includeSubcollections = input.includeSubcollections === true
     const previewItems: DiffPreviewItem[] = []
+    let matchedCount = 0
 
     logInfo(
       'bulk_operations',
@@ -580,23 +694,29 @@ export async function previewBulkDeleteField(
     )
 
     await walkScopedDocuments(input.projectId, collectionPath, includeSubcollections, (documentPath, data) => {
-      if (!(field in data) || previewItems.length >= PREVIEW_LIMIT) {
+      if (!(field in data)) {
         return
       }
 
-      previewItems.push({
-        documentPath,
-        field,
-        before: formatPreviewValue(data[field]),
-        after: null
-      })
+      matchedCount += 1
+      if (previewItems.length < PREVIEW_LIMIT) {
+        previewItems.push({
+          documentPath,
+          field,
+          before: formatPreviewValue(data[field]),
+          after: null
+        })
+      }
     })
 
-    if (previewItems.length === 0) {
+    if (matchedCount === 0) {
       throw new Error('削除対象のフィールドを持つドキュメントがありません')
     }
 
-    return { ok: true, data: { items: previewItems, skippedCount: 0, collisionPaths: [] } }
+    return {
+      ok: true,
+      data: { items: previewItems, matchedCount, skippedCount: 0, collisionPaths: [] }
+    }
   } catch (error) {
     return toBulkError(error)
   }

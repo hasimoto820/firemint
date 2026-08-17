@@ -447,6 +447,11 @@ code {
   font-size: 11px;
 }
 
+.firestore-main .document-table-panel__page-btn {
+  font-size: 11px;
+  padding: 3px 8px;
+}
+
 .firestore-main .document-table-panel__columns {
   padding: 10px;
   border-radius: 6px;
@@ -1657,6 +1662,26 @@ code {
   flex-shrink: 0;
 }
 
+.collection-tree__load-more {
+  border: none;
+  background: transparent;
+  color: var(--ev-c-text-2);
+  font-size: 12px;
+  padding: 2px 4px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.collection-tree__load-more:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.collection-tree__load-more:hover:not(:disabled) {
+  color: var(--ev-c-text-1);
+  text-decoration: underline;
+}
+
 .collection-tree__context-menu {
   position: fixed;
   z-index: 1300;
@@ -2053,6 +2078,73 @@ code {
 .document-table-panel__count {
   margin-left: auto;
   font-size: 12px;
+  color: var(--ev-c-text-2);
+}
+
+.document-table-panel__paging {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.document-table-panel__paging .document-table-panel__count {
+  margin-left: 0;
+}
+
+.document-table-panel__page-btn {
+  min-width: 28px;
+  border: 1px solid var(--ev-c-gray-3, #8b8b8b);
+  background: transparent;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--ev-c-text-1);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
+
+.document-table-panel__page-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.document-table-panel__page-btn:not(:disabled):hover {
+  background: var(--ev-c-gray-1);
+}
+
+.document-table-panel__page-btn--stop {
+  color: var(--color-danger, #c62828);
+  border-color: var(--color-danger, #c62828);
+}
+
+.document-table-panel__page-jump {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 4px;
+}
+
+.document-table-panel__page-jump-label {
+  font-size: 11px;
+  color: var(--ev-c-text-2);
+}
+
+.document-table-panel__page-input {
+  width: 52px;
+  padding: 3px 6px;
+  border: 1px solid var(--ev-c-gray-1);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ev-c-text-1);
+  font-size: 12px;
+}
+
+.document-table-panel__seek-status {
+  font-size: 11px;
   color: var(--ev-c-text-2);
 }
 

@@ -32,6 +32,7 @@ export const zhHans: MessageCatalog = {
   'menu.rename': '重命名',
   'menu.rename_collection': '集合',
   'menu.rename_field_bulk': '字段（批量）',
+  'menu.update_field_value': '改值',
   'menu.close_tab': '关闭标签',
   'menu.close_other_tabs': '关闭其他标签',
   'menu.minimize': '最小化',

@@ -32,6 +32,7 @@ export const ja: MessageCatalog = {
   'menu.rename': 'リネーム',
   'menu.rename_collection': 'コレクション',
   'menu.rename_field_bulk': 'フィールド一括',
+  'menu.update_field_value': '値変更',
   'menu.close_tab': 'タブを閉じる',
   'menu.close_other_tabs': '他のタブを閉じる',
   'menu.minimize': '最小化',

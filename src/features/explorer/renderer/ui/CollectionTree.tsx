@@ -72,14 +72,18 @@ function CollectionTree({
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set())
   const [childrenByPath, setChildrenByPath] = useState<Record<string, TreeNode[]>>({})
   const childrenRef = useRef<Record<string, TreeNode[]>>({})
+  const [hasMoreByPath, setHasMoreByPath] = useState<Record<string, boolean>>({})
+  const nextCursorByPathRef = useRef<Record<string, string | null>>({})
   const [loadingPaths, setLoadingPaths] = useState<Set<string>>(new Set())
   const [error, setError] = useState<string | null>(null)
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
 
   const resetTree = useCallback((): void => {
     childrenRef.current = {}
+    nextCursorByPathRef.current = {}
     setExpandedPaths(new Set())
     setChildrenByPath({})
+    setHasMoreByPath({})
     setLoadingPaths(new Set())
     setError(null)
   }, [])
@@ -118,7 +122,10 @@ function CollectionTree({
           throw new Error(result.error)
         }
 
-        return result.data.map((document) => ({
+        nextCursorByPathRef.current[node.path] = result.data.nextCursor
+        setHasMoreByPath((current) => ({ ...current, [node.path]: result.data.hasMore }))
+
+        return result.data.documents.map((document) => ({
           kind: 'document' as const,
           name: document.id,
           path: document.path
@@ -131,11 +138,66 @@ function CollectionTree({
         throw new Error(result.error)
       }
 
+      delete nextCursorByPathRef.current[node.path]
+      setHasMoreByPath((current) => {
+        if (!(node.path in current)) {
+          return current
+        }
+
+        const next = { ...current }
+        delete next[node.path]
+        return next
+      })
+
       return result.data.map((name) => ({
         kind: 'collection' as const,
         name,
         path: buildSubcollectionPath(node.path, name)
       }))
+    },
+    [projectId]
+  )
+
+  const loadMoreDocuments = useCallback(
+    async (collectionPath: string): Promise<void> => {
+      const startAfterId = nextCursorByPathRef.current[collectionPath]
+      if (!startAfterId) {
+        return
+      }
+
+      setLoadingPaths((current) => new Set(current).add(collectionPath))
+      setError(null)
+
+      try {
+        const result = await window.api.explorer.listDocuments(projectId, collectionPath, {
+          startAfterId
+        })
+
+        if (!result.ok) {
+          throw new Error(result.error)
+        }
+
+        const moreNodes = result.data.documents.map((document) => ({
+          kind: 'document' as const,
+          name: document.id,
+          path: document.path
+        }))
+
+        const existing = childrenRef.current[collectionPath] ?? []
+        const merged = [...existing, ...moreNodes]
+        childrenRef.current[collectionPath] = merged
+        setChildrenByPath((current) => ({ ...current, [collectionPath]: merged }))
+        nextCursorByPathRef.current[collectionPath] = result.data.nextCursor
+        setHasMoreByPath((current) => ({ ...current, [collectionPath]: result.data.hasMore }))
+      } catch (loadError) {
+        setError(loadError instanceof Error ? loadError.message : 'ツリーの読み込みに失敗しました')
+      } finally {
+        setLoadingPaths((current) => {
+          const next = new Set(current)
+          next.delete(collectionPath)
+          return next
+        })
+      }
     },
     [projectId]
   )
@@ -154,7 +216,17 @@ function CollectionTree({
         registerCollectionPaths(children)
       } catch (loadError) {
         delete childrenRef.current[path]
+        delete nextCursorByPathRef.current[path]
         setChildrenByPath((current) => {
+          const next = { ...current }
+          delete next[path]
+          return next
+        })
+        setHasMoreByPath((current) => {
+          if (!(path in current)) {
+            return current
+          }
+
           const next = { ...current }
           delete next[path]
           return next
@@ -418,7 +490,26 @@ function CollectionTree({
           </button>
         </div>
         {isExpanded && children.length > 0 && (
-          <ul className="collection-tree__children">{children.map((child) => renderNode(child))}</ul>
+          <ul className="collection-tree__children">
+            {children.map((child) => renderNode(child))}
+            {node.kind === 'collection' && hasMoreByPath[node.path] && (
+              <li className="collection-tree__branch">
+                <div
+                  className="collection-tree__row"
+                  style={{ paddingLeft: `${8 + (depth + 1) * 14}px` }}
+                >
+                  <button
+                    type="button"
+                    className="collection-tree__load-more"
+                    onClick={() => void loadMoreDocuments(node.path)}
+                    disabled={disabled || isLoading}
+                  >
+                    {isLoading ? '読み込み中…' : 'さらに読み込む'}
+                  </button>
+                </div>
+              </li>
+            )}
+          </ul>
         )}
         {isExpanded && !isLoading && children.length === 0 && (
           <p className="collection-tree__empty" style={{ paddingLeft: `${24 + depth * 14}px` }}>
@@ -559,6 +650,20 @@ function CollectionTree({
                 }}
               >
                 新規
+              </button>
+              <button
+                type="button"
+                className="collection-tree__context-item collection-tree__context-item--indent"
+                role="menuitem"
+                disabled={!onFieldBulk}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  const path = contextMenu.collectionPath
+                  setContextMenu(null)
+                  onFieldBulk?.(path, 'update')
+                }}
+              >
+                値変更
               </button>
               <button
                 type="button"

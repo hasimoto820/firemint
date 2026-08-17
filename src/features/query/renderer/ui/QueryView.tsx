@@ -6,6 +6,7 @@ import {
   buildDefaultJsQuerySource,
   type SavedQuery
 } from '@features/query/shared/types'
+import { useI18n } from '@shared/i18n/renderer/I18nProvider'
 import type { WorkspaceTabQueryDraftPatch } from '@shared/shell/workspace_tab'
 import DocumentJsonPanel from '@shared/ui/DocumentJsonPanel'
 import DocumentTable from '@shared/ui/DocumentTable'
@@ -55,15 +56,16 @@ function QueryView({
   queryResultSelectedPath,
   onQueryDraftChange
 }: QueryViewProps): React.JSX.Element {
+  const { t } = useI18n()
   const projectId = status.projectId
   const readOnly = status.readOnly
   const autocomplete = useOptionalAutocompleteApi()
   const source = querySource ?? buildDefaultJsQuerySource(activeCollectionPath)
   const selectedDocument =
     queryDocuments.find((document) => document.path === queryResultSelectedPath) ?? null
-  const jsonText = selectedDocument
-    ? JSON.stringify(selectedDocument.data, null, 2)
-    : '{\n  \n}'
+  const [jsonText, setJsonText] = useState('{\n  \n}')
+  const [selectedCreateTime, setSelectedCreateTime] = useState<string | null>(null)
+  const [selectedUpdateTime, setSelectedUpdateTime] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [statusMessage, setStatusMessage] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -96,6 +98,14 @@ function QueryView({
   useEffect(() => {
     void refreshSavedQueries()
   }, [refreshSavedQueries])
+
+  useEffect(() => {
+    if (!queryResultSelectedPath) {
+      setJsonText('{\n  \n}')
+      setSelectedCreateTime(null)
+      setSelectedUpdateTime(null)
+    }
+  }, [queryResultSelectedPath])
 
   // タブに未保存の下書きが無いとき、コレクション向け default を一度だけ書き込む
   useEffect(() => {
@@ -184,6 +194,10 @@ function QueryView({
         return
       }
 
+      setJsonText(JSON.stringify(result.data.data, null, 2))
+      setSelectedCreateTime(result.data.createTime)
+      setSelectedUpdateTime(result.data.updateTime)
+
       onQueryDraftChange({
         queryResultSelectedPath: documentPath,
         queryDocuments: queryDocuments.map((document) =>
@@ -197,6 +211,100 @@ function QueryView({
             : document
         )
       })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleSave = async (forceOverwrite = false): Promise<void> => {
+    if (!queryResultSelectedPath || readOnly) {
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+    setStatusMessage(null)
+
+    try {
+      const parsed = JSON.parse(jsonText) as Record<string, unknown>
+      const result = await window.api.explorer.updateDocument({
+        projectId,
+        documentPath: queryResultSelectedPath,
+        data: parsed,
+        expectedUpdateTime: selectedUpdateTime,
+        forceOverwrite
+      })
+
+      if (!result.ok) {
+        if (result.code === 'conflict') {
+          setLoading(false)
+          setError(t('explorer.conflict.message'))
+          const overwrite = await confirmAction(t('explorer.conflict.overwrite_confirm'))
+          if (overwrite) {
+            await handleSave(true)
+            return
+          }
+          const reload = await confirmAction(t('explorer.conflict.reload_confirm'))
+          if (reload) {
+            await handleSelectDocument(queryResultSelectedPath)
+          }
+          return
+        }
+
+        setError(result.error)
+        return
+      }
+
+      autocomplete.addFieldNames(projectId, Object.keys(parsed))
+      await handleSelectDocument(queryResultSelectedPath)
+      setStatusMessage('保存しました')
+    } catch (parseError) {
+      setError(parseError instanceof Error ? parseError.message : 'JSON の形式が正しくありません')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleDelete = async (): Promise<void> => {
+    if (!queryResultSelectedPath || readOnly) {
+      return
+    }
+
+    if (!(await confirmAction('このドキュメントを削除しますか？'))) {
+      return
+    }
+
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur()
+    }
+
+    setLoading(true)
+    setError(null)
+    setStatusMessage(null)
+
+    try {
+      const result = await window.api.explorer.deleteDocument(projectId, queryResultSelectedPath)
+      if (!result.ok) {
+        setError(result.error)
+        return
+      }
+
+      const deletedPath = queryResultSelectedPath
+      const nextDocuments = queryDocuments.filter((document) => document.path !== deletedPath)
+      setBulkSelectedPaths((current) => {
+        const next = new Set(current)
+        next.delete(deletedPath)
+        return next
+      })
+      onQueryDraftChange({
+        queryDocuments: nextDocuments,
+        queryResultCount: nextDocuments.length,
+        queryResultSelectedPath: null
+      })
+      setJsonText('{\n  \n}')
+      setSelectedCreateTime(null)
+      setSelectedUpdateTime(null)
+      setStatusMessage('削除しました')
     } finally {
       setLoading(false)
     }
@@ -387,7 +495,8 @@ function QueryView({
       {loading && <p className="query-main__loading">実行中...</p>}
       {queryResultCount === null && !loading && (
         <p className="query-main__empty-hint">
-          JS を書いて Run（Ctrl+Enter）で結果を表示します。db / admin が使えます。
+          Run で絞り込み → 行を選んで JSON を保存、またはチェックして一括。db / admin
+          が使えます。
         </p>
       )}
       {queryResultCount !== null && (
@@ -424,15 +533,16 @@ function QueryView({
               projectId={projectId}
               documentPath={queryResultSelectedPath}
               jsonText={jsonText}
-              createTime={selectedDocument?.createTime ?? null}
-              updateTime={selectedDocument?.updateTime ?? null}
+              createTime={selectedCreateTime}
+              updateTime={selectedUpdateTime}
               documentData={selectedDocument?.data ?? null}
               loading={loading}
-              onChange={() => undefined}
-              onSave={() => undefined}
-              onDelete={() => undefined}
+              onChange={setJsonText}
+              onSave={() => void handleSave()}
+              onDelete={() => void handleDelete()}
               onCreate={() => undefined}
-              readOnly
+              showCreate={false}
+              readOnly={readOnly}
             />
           </div>
         </>

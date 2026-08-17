@@ -8,10 +8,12 @@ import type {
   DeleteCollectionInput,
   DuplicateCollectionInput,
   DuplicateDocumentInput,
+  ListDocumentsOptions,
   RenameCollectionInput,
   UpdateDocumentInput
 } from '@features/explorer/shared/types'
 import {
+  countDocuments,
   createCollection,
   createDocument,
   createSubcollection,
@@ -35,9 +37,22 @@ export function registerExplorerHandlers(): void {
 
   ipcMain.handle(
     IPC_CHANNELS.EXPLORER_LIST_DOCUMENTS,
-    async (_event, projectId: string, collectionPath: string) => {
+    async (
+      _event,
+      projectId: string,
+      collectionPath: string,
+      options?: ListDocumentsOptions
+    ) => {
       logInfo('ipc:explorer', `listDocuments invoked projectId=${projectId} path=${collectionPath}`)
-      return listDocuments(projectId, collectionPath)
+      return listDocuments(projectId, collectionPath, options)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.EXPLORER_COUNT_DOCUMENTS,
+    async (_event, projectId: string, collectionPath: string) => {
+      logInfo('ipc:explorer', `countDocuments invoked projectId=${projectId} path=${collectionPath}`)
+      return countDocuments(projectId, collectionPath)
     }
   )
 

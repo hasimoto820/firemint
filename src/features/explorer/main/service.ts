@@ -14,6 +14,7 @@ import {
 } from '@shared/firestore/serialize'
 import { logError, logInfo } from '@shared/logging/logger'
 import { ensureWritable } from '@features/workspace/main/guard'
+import { LIST_DOCUMENTS_PAGE_SIZE } from '@features/explorer/shared/types'
 import type {
   CreateCollectionInput,
   CreateCollectionResult,
@@ -28,6 +29,8 @@ import type {
   DuplicateCollectionResult,
   DuplicateDocumentInput,
   ExplorerResult,
+  ListDocumentsOptions,
+  ListDocumentsPage,
   RenameCollectionInput,
   RenameCollectionResult,
   UpdateDocumentInput
@@ -128,16 +131,59 @@ export async function listRootCollections(projectId: string): Promise<ExplorerRe
 
 export async function listDocuments(
   projectId: string,
-  collectionPath: string
-): Promise<ExplorerResult<DocumentSummary[]>> {
+  collectionPath: string,
+  options: ListDocumentsOptions = {}
+): Promise<ExplorerResult<ListDocumentsPage>> {
   try {
     ensureConnected(projectId)
-    logInfo('explorer', `listDocuments projectId=${projectId} path=${collectionPath}`)
-    const snapshot = await getCollectionRef(collectionPath, projectId).limit(200).get()
+    const pageSize = Math.min(
+      Math.max(options.pageSize ?? LIST_DOCUMENTS_PAGE_SIZE, 1),
+      500
+    )
+    const startAfterId = options.startAfterId?.trim() || null
+    logInfo(
+      'explorer',
+      `listDocuments projectId=${projectId} path=${collectionPath} pageSize=${pageSize} startAfterId=${startAfterId ?? '-'}`
+    )
 
-    const documents = snapshot.docs.map((doc) => toDocumentSummaryFromSnapshot(collectionPath, doc))
+    let query = getCollectionRef(collectionPath, projectId)
+      .orderBy('__name__')
+      .limit(pageSize + 1)
 
-    return { ok: true, data: documents }
+    if (startAfterId) {
+      query = query.startAfter(startAfterId)
+    }
+
+    const snapshot = await query.get()
+    const hasMore = snapshot.docs.length > pageSize
+    const pageDocs = hasMore ? snapshot.docs.slice(0, pageSize) : snapshot.docs
+    const documents = pageDocs.map((doc) => toDocumentSummaryFromSnapshot(collectionPath, doc))
+    const nextCursor =
+      hasMore && pageDocs.length > 0 ? pageDocs[pageDocs.length - 1].id : null
+
+    return {
+      ok: true,
+      data: {
+        documents,
+        hasMore,
+        nextCursor,
+        pageSize
+      }
+    }
+  } catch (error) {
+    return toExplorerError(error)
+  }
+}
+
+export async function countDocuments(
+  projectId: string,
+  collectionPath: string
+): Promise<ExplorerResult<number>> {
+  try {
+    ensureConnected(projectId)
+    logInfo('explorer', `countDocuments projectId=${projectId} path=${collectionPath}`)
+    const snapshot = await getCollectionRef(collectionPath, projectId).count().get()
+    return { ok: true, data: snapshot.data().count }
   } catch (error) {
     return toExplorerError(error)
   }

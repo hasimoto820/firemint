@@ -32,6 +32,7 @@ export const zhHant: MessageCatalog = {
   'menu.rename': '重新命名',
   'menu.rename_collection': '集合',
   'menu.rename_field_bulk': '欄位（批次）',
+  'menu.update_field_value': '改值',
   'menu.close_tab': '關閉分頁',
   'menu.close_other_tabs': '關閉其他分頁',
   'menu.minimize': '最小化',

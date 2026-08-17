@@ -556,7 +556,7 @@ function FirestorePageInner({
       }
 
       const listed = await window.api.explorer.listDocuments(projectId, collectionPath)
-      if (listed.ok && listed.data.length === 0) {
+      if (listed.ok && listed.data.documents.length === 0) {
         await handleCollectionBecameEmpty(collectionPath)
         return
       }

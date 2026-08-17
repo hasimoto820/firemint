@@ -52,8 +52,10 @@ function FieldBulkRenameDialog({
   const [fromField, setFromField] = useState('')
   const [toField, setToField] = useState('')
   const [createField, setCreateField] = useState('')
+  const [updateFieldName, setUpdateFieldName] = useState('')
   const [valueType, setValueType] = useState<BulkFieldValueType>('string')
   const [createValue, setCreateValue] = useState('')
+  const [updateValue, setUpdateValue] = useState('')
   const [deleteFieldName, setDeleteFieldName] = useState('')
   const [includeSubcollections, setIncludeSubcollections] = useState(false)
   const [preview, setPreview] = useState<BulkFieldPreview | null>(null)
@@ -71,8 +73,10 @@ function FieldBulkRenameDialog({
     setFromField('')
     setToField('')
     setCreateField('')
+    setUpdateFieldName('')
     setValueType('string')
     setCreateValue('')
+    setUpdateValue('')
     setDeleteFieldName('')
     setIncludeSubcollections(false)
     setPreview(null)
@@ -96,7 +100,7 @@ function FieldBulkRenameDialog({
       }
 
       if (result.ok) {
-        const columns = collectDataColumns(result.data)
+        const columns = collectDataColumns(result.data.documents)
         setFieldCandidates(columns)
         autocomplete.addFieldNames(projectId, columns)
       }
@@ -111,6 +115,9 @@ function FieldBulkRenameDialog({
     setPreview(null)
   }
 
+  const valueForType = (raw: string): string =>
+    valueType === 'boolean' ? raw || 'true' : raw
+
   const handlePreview = async (): Promise<void> => {
     setBusy(true)
     setError(null)
@@ -122,7 +129,27 @@ function FieldBulkRenameDialog({
           collectionPath,
           field: createField,
           valueType,
-          value: valueType === 'boolean' ? createValue || 'true' : createValue,
+          value: valueForType(createValue),
+          includeSubcollections
+        })
+
+        if (!result.ok) {
+          setError(result.error)
+          clearPreview()
+          return
+        }
+
+        setPreview(result.data)
+        return
+      }
+
+      if (mode === 'update') {
+        const result = await window.api.bulk.previewUpdateFieldValue({
+          projectId,
+          collectionPath,
+          field: updateFieldName,
+          valueType,
+          value: valueForType(updateValue),
           includeSubcollections
         })
 
@@ -175,7 +202,7 @@ function FieldBulkRenameDialog({
   }
 
   const handleApply = async (): Promise<void> => {
-    if (!preview || (preview.items.length === 0 && preview.skippedCount === 0)) {
+    if (!preview || (preview.matchedCount === 0 && preview.skippedCount === 0)) {
       setError('先にプレビューを実行してください')
       return
     }
@@ -184,9 +211,11 @@ function FieldBulkRenameDialog({
     const confirmMessage =
       mode === 'create'
         ? `${kindLabel}「${collectionPath}」全体にフィールド「${createField.trim()}」を追加します${scope}。よろしいですか？`
-        : mode === 'rename'
-          ? `${kindLabel}「${collectionPath}」全体でフィールド「${fromField.trim()}」を「${toField.trim()}」にリネームします${scope}。よろしいですか？`
-          : `${kindLabel}「${collectionPath}」全体からフィールド「${deleteFieldName.trim()}」を削除します${scope}。よろしいですか？`
+        : mode === 'update'
+          ? `${kindLabel}「${collectionPath}」全体のフィールド「${updateFieldName.trim()}」の値を変更します${scope}。よろしいですか？`
+          : mode === 'rename'
+            ? `${kindLabel}「${collectionPath}」全体でフィールド「${fromField.trim()}」を「${toField.trim()}」にリネームします${scope}。よろしいですか？`
+            : `${kindLabel}「${collectionPath}」全体からフィールド「${deleteFieldName.trim()}」を削除します${scope}。よろしいですか？`
 
     if (!(await confirmAction(confirmMessage))) {
       return
@@ -198,6 +227,7 @@ function FieldBulkRenameDialog({
     try {
       let result:
         | Awaited<ReturnType<typeof window.api.bulk.createField>>
+        | Awaited<ReturnType<typeof window.api.bulk.updateFieldValue>>
         | Awaited<ReturnType<typeof window.api.bulk.renameField>>
         | Awaited<ReturnType<typeof window.api.bulk.deleteField>>
 
@@ -207,7 +237,16 @@ function FieldBulkRenameDialog({
           collectionPath,
           field: createField,
           valueType,
-          value: valueType === 'boolean' ? createValue || 'true' : createValue,
+          value: valueForType(createValue),
+          includeSubcollections
+        })
+      } else if (mode === 'update') {
+        result = await window.api.bulk.updateFieldValue({
+          projectId,
+          collectionPath,
+          field: updateFieldName,
+          valueType,
+          value: valueForType(updateValue),
           includeSubcollections
         })
       } else if (mode === 'rename') {
@@ -247,14 +286,115 @@ function FieldBulkRenameDialog({
     return null
   }
 
+  const canPreviewValue =
+    valueType === 'null' || Boolean((mode === 'create' ? createValue : updateValue).trim()) || valueType === 'boolean'
+
   const canPreview =
     mode === 'create'
-      ? Boolean(createField.trim()) && (valueType === 'null' || Boolean(createValue.trim()) || valueType === 'boolean')
-      : mode === 'rename'
-        ? Boolean(fromField.trim() && toField.trim())
-        : Boolean(deleteFieldName.trim())
+      ? Boolean(createField.trim()) && canPreviewValue
+      : mode === 'update'
+        ? Boolean(updateFieldName.trim()) && canPreviewValue
+        : mode === 'rename'
+          ? Boolean(fromField.trim() && toField.trim())
+          : Boolean(deleteFieldName.trim())
 
-  const canApply = Boolean(preview && (preview.items.length > 0 || preview.skippedCount > 0))
+  const canApply = Boolean(preview && (preview.matchedCount > 0 || preview.skippedCount > 0))
+
+  const applyLabel =
+    mode === 'create' ? '追加' : mode === 'update' ? '値変更' : mode === 'rename' ? 'リネーム' : '削除'
+
+  const renderValueInputs = (
+    fieldName: string,
+    setFieldName: (value: string) => void,
+    value: string,
+    setValue: (value: string) => void,
+    fieldPlaceholder: string
+  ): React.JSX.Element => (
+    <div className="bulk-actions__update-row">
+      {mode === 'update' ? (
+        <AutocompleteInput
+          className="bulk-actions__field-wrap"
+          fieldClassName="bulk-actions__input"
+          value={fieldName}
+          items={fieldItems}
+          disabled={busy}
+          autoFocus
+          placeholder={fieldPlaceholder}
+          aria-label={fieldPlaceholder}
+          onChange={(nextValue) => {
+            setFieldName(nextValue)
+            clearPreview()
+            setError(null)
+          }}
+        />
+      ) : (
+        <input
+          className="bulk-actions__input"
+          value={fieldName}
+          disabled={busy}
+          autoFocus
+          placeholder={fieldPlaceholder}
+          onChange={(event) => {
+            setFieldName(event.target.value)
+            clearPreview()
+            setError(null)
+          }}
+        />
+      )}
+      <select
+        className="bulk-actions__input"
+        value={valueType}
+        disabled={busy}
+        aria-label="型"
+        onChange={(event) => {
+          const nextType = event.target.value as BulkFieldValueType
+          setValueType(nextType)
+          if (nextType === 'boolean') {
+            setValue('true')
+          } else if (nextType === 'null') {
+            setValue('')
+          }
+          clearPreview()
+          setError(null)
+        }}
+      >
+        {VALUE_TYPES.map((type) => (
+          <option key={type} value={type}>
+            {type}
+          </option>
+        ))}
+      </select>
+      {valueType === 'boolean' ? (
+        <select
+          className="bulk-actions__input"
+          value={value || 'true'}
+          disabled={busy}
+          aria-label="値"
+          onChange={(event) => {
+            setValue(event.target.value)
+            clearPreview()
+            setError(null)
+          }}
+        >
+          <option value="true">true</option>
+          <option value="false">false</option>
+        </select>
+      ) : valueType === 'null' ? null : (
+        <input
+          className="bulk-actions__input"
+          type={valueType === 'number' ? 'number' : valueType === 'timestamp' ? 'datetime-local' : 'text'}
+          value={value}
+          disabled={busy}
+          placeholder="値"
+          onChange={(event) => {
+            setValue(event.target.value)
+            clearPreview()
+            setError(null)
+          }}
+        />
+      )}
+    </div>
+  )
 
   return (
     <div className="project-export-dialog" role="dialog" aria-modal="true">
@@ -263,7 +403,7 @@ function FieldBulkRenameDialog({
         <header className="project-export-dialog__header">
           <h2 className="project-export-dialog__title">フィールド一括</h2>
           <p className="project-export-dialog__lead">
-            {kindLabel} <code>{collectionPath}</code> 全体のフィールドを新規／リネーム／削除します。
+            {kindLabel} <code>{collectionPath}</code> 全体のフィールドを新規／値変更／リネーム／削除します。
           </p>
         </header>
 
@@ -278,6 +418,17 @@ function FieldBulkRenameDialog({
             disabled={busy}
           >
             新規
+          </Button>
+          <Button
+            variant={mode === 'update' ? 'primary' : undefined}
+            onClick={() => {
+              setMode('update')
+              clearPreview()
+              setError(null)
+            }}
+            disabled={busy}
+          >
+            値変更
           </Button>
           <Button
             variant={mode === 'rename' ? 'primary' : undefined}
@@ -317,121 +468,64 @@ function FieldBulkRenameDialog({
           サブコレクションを含む
         </label>
 
-        {mode === 'create' ? (
-          <div className="bulk-actions__update-row">
-            <input
-              className="bulk-actions__input"
-              value={createField}
-              disabled={busy}
-              autoFocus
-              placeholder="フィールド名"
-              onChange={(event) => {
-                setCreateField(event.target.value)
-                clearPreview()
-                setError(null)
-              }}
-            />
-            <select
-              className="bulk-actions__input"
-              value={valueType}
-              disabled={busy}
-              aria-label="型"
-              onChange={(event) => {
-                const nextType = event.target.value as BulkFieldValueType
-                setValueType(nextType)
-                if (nextType === 'boolean') {
-                  setCreateValue('true')
-                } else if (nextType === 'null') {
-                  setCreateValue('')
-                }
-                clearPreview()
-                setError(null)
-              }}
-            >
-              {VALUE_TYPES.map((type) => (
-                <option key={type} value={type}>
-                  {type}
-                </option>
-              ))}
-            </select>
-            {valueType === 'boolean' ? (
-              <select
-                className="bulk-actions__input"
-                value={createValue || 'true'}
-                disabled={busy}
-                aria-label="値"
-                onChange={(event) => {
-                  setCreateValue(event.target.value)
-                  clearPreview()
-                  setError(null)
-                }}
-              >
-                <option value="true">true</option>
-                <option value="false">false</option>
-              </select>
-            ) : valueType === 'null' ? null : (
-              <input
-                className="bulk-actions__input"
-                type={valueType === 'number' ? 'number' : valueType === 'timestamp' ? 'datetime-local' : 'text'}
-                value={createValue}
-                disabled={busy}
-                placeholder="値"
-                onChange={(event) => {
-                  setCreateValue(event.target.value)
-                  clearPreview()
-                  setError(null)
-                }}
-              />
+        {mode === 'create'
+          ? renderValueInputs(createField, setCreateField, createValue, setCreateValue, 'フィールド名')
+          : mode === 'update'
+            ? renderValueInputs(
+                updateFieldName,
+                setUpdateFieldName,
+                updateValue,
+                setUpdateValue,
+                'フィールド名'
+              )
+            : mode === 'rename' ? (
+              <div className="bulk-actions__update-row">
+                <AutocompleteInput
+                  className="bulk-actions__field-wrap"
+                  fieldClassName="bulk-actions__input"
+                  value={fromField}
+                  items={fieldItems}
+                  disabled={busy}
+                  autoFocus
+                  placeholder="旧フィールド名"
+                  aria-label="旧フィールド名"
+                  onChange={(nextValue) => {
+                    setFromField(nextValue)
+                    clearPreview()
+                    setError(null)
+                  }}
+                />
+                <input
+                  className="bulk-actions__input"
+                  value={toField}
+                  disabled={busy}
+                  placeholder="新フィールド名"
+                  onChange={(event) => {
+                    setToField(event.target.value)
+                    clearPreview()
+                    setError(null)
+                  }}
+                />
+              </div>
+            ) : (
+              <div className="bulk-actions__update-row">
+                <AutocompleteInput
+                  className="bulk-actions__field-wrap"
+                  fieldClassName="bulk-actions__input"
+                  value={deleteFieldName}
+                  items={fieldItems}
+                  disabled={busy}
+                  autoFocus
+                  placeholder="削除するフィールド名"
+                  aria-label="削除するフィールド名"
+                  onChange={(nextValue) => {
+                    setDeleteFieldName(nextValue)
+                    clearPreview()
+                    setError(null)
+                  }}
+                />
+              </div>
             )}
-          </div>
-        ) : mode === 'rename' ? (
-          <div className="bulk-actions__update-row">
-            <AutocompleteInput
-              className="bulk-actions__field-wrap"
-              fieldClassName="bulk-actions__input"
-              value={fromField}
-              items={fieldItems}
-              disabled={busy}
-              autoFocus
-              placeholder="旧フィールド名"
-              aria-label="旧フィールド名"
-              onChange={(nextValue) => {
-                setFromField(nextValue)
-                clearPreview()
-                setError(null)
-              }}
-            />
-            <input
-              className="bulk-actions__input"
-              value={toField}
-              disabled={busy}
-              placeholder="新フィールド名"
-              onChange={(event) => {
-                setToField(event.target.value)
-                clearPreview()
-                setError(null)
-              }}
-            />
-          </div>
-        ) : (
-          <div className="bulk-actions__update-row">
-            <AutocompleteInput
-              className="bulk-actions__field-wrap"
-              fieldClassName="bulk-actions__input"
-              value={deleteFieldName}
-              items={fieldItems}
-              disabled={busy}
-              autoFocus
-              placeholder="削除するフィールド名"
-              aria-label="削除するフィールド名"
-              onChange={(nextValue) => {
-                setDeleteFieldName(nextValue)
-                clearPreview()
-                setError(null)
-              }}
-            />
-          </div>
-        )}
 
         {error && <p className="project-export-dialog__error">{error}</p>}
 
@@ -441,7 +535,9 @@ function FieldBulkRenameDialog({
           </p>
         )}
 
-        {preview && preview.items.length > 0 && <DiffPreviewPanel items={preview.items} />}
+        {preview && (preview.items.length > 0 || preview.matchedCount > 0) && (
+          <DiffPreviewPanel items={preview.items} matchedCount={preview.matchedCount} />
+        )}
 
         <div className="project-export-dialog__actions">
           <Button onClick={onClose} disabled={busy}>
@@ -455,7 +551,7 @@ function FieldBulkRenameDialog({
             onClick={() => void handleApply()}
             disabled={busy || !canApply}
           >
-            {busy ? '実行中…' : mode === 'create' ? '追加' : mode === 'rename' ? 'リネーム' : '削除'}
+            {busy ? '実行中…' : applyLabel}
           </Button>
         </div>
       </div>

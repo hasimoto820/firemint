@@ -10,6 +10,8 @@ export type BulkFieldWriteResult = BulkOperationSummary & {
 
 export type BulkFieldPreview = {
   items: DiffPreviewItem[]
+  /** 実際に変更される予定の件数（見本の 50 件とは別） */
+  matchedCount: number
   skippedCount: number
   collisionPaths: string[]
 }
@@ -38,9 +40,19 @@ export type BulkUpdateFieldInput = {
 
 export type BulkFieldValueType = 'string' | 'number' | 'boolean' | 'null' | 'timestamp'
 
-export type BulkFieldMode = 'create' | 'rename' | 'delete'
+export type BulkFieldMode = 'create' | 'update' | 'rename' | 'delete'
 
 export type BulkCreateFieldInput = {
+  projectId: string
+  collectionPath: string
+  field: string
+  valueType: BulkFieldValueType
+  value: string
+  includeSubcollections?: boolean
+}
+
+/** コレクション全体のフィールド値を上書き（無いドキュメントにも付与） */
+export type BulkUpdateFieldValueInput = {
   projectId: string
   collectionPath: string
   field: string

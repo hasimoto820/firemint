@@ -18,12 +18,20 @@ function formatDiffValue(value: unknown): string {
 
 type DiffPreviewPanelProps = {
   items: DiffPreviewItem[]
+  /** 実際の対象件数。未指定時は items.length（チェック一括など） */
+  matchedCount?: number
 }
 
-function DiffPreviewPanel({ items }: DiffPreviewPanelProps): React.JSX.Element {
+function DiffPreviewPanel({ items, matchedCount }: DiffPreviewPanelProps): React.JSX.Element {
+  const targetCount = matchedCount ?? items.length
+  const title =
+    matchedCount !== undefined
+      ? `先頭 ${items.length} 件表示 / 対象 ${targetCount} 件`
+      : `変更内容（${items.length} 件）`
+
   return (
     <div className="diff-preview">
-      <h3 className="diff-preview__title">Diff プレビュー（{items.length} 件）</h3>
+      <h3 className="diff-preview__title">{title}</h3>
       <div className="diff-preview__wrap">
         <table className="diff-preview__table">
           <thead>

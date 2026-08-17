@@ -10,7 +10,8 @@ import type {
   CreateCollectionResult,
   CreateDocumentInput,
   DocumentDetail,
-  DocumentSummary,
+  ListDocumentsOptions,
+  ListDocumentsPage,
   CreateSubcollectionInput,
   CreateSubcollectionResult,
   DeleteCollectionInput,
@@ -42,6 +43,7 @@ import type {
   BulkRenameFieldInput,
   BulkResult,
   BulkUpdateFieldInput,
+  BulkUpdateFieldValueInput,
   DiffPreviewItem
 } from '@features/bulk_operations/shared/types'
 
@@ -148,8 +150,13 @@ export type ExplorerIpcApi = {
   listRootCollections: (projectId: string) => Promise<ExplorerResult<string[]>>
   listDocuments: (
     projectId: string,
+    collectionPath: string,
+    options?: ListDocumentsOptions
+  ) => Promise<ExplorerResult<ListDocumentsPage>>
+  countDocuments: (
+    projectId: string,
     collectionPath: string
-  ) => Promise<ExplorerResult<DocumentSummary[]>>
+  ) => Promise<ExplorerResult<number>>
   getDocument: (projectId: string, documentPath: string) => Promise<ExplorerResult<DocumentDetail>>
   createDocument: (input: CreateDocumentInput) => Promise<ExplorerResult<string>>
   updateDocument: (input: UpdateDocumentInput) => Promise<ExplorerResult<null>>
@@ -185,6 +192,12 @@ export type BulkOperationsIpcApi = {
   updateField: (input: BulkUpdateFieldInput) => Promise<BulkResult<BulkOperationSummary>>
   previewCreateField: (input: BulkCreateFieldInput) => Promise<BulkResult<BulkFieldPreview>>
   createField: (input: BulkCreateFieldInput) => Promise<BulkResult<BulkFieldWriteResult>>
+  previewUpdateFieldValue: (
+    input: BulkUpdateFieldValueInput
+  ) => Promise<BulkResult<BulkFieldPreview>>
+  updateFieldValue: (
+    input: BulkUpdateFieldValueInput
+  ) => Promise<BulkResult<BulkFieldWriteResult>>
   previewRenameField: (input: BulkRenameFieldInput) => Promise<BulkResult<BulkFieldPreview>>
   renameField: (input: BulkRenameFieldInput) => Promise<BulkResult<BulkFieldWriteResult>>
   previewDeleteField: (input: BulkDeleteFieldInput) => Promise<BulkResult<BulkFieldPreview>>

@@ -19,6 +19,8 @@ export type TableFilterOperator =
   | 'contains'
   | 'in'
   | 'array-contains'
+  | 'exists'
+  | 'not-exists'
 
 export type TableFilterClause = {
   id: string
@@ -36,8 +38,26 @@ export const TABLE_FILTER_OPERATORS: { value: TableFilterOperator; label: string
   { value: '>=', label: '>=' },
   { value: 'contains', label: '部分一致' },
   { value: 'in', label: 'in' },
-  { value: 'array-contains', label: 'array contains' }
+  { value: 'array-contains', label: 'array contains' },
+  { value: 'exists', label: '存在する' },
+  { value: 'not-exists', label: '存在しない' }
 ]
+
+export function isUnaryFilterOperator(operator: TableFilterOperator): boolean {
+  return operator === 'exists' || operator === 'not-exists'
+}
+
+export function isFilterClauseActive(clause: TableFilterClause): boolean {
+  if (!clause.field.trim()) {
+    return false
+  }
+
+  if (isUnaryFilterOperator(clause.operator)) {
+    return true
+  }
+
+  return Boolean(clause.value.trim())
+}
 
 export function createEmptyFilterClause(): TableFilterClause {
   return {
@@ -408,6 +428,14 @@ function matchesArrayContains(fieldValue: unknown, rawValue: string): boolean {
   return fieldValue.some((item) => valuesEqual(item, needle))
 }
 
+function documentHasField(document: DocumentSummary, field: string): boolean {
+  if (field === 'id' || field === 'path' || field === 'createTime' || field === 'updateTime') {
+    return true
+  }
+
+  return Object.prototype.hasOwnProperty.call(document.data ?? {}, field)
+}
+
 export function matchesFilterClause(
   document: DocumentSummary,
   clause: TableFilterClause
@@ -415,7 +443,19 @@ export function matchesFilterClause(
   const field = clause.field.trim()
   const value = clause.value.trim()
 
-  if (!field || !value) {
+  if (!field) {
+    return true
+  }
+
+  if (clause.operator === 'exists') {
+    return documentHasField(document, field)
+  }
+
+  if (clause.operator === 'not-exists') {
+    return !documentHasField(document, field)
+  }
+
+  if (!value) {
     return true
   }
 
@@ -470,7 +510,7 @@ export function filterDocuments(
   documents: DocumentSummary[],
   clauses: TableFilterClause[]
 ): DocumentSummary[] {
-  const active = clauses.filter((clause) => clause.field.trim() && clause.value.trim())
+  const active = clauses.filter((clause) => isFilterClauseActive(clause))
 
   if (active.length === 0) {
     return documents

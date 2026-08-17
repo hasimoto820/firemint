@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useOptionalAutocompleteApi } from '@features/autocomplete/renderer/hooks'
 import type { ConnectionStatus } from '@features/connection/shared/types'
 import type { ImpExpIntent } from '@features/data_transfer/shared/imp_exp'
 import type { BulkFieldMode } from '@features/bulk_operations/shared/types'
 import type { DocumentSummary } from '@features/explorer/shared/types'
+import { LIST_DOCUMENTS_PAGE_SIZE } from '@features/explorer/shared/types'
 import { isSubcollectionPath } from '@features/explorer/shared/tree'
 import {
   runDuplicateCollection,
@@ -77,33 +78,106 @@ function SimpleView({
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [bulkSelectedPaths, setBulkSelectedPaths] = useState<Set<string>>(new Set())
+  const [pageIndex, setPageIndex] = useState(0)
+  const [pageSize, setPageSize] = useState(LIST_DOCUMENTS_PAGE_SIZE)
+  const [hasMore, setHasMore] = useState(false)
+  const [totalCount, setTotalCount] = useState<number | null>(null)
+  const [seeking, setSeeking] = useState(false)
+  const [seekStatus, setSeekStatus] = useState<string | null>(null)
+  const pageIndexRef = useRef(0)
+  const hasMoreRef = useRef(false)
+  /** pageStartCursors[i] = ページ i を読むときの startAfterId（0 ページ目は null） */
+  const pageStartCursorsRef = useRef<(string | null)[]>([null])
+  const seekCanceledRef = useRef(false)
 
-  const loadDocuments = useCallback(
-    async (collectionPath: string): Promise<DocumentSummary[] | null> => {
-      setLoading(true)
+  const refreshTotalCount = useCallback(
+    async (collectionPath: string): Promise<void> => {
+      const result = await window.api.explorer.countDocuments(projectId, collectionPath)
+      if (result.ok) {
+        setTotalCount(result.data)
+        return
+      }
+
+      setTotalCount(null)
+    },
+    [projectId]
+  )
+
+  const loadDocumentsPage = useCallback(
+    async (
+      collectionPath: string,
+      targetPage: number,
+      options?: { retainLoading?: boolean }
+    ): Promise<DocumentSummary[] | null> => {
+      if (!options?.retainLoading) {
+        setLoading(true)
+      }
       setError(null)
 
       try {
-        const result = await window.api.explorer.listDocuments(projectId, collectionPath)
-        if (!result.ok) {
-          setError(result.error)
-          setDocuments([])
+        const cursors = pageStartCursorsRef.current
+        if (targetPage > 0 && cursors[targetPage] === undefined) {
+          setError(`ページ ${targetPage + 1} へ進むための位置情報がありません`)
           return null
         }
 
-        setDocuments(result.data)
+        const startAfterId = cursors[targetPage] ?? null
+        const result = await window.api.explorer.listDocuments(projectId, collectionPath, {
+          startAfterId
+        })
+
+        if (!result.ok) {
+          setError(result.error)
+          setDocuments([])
+          setHasMore(false)
+          hasMoreRef.current = false
+          return null
+        }
+
+        const {
+          documents: pageDocs,
+          hasMore: more,
+          nextCursor,
+          pageSize: size
+        } = result.data
+
+        const nextCursors = cursors.slice(0, targetPage + 1)
+        if (more && nextCursor) {
+          nextCursors[targetPage + 1] = nextCursor
+        }
+        pageStartCursorsRef.current = nextCursors
+        pageIndexRef.current = targetPage
+        hasMoreRef.current = more
+
+        setDocuments(pageDocs)
+        setHasMore(more)
+        setPageSize(size)
+        setPageIndex(targetPage)
         setBulkSelectedPaths(new Set())
-        const fields = collectDataColumns(result.data)
+
+        const fields = collectDataColumns(pageDocs)
         if (fields.length > 0) {
           autocomplete.addFieldNames(projectId, fields)
         }
 
-        return result.data
+        return pageDocs
       } finally {
-        setLoading(false)
+        if (!options?.retainLoading) {
+          setLoading(false)
+        }
       }
     },
     [autocomplete, projectId]
+  )
+
+  const resetAndLoadFirstPage = useCallback(
+    async (collectionPath: string): Promise<DocumentSummary[] | null> => {
+      pageStartCursorsRef.current = [null]
+      pageIndexRef.current = 0
+      void refreshTotalCount(collectionPath)
+      return loadDocumentsPage(collectionPath, 0)
+    },
+    [loadDocumentsPage, refreshTotalCount]
   )
 
   const loadDocument = useCallback(
@@ -134,11 +208,16 @@ function SimpleView({
     if (!activeCollectionPath) {
       setDocuments([])
       setBulkSelectedPaths(new Set())
+      setPageIndex(0)
+      setHasMore(false)
+      setTotalCount(null)
+      pageStartCursorsRef.current = [null]
+      pageIndexRef.current = 0
       return
     }
 
-    void loadDocuments(activeCollectionPath)
-  }, [activeCollectionPath, collectionDataReloadToken, loadDocuments])
+    void resetAndLoadFirstPage(activeCollectionPath)
+  }, [activeCollectionPath, collectionDataReloadToken, resetAndLoadFirstPage])
 
   useEffect(() => {
     if (!selectedDocumentPath) {
@@ -193,7 +272,7 @@ function SimpleView({
       autocomplete.addFieldNames(projectId, Object.keys(parsed))
 
       if (activeCollectionPath) {
-        await loadDocuments(activeCollectionPath)
+        await loadDocumentsPage(activeCollectionPath, pageIndexRef.current)
         await loadDocument(selectedDocumentPath)
       }
     } catch (parseError) {
@@ -226,12 +305,24 @@ function SimpleView({
         return
       }
 
-      const documentsAfterDelete = await loadDocuments(activeCollectionPath)
+      const documentsAfterDelete = await loadDocumentsPage(
+        activeCollectionPath,
+        pageIndexRef.current
+      )
       if (documentsAfterDelete && documentsAfterDelete.length === 0) {
+        if (pageIndexRef.current > 0) {
+          await loadDocumentsPage(activeCollectionPath, pageIndexRef.current - 1)
+          void refreshTotalCount(activeCollectionPath)
+          onSelectDocument(null)
+          onCollectionDocumentsChanged?.()
+          return
+        }
+
         onCollectionBecameEmpty?.(activeCollectionPath)
         return
       }
 
+      void refreshTotalCount(activeCollectionPath)
       onSelectDocument(null)
       onCollectionDocumentsChanged?.()
     } finally {
@@ -260,7 +351,8 @@ function SimpleView({
         return
       }
 
-      await loadDocuments(activeCollectionPath)
+      await loadDocumentsPage(activeCollectionPath, pageIndexRef.current)
+      void refreshTotalCount(activeCollectionPath)
       onSelectDocument(`${activeCollectionPath}/${result.data}`)
       onCollectionDocumentsChanged?.()
     } catch (error) {
@@ -298,14 +390,180 @@ function SimpleView({
       return
     }
 
-    const documentsAfterDelete = await loadDocuments(activeCollectionPath)
+    const documentsAfterDelete = await loadDocumentsPage(
+      activeCollectionPath,
+      pageIndexRef.current
+    )
     if (documentsAfterDelete && documentsAfterDelete.length === 0) {
+      if (pageIndexRef.current > 0) {
+        await loadDocumentsPage(activeCollectionPath, pageIndexRef.current - 1)
+        void refreshTotalCount(activeCollectionPath)
+        onCollectionDocumentsChanged?.()
+        return
+      }
+
       onCollectionBecameEmpty?.(activeCollectionPath)
       return
     }
 
+    void refreshTotalCount(activeCollectionPath)
     onCollectionDocumentsChanged?.()
   }
+
+  const handleFirstPage = (): void => {
+    if (!activeCollectionPath || pageIndex <= 0 || loading || seeking) {
+      return
+    }
+
+    void loadDocumentsPage(activeCollectionPath, 0)
+  }
+
+  const handlePrevPage = (): void => {
+    if (!activeCollectionPath || pageIndex <= 0 || loading || seeking) {
+      return
+    }
+
+    void loadDocumentsPage(activeCollectionPath, pageIndex - 1)
+  }
+
+  const handleNextPage = (): void => {
+    if (!activeCollectionPath || !hasMore || loading || seeking) {
+      return
+    }
+
+    void loadDocumentsPage(activeCollectionPath, pageIndex + 1)
+  }
+
+  const handleCancelSeek = (): void => {
+    seekCanceledRef.current = true
+  }
+
+  const runSeek = async (
+    collectionPath: string,
+    options: {
+      targetPage?: number
+      toLast?: boolean
+      label: string
+    }
+  ): Promise<void> => {
+    seekCanceledRef.current = false
+    setSeeking(true)
+    setLoading(true)
+    setError(null)
+
+    try {
+      let walkPage = pageStartCursorsRef.current.length - 1
+      if (walkPage < 0) {
+        walkPage = 0
+      }
+
+      while (true) {
+        if (seekCanceledRef.current) {
+          setSeekStatus('停止しました')
+          return
+        }
+
+        if (options.toLast) {
+          setSeekStatus(`最終ページへ…（${walkPage + 1}）`)
+        } else if (options.targetPage !== undefined) {
+          if (walkPage >= options.targetPage) {
+            break
+          }
+          setSeekStatus(`${walkPage + 1} → ${options.label}…`)
+        }
+
+        const docs = await loadDocumentsPage(collectionPath, walkPage, {
+          retainLoading: true
+        })
+
+        if (!docs) {
+          return
+        }
+
+        if (!hasMoreRef.current) {
+          if (options.toLast) {
+            setSeekStatus(null)
+            return
+          }
+
+          if (options.targetPage !== undefined && walkPage < options.targetPage) {
+            setError(`ページ ${options.label} はありません（最終は ${walkPage + 1} ページ）`)
+          }
+          setSeekStatus(null)
+          return
+        }
+
+        walkPage += 1
+
+        if (options.targetPage !== undefined && walkPage >= options.targetPage) {
+          break
+        }
+      }
+
+      if (seekCanceledRef.current) {
+        setSeekStatus('停止しました')
+        return
+      }
+
+      if (options.targetPage !== undefined) {
+        setSeekStatus(`${options.label} を表示…`)
+        await loadDocumentsPage(collectionPath, options.targetPage, { retainLoading: true })
+      }
+
+      setSeekStatus(null)
+    } finally {
+      setSeeking(false)
+      setLoading(false)
+    }
+  }
+
+  const handleGoToPage = (pageNumber1Based: number): void => {
+    if (!activeCollectionPath || loading || seeking) {
+      return
+    }
+
+    const targetPage = pageNumber1Based - 1
+    if (targetPage < 0) {
+      return
+    }
+
+    if (targetPage === pageIndexRef.current) {
+      return
+    }
+
+    const knownLast = pageStartCursorsRef.current.length - 1
+    if (targetPage <= knownLast) {
+      void loadDocumentsPage(activeCollectionPath, targetPage)
+      return
+    }
+
+    void runSeek(activeCollectionPath, {
+      targetPage,
+      label: `${pageNumber1Based} ページ`
+    })
+  }
+
+  const handleLastPage = (): void => {
+    if (!activeCollectionPath || !hasMore || loading || seeking) {
+      return
+    }
+
+    void runSeek(activeCollectionPath, {
+      toLast: true,
+      label: '最終ページ'
+    })
+  }
+
+  const rangeFrom = documents.length === 0 ? 0 : pageIndex * pageSize + 1
+  const rangeTo = pageIndex * pageSize + documents.length
+  const rangeLabel =
+    documents.length === 0
+      ? totalCount === null
+        ? '0 件'
+        : `0 / ${totalCount} 件`
+      : totalCount === null
+        ? `${rangeFrom}–${rangeTo} 件`
+        : `${rangeFrom}–${rangeTo} / ${totalCount} 件`
 
   const handleDuplicateDocument = async (): Promise<void> => {
     if (!selectedDocumentPath || !activeCollectionPath) {
@@ -323,7 +581,8 @@ function SimpleView({
       return
     }
 
-    await loadDocuments(activeCollectionPath)
+    await loadDocumentsPage(activeCollectionPath, pageIndexRef.current)
+    void refreshTotalCount(activeCollectionPath)
     const newPath = `${activeCollectionPath}/${outcome.documentId}`
     onSelectDocument(newPath)
     onCollectionDocumentsChanged?.()
@@ -461,6 +720,7 @@ function SimpleView({
           canDuplicateSubcollection: !readOnly && isNestedCollection,
           canDeleteSubcollection: !readOnly && isNestedCollection,
           canCreateFieldBulk: !readOnly && Boolean(activeCollectionPath),
+          canUpdateFieldBulk: !readOnly && Boolean(activeCollectionPath),
           canRenameFieldBulk: !readOnly && Boolean(activeCollectionPath),
           canDeleteFieldBulk: !readOnly && Boolean(activeCollectionPath),
           onCreate: () => void handleCreate(),
@@ -478,6 +738,7 @@ function SimpleView({
           onDuplicateSubcollection: () => void handleDuplicateSubcollection(),
           onDeleteSubcollection: () => handleDeleteSubcollection(),
           onCreateFieldBulk: () => onRequestFieldBulk?.('create'),
+          onUpdateFieldBulk: () => onRequestFieldBulk?.('update'),
           onRenameFieldBulk: () => onRequestFieldBulk?.('rename'),
           onDeleteFieldBulk: () => onRequestFieldBulk?.('delete')
         }
@@ -497,6 +758,7 @@ function SimpleView({
           canDuplicateSubcollection: false,
           canDeleteSubcollection: false,
           canCreateFieldBulk: false,
+          canUpdateFieldBulk: false,
           canRenameFieldBulk: false,
           canDeleteFieldBulk: false
         },
@@ -535,6 +797,22 @@ function SimpleView({
           onBulkToggle={handleBulkToggle}
           onBulkToggleAll={handleBulkToggleAll}
           onSelectDocument={(path) => onSelectDocument(path)}
+          paging={{
+            rangeLabel,
+            hasPrev: pageIndex > 0,
+            hasNext: hasMore,
+            hasLast: hasMore,
+            disabled: loading,
+            pageNumber: pageIndex + 1,
+            seeking,
+            seekStatus,
+            onFirst: handleFirstPage,
+            onPrev: handlePrevPage,
+            onNext: handleNextPage,
+            onLast: handleLastPage,
+            onGoToPage: handleGoToPage,
+            onCancelSeek: handleCancelSeek
+          }}
         />
         {!readOnly && (
           <BulkActionsPanel

@@ -30,6 +30,7 @@ export const en: Record<string, string> = {
   'menu.rename': 'Rename',
   'menu.rename_collection': 'Collection',
   'menu.rename_field_bulk': 'Fields (bulk)',
+  'menu.update_field_value': 'Update value',
   'menu.close_tab': 'Close tab',
   'menu.close_other_tabs': 'Close other tabs',
   'menu.minimize': 'Minimize',

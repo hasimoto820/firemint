@@ -7,6 +7,8 @@ import {
   createEmptyFilterClause,
   filterDocuments,
   getCellText,
+  isFilterClauseActive,
+  isUnaryFilterOperator,
   mergeColumnOrder,
   moveColumn,
   sortDocuments,
@@ -15,6 +17,26 @@ import {
   type TableFilterClause,
   type TableFilterOperator
 } from './document_table_utils'
+
+type DocumentTablePaging = {
+  rangeLabel: string
+  hasPrev: boolean
+  hasNext: boolean
+  /** 末尾ページへ進めるか（続きがあるとき true。最終ページでは false） */
+  hasLast?: boolean
+  disabled?: boolean
+  /** 1 始まりの現在ページ */
+  pageNumber: number
+  seeking?: boolean
+  seekStatus?: string | null
+  onFirst: () => void
+  onPrev: () => void
+  onNext: () => void
+  onLast: () => void
+  /** 1 始まりのページ番号へ移動 */
+  onGoToPage: (pageNumber: number) => void
+  onCancelSeek?: () => void
+}
 
 type DocumentTableProps = {
   documents: DocumentSummary[]
@@ -27,6 +49,7 @@ type DocumentTableProps = {
   onBulkToggleAll?: (checked: boolean) => void
   tableKey?: string
   projectId?: string
+  paging?: DocumentTablePaging
 }
 
 function filterValuePlaceholder(operator: TableFilterOperator): string {
@@ -37,12 +60,129 @@ function filterValuePlaceholder(operator: TableFilterOperator): string {
       return '配列内の1値（例: beta）'
     case 'contains':
       return '部分一致する文字列'
+    case 'exists':
+    case 'not-exists':
+      return '（不要）'
     default:
       return '値を入力'
   }
 }
 
 const MAX_FILTER_CLAUSES = 5
+
+function DocumentTablePagingControls({
+  paging,
+  countLabel
+}: {
+  paging: DocumentTablePaging
+  countLabel: string
+}): React.JSX.Element {
+  const [pageInput, setPageInput] = useState(String(paging.pageNumber))
+
+  useEffect(() => {
+    setPageInput(String(paging.pageNumber))
+  }, [paging.pageNumber])
+
+  const submitGoToPage = (): void => {
+    const parsed = Number.parseInt(pageInput.trim(), 10)
+    if (!Number.isFinite(parsed) || parsed < 1) {
+      setPageInput(String(paging.pageNumber))
+      return
+    }
+
+    paging.onGoToPage(parsed)
+  }
+
+  const navDisabled = Boolean(paging.disabled || paging.seeking)
+
+  return (
+    <div className="document-table-panel__paging">
+      <button
+        type="button"
+        className="document-table-panel__page-btn"
+        onClick={paging.onFirst}
+        disabled={navDisabled || !paging.hasPrev}
+        aria-label="最初のページ"
+        title="最初"
+      >
+        «
+      </button>
+      <button
+        type="button"
+        className="document-table-panel__page-btn"
+        onClick={paging.onPrev}
+        disabled={navDisabled || !paging.hasPrev}
+        aria-label="前のページ"
+        title="前へ"
+      >
+        ‹
+      </button>
+      <span className="document-table-panel__count">{countLabel}</span>
+      <button
+        type="button"
+        className="document-table-panel__page-btn"
+        onClick={paging.onNext}
+        disabled={navDisabled || !paging.hasNext}
+        aria-label="次のページ"
+        title="次へ"
+      >
+        ›
+      </button>
+      <button
+        type="button"
+        className="document-table-panel__page-btn"
+        onClick={paging.onLast}
+        disabled={navDisabled || !paging.hasLast || !paging.onLast}
+        aria-label="最後のページ"
+        title="最後"
+      >
+        »
+      </button>
+      <label className="document-table-panel__page-jump">
+        <span className="document-table-panel__page-jump-label">ページ</span>
+        <input
+          className="document-table-panel__page-input"
+          type="number"
+          min={1}
+          inputMode="numeric"
+          value={pageInput}
+          disabled={navDisabled}
+          aria-label="ページ番号"
+          onChange={(event) => setPageInput(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              event.preventDefault()
+              submitGoToPage()
+            }
+          }}
+        />
+        <button
+          type="button"
+          className="document-table-panel__page-btn"
+          onClick={submitGoToPage}
+          disabled={navDisabled}
+        >
+          移動
+        </button>
+      </label>
+      {paging.seeking && (
+        <>
+          {paging.seekStatus && (
+            <span className="document-table-panel__seek-status">{paging.seekStatus}</span>
+          )}
+          <button
+            type="button"
+            className="document-table-panel__page-btn document-table-panel__page-btn--stop"
+            onClick={paging.onCancelSeek}
+            disabled={!paging.onCancelSeek}
+          >
+            停止
+          </button>
+        </>
+      )}
+    </div>
+  )
+}
 
 function nextSortState(current: SortState, column: string): SortState {
   if (!current || current.column !== column) {
@@ -74,7 +214,8 @@ function DocumentTable({
   onBulkToggle,
   onBulkToggleAll,
   tableKey,
-  projectId = ''
+  projectId = '',
+  paging
 }: DocumentTableProps): React.JSX.Element {
   const [columnOrder, setColumnOrder] = useState<string[]>([])
   const [hiddenColumns, setHiddenColumns] = useState<Set<string>>(new Set())
@@ -154,7 +295,11 @@ function DocumentTable({
     return (
       <div className="document-table-panel">
         <div className="document-table-panel__toolbar">
-          <span className="document-table-panel__count">0 件</span>
+          {paging ? (
+            <DocumentTablePagingControls paging={paging} countLabel={paging.rangeLabel} />
+          ) : (
+            <span className="document-table-panel__count">0 件</span>
+          )}
         </div>
         <p className="document-table__empty">ドキュメントがありません</p>
       </div>
@@ -175,9 +320,21 @@ function DocumentTable({
         >
           + フィルタ
         </button>
-        <span className="document-table-panel__count">
-          {displayedDocuments.length} / {documents.length} 件
-        </span>
+        {paging ? (
+          <DocumentTablePagingControls
+            paging={paging}
+            countLabel={
+              filterClauses.some((clause) => isFilterClauseActive(clause)) &&
+              displayedDocuments.length !== documents.length
+                ? `このページ ${displayedDocuments.length}/${documents.length} · ${paging.rangeLabel}`
+                : paging.rangeLabel
+            }
+          />
+        ) : (
+          <span className="document-table-panel__count">
+            {displayedDocuments.length} / {documents.length} 件
+          </span>
+        )}
       </div>
 
       <div className="document-filter-bar">
@@ -210,10 +367,11 @@ function DocumentTable({
             </select>
             <input
               className="document-filter-bar__value"
-              value={clause.value}
+              value={isUnaryFilterOperator(clause.operator) ? '' : clause.value}
               onChange={(event) => updateFilterClause(clause.id, { value: event.target.value })}
               placeholder={filterValuePlaceholder(clause.operator)}
               aria-label="フィルタ値"
+              disabled={isUnaryFilterOperator(clause.operator)}
             />
             <button
               type="button"

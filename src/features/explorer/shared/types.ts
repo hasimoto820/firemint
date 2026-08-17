@@ -8,6 +8,23 @@ export type DocumentSummary = {
 
 export type DocumentDetail = DocumentSummary
 
+/** Simple / ツリーの 1 ページ件数。総数は取らない */
+export const LIST_DOCUMENTS_PAGE_SIZE = 200
+
+export type ListDocumentsOptions = {
+  pageSize?: number
+  /** このドキュメント ID の次から（`orderBy(__name__)`） */
+  startAfterId?: string | null
+}
+
+export type ListDocumentsPage = {
+  documents: DocumentSummary[]
+  hasMore: boolean
+  /** 次ページ用。hasMore のとき最後のドキュメント ID */
+  nextCursor: string | null
+  pageSize: number
+}
+
 export type CreateDocumentInput = {
   projectId: string
   collectionPath: string

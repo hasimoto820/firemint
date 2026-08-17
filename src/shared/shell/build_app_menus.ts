@@ -25,6 +25,7 @@ export type AppMenuContextActions = {
   canDuplicateSubcollection: boolean
   canDeleteSubcollection: boolean
   canCreateFieldBulk: boolean
+  canUpdateFieldBulk: boolean
   canRenameFieldBulk: boolean
   canDeleteFieldBulk: boolean
   onCreate?: () => void
@@ -42,6 +43,7 @@ export type AppMenuContextActions = {
   onDuplicateSubcollection?: () => void
   onDeleteSubcollection?: () => void
   onCreateFieldBulk?: () => void
+  onUpdateFieldBulk?: () => void
   onRenameFieldBulk?: () => void
   onDeleteFieldBulk?: () => void
 }
@@ -293,6 +295,14 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
           indent: true,
           disabled: !context?.canCreateFieldBulk,
           onClick: context?.onCreateFieldBulk
+        },
+        {
+          type: 'item',
+          id: 'edit-field-bulk-update',
+          label: t('menu.update_field_value'),
+          indent: true,
+          disabled: !context?.canUpdateFieldBulk,
+          onClick: context?.onUpdateFieldBulk
         },
         {
           type: 'item',

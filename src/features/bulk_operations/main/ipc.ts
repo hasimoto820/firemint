@@ -6,7 +6,8 @@ import type {
   BulkDeleteFieldInput,
   BulkDeleteInput,
   BulkRenameFieldInput,
-  BulkUpdateFieldInput
+  BulkUpdateFieldInput,
+  BulkUpdateFieldValueInput
 } from '@features/bulk_operations/shared/types'
 import {
   bulkCreateField,
@@ -14,10 +15,12 @@ import {
   bulkDeleteField,
   bulkRenameField,
   bulkUpdateField,
+  bulkUpdateFieldValue,
   previewBulkCreateField,
   previewBulkDeleteField,
   previewBulkRenameField,
-  previewBulkUpdateField
+  previewBulkUpdateField,
+  previewBulkUpdateFieldValue
 } from './service'
 
 export function registerBulkOperationsHandlers(): void {
@@ -43,6 +46,22 @@ export function registerBulkOperationsHandlers(): void {
     logInfo('ipc:bulk_operations', `createField invoked path=${input.collectionPath}`)
     return bulkCreateField(input)
   })
+
+  ipcMain.handle(
+    IPC_CHANNELS.BULK_PREVIEW_UPDATE_FIELD_VALUE,
+    async (_event, input: BulkUpdateFieldValueInput) => {
+      logInfo('ipc:bulk_operations', `previewUpdateFieldValue invoked path=${input.collectionPath}`)
+      return previewBulkUpdateFieldValue(input)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.BULK_UPDATE_FIELD_VALUE,
+    async (_event, input: BulkUpdateFieldValueInput) => {
+      logInfo('ipc:bulk_operations', `updateFieldValue invoked path=${input.collectionPath}`)
+      return bulkUpdateFieldValue(input)
+    }
+  )
 
   ipcMain.handle(
     IPC_CHANNELS.BULK_PREVIEW_RENAME_FIELD,

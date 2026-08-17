@@ -47,8 +47,10 @@ const api: IpcApi = {
   explorer: {
     listRootCollections: (projectId: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.EXPLORER_LIST_ROOT_COLLECTIONS, projectId),
-    listDocuments: (projectId: string, collectionPath: string) =>
-      ipcRenderer.invoke(IPC_CHANNELS.EXPLORER_LIST_DOCUMENTS, projectId, collectionPath),
+    listDocuments: (projectId: string, collectionPath: string, options?) =>
+      ipcRenderer.invoke(IPC_CHANNELS.EXPLORER_LIST_DOCUMENTS, projectId, collectionPath, options),
+    countDocuments: (projectId: string, collectionPath: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.EXPLORER_COUNT_DOCUMENTS, projectId, collectionPath),
     getDocument: (projectId: string, documentPath: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.EXPLORER_GET_DOCUMENT, projectId, documentPath),
     createDocument: (input) => ipcRenderer.invoke(IPC_CHANNELS.EXPLORER_CREATE_DOCUMENT, input),
@@ -83,6 +85,10 @@ const api: IpcApi = {
     previewCreateField: (input) =>
       ipcRenderer.invoke(IPC_CHANNELS.BULK_PREVIEW_CREATE_FIELD, input),
     createField: (input) => ipcRenderer.invoke(IPC_CHANNELS.BULK_CREATE_FIELD, input),
+    previewUpdateFieldValue: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.BULK_PREVIEW_UPDATE_FIELD_VALUE, input),
+    updateFieldValue: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.BULK_UPDATE_FIELD_VALUE, input),
     previewRenameField: (input) =>
       ipcRenderer.invoke(IPC_CHANNELS.BULK_PREVIEW_RENAME_FIELD, input),
     renameField: (input) => ipcRenderer.invoke(IPC_CHANNELS.BULK_RENAME_FIELD, input),

@@ -19,6 +19,8 @@ type DocumentJsonPanelProps = {
   onCreate: () => void
   onDuplicate?: () => void
   readOnly?: boolean
+  /** false のとき新規ボタンを出さない（Query 結果編集など） */
+  showCreate?: boolean
 }
 
 function DocumentJsonPanel({
@@ -34,7 +36,8 @@ function DocumentJsonPanel({
   onDelete,
   onCreate,
   onDuplicate,
-  readOnly = false
+  readOnly = false,
+  showCreate = true
 }: DocumentJsonPanelProps): React.JSX.Element {
   const geopoints = documentData ? findGeopointFields(documentData) : []
   const imageUrls = documentData ? findImageUrlFields(documentData) : []
@@ -47,9 +50,11 @@ function DocumentJsonPanel({
         <div className="document-json-panel__actions">
           {!readOnly && (
             <>
-              <Button onClick={onCreate} disabled={loading}>
-                新規
-              </Button>
+              {showCreate && (
+                <Button onClick={onCreate} disabled={loading}>
+                  新規
+                </Button>
+              )}
               <Button onClick={onSave} disabled={loading || !documentPath}>
                 保存
               </Button>
