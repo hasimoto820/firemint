@@ -5,3 +5,9 @@ out
 .eslintcache
 *.log*
 *firebase-adminsdk*.json
+hosting/node_modules
+hosting/dist
+hosting/.firebase
+hosting/secrets/*
+!hosting/secrets/.gitignore
+!hosting/secrets/README.txt

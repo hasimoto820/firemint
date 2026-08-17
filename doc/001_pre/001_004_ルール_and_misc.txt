@@ -44,10 +44,6 @@ current collection/collection group         グループタブ
 
 
 
-
-
-
-
 misc
 
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
@@ -67,6 +63,28 @@ misc
 
 firefooに対する不満
 https://www.reddit.com/r/Firebase/comments/1nd21eo/is_there_a_better_alternative_to_firefoo/?tl=ja
+
+
+
+
+
+
+
+操作
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+
+
+
+hostingのデプロイ
+
+cd hosting
+FireMint\sys\firemint\hosting\
+
+npm run build
+npx firebase-tools deploy --only hosting --project firemint-e801f
+
 
 
 
