@@ -23,6 +23,8 @@ type WorkspacePaneProps = {
   onSelectDocument: (documentPath: string | null) => void
   onRootCollectionsChanged: () => void
   onRequestCreateCollection: () => void
+  onRequestCreateDocument: (collectionPath: string) => void
+  onRequestDuplicateDocument: (documentPath: string) => void
   onRequestRenameCollection: (collectionPath: string) => void
   onRequestCreateSubcollection: (documentPath: string) => void
   onRequestDeleteSubcollection: (collectionPath: string) => void
@@ -53,6 +55,8 @@ function WorkspacePane({
   onSelectDocument,
   onRootCollectionsChanged,
   onRequestCreateCollection,
+  onRequestCreateDocument,
+  onRequestDuplicateDocument,
   onRequestRenameCollection,
   onRequestCreateSubcollection,
   onRequestDeleteSubcollection,
@@ -126,6 +130,8 @@ function WorkspacePane({
           onSelectDocument={onSelectDocument}
           onRootCollectionsChanged={onRootCollectionsChanged}
           onRequestCreateCollection={onRequestCreateCollection}
+          onRequestCreateDocument={onRequestCreateDocument}
+          onRequestDuplicateDocument={onRequestDuplicateDocument}
           onRequestRenameCollection={onRequestRenameCollection}
           onRequestCreateSubcollection={onRequestCreateSubcollection}
           onRequestDeleteSubcollection={onRequestDeleteSubcollection}

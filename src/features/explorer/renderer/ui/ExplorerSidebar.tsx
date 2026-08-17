@@ -17,6 +17,7 @@ type ExplorerSidebarProps = {
   onRenameCollection?: (collectionPath: string) => void
   onDuplicateCollection?: (collectionPath: string) => void
   onDeleteCollection?: (collectionPath: string) => void
+  onCreateDocument?: (collectionPath: string) => void
   onFieldBulk?: (collectionPath: string, mode: BulkFieldMode) => void
   onDuplicateDocument?: (documentPath: string) => void
   onDeleteDocument?: (documentPath: string) => void
@@ -47,6 +48,7 @@ function ExplorerSidebar({
   onRenameCollection,
   onDuplicateCollection,
   onDeleteCollection,
+  onCreateDocument,
   onFieldBulk,
   onDuplicateDocument,
   onDeleteDocument,
@@ -90,6 +92,7 @@ function ExplorerSidebar({
               onRenameCollection={onRenameCollection}
               onDuplicateCollection={onDuplicateCollection}
               onDeleteCollection={onDeleteCollection}
+              onCreateDocument={onCreateDocument}
               onFieldBulk={onFieldBulk}
               onDuplicateDocument={onDuplicateDocument}
               onDeleteDocument={onDeleteDocument}

@@ -10,6 +10,8 @@ import { useT } from '@shared/i18n/renderer/I18nProvider'
 import { confirmAction } from '@shared/ui/confirmAction'
 import CollectionCreateDialog from '@features/explorer/renderer/ui/CollectionCreateDialog'
 import CollectionRenameDialog from '@features/explorer/renderer/ui/CollectionRenameDialog'
+import DocumentCreateDialog from '@features/explorer/renderer/ui/DocumentCreateDialog'
+import DocumentDuplicateDialog from '@features/explorer/renderer/ui/DocumentDuplicateDialog'
 import FieldBulkRenameDialog from '@features/explorer/renderer/ui/FieldBulkRenameDialog'
 import SubcollectionCreateDialog from '@features/explorer/renderer/ui/SubcollectionCreateDialog'
 import SubcollectionDeleteDialog from '@features/explorer/renderer/ui/SubcollectionDeleteDialog'
@@ -18,10 +20,7 @@ import {
   collectionKindLabel,
   parentDocumentPathOfSubcollection
 } from '@features/explorer/shared/tree'
-import {
-  runDuplicateCollection,
-  runDuplicateDocument
-} from '@features/explorer/renderer/duplicateCollection'
+import { runDuplicateCollection } from '@features/explorer/renderer/duplicateCollection'
 import type { ScriptJobSnapshot } from '@features/script_runner/shared/types'
 import {
   applyImpExpIntent,
@@ -103,6 +102,10 @@ function FirestorePageInner({
   const [renameCollectionPath, setRenameCollectionPath] = useState<string | null>(null)
   const [fieldBulk, setFieldBulk] = useState<{ path: string; mode: BulkFieldMode } | null>(null)
   const [createCollectionOpen, setCreateCollectionOpen] = useState(false)
+  const [createDocumentCollectionPath, setCreateDocumentCollectionPath] = useState<string | null>(
+    null
+  )
+  const [duplicateDocumentPath, setDuplicateDocumentPath] = useState<string | null>(null)
   const [createSubcollectionDocumentPath, setCreateSubcollectionDocumentPath] = useState<string | null>(
     null
   )
@@ -373,7 +376,7 @@ function FirestorePageInner({
   )
 
   const handleRequestDuplicateDocument = useCallback(
-    async (documentPath: string): Promise<void> => {
+    (documentPath: string): void => {
       if (status.readOnly) {
         return
       }
@@ -384,24 +387,9 @@ function FirestorePageInner({
       }
 
       openCollection(collectionPath, { selectedDocumentPath: documentPath })
-
-      const outcome = await runDuplicateDocument(projectId, documentPath)
-
-      if (outcome.status === 'canceled') {
-        return
-      }
-
-      if (outcome.status === 'error') {
-        await confirmAction(outcome.error, { confirmLabel: '閉じる' })
-        return
-      }
-
-      const newPath = `${collectionPath}/${outcome.documentId}`
-      setTreeContentReloadToken((token) => token + 1)
-      setCollectionDataReloadToken((token) => token + 1)
-      openCollection(collectionPath, { selectedDocumentPath: newPath })
+      setDuplicateDocumentPath(documentPath)
     },
-    [openCollection, projectId, status.readOnly]
+    [openCollection, status.readOnly]
   )
 
   const handleRequestRenameCollection = useCallback(
@@ -424,6 +412,18 @@ function FirestorePageInner({
 
       openCollection(collectionPath, { selectedDocumentPath: null })
       setFieldBulk({ path: collectionPath, mode })
+    },
+    [openCollection, status.readOnly]
+  )
+
+  const handleRequestCreateDocument = useCallback(
+    (collectionPath: string): void => {
+      if (status.readOnly) {
+        return
+      }
+
+      openCollection(collectionPath)
+      setCreateDocumentCollectionPath(collectionPath)
     },
     [openCollection, status.readOnly]
   )
@@ -615,6 +615,17 @@ function FirestorePageInner({
       })
     },
     [autocomplete, loadRootCollections, openCollection, projectId]
+  )
+
+  const handleDocumentCreated = useCallback(
+    (collectionPath: string, documentId: string): void => {
+      setTreeContentReloadToken((token) => token + 1)
+      setCollectionDataReloadToken((token) => token + 1)
+      openCollection(collectionPath, {
+        selectedDocumentPath: `${collectionPath}/${documentId}`
+      })
+    },
+    [openCollection]
   )
 
   const handleCollectionRenamed = useCallback(
@@ -1081,6 +1092,8 @@ function FirestorePageInner({
           onSelectDocument={(path) => handlePaneDocumentChange(active.id, path)}
           onRootCollectionsChanged={() => void loadRootCollections()}
           onRequestCreateCollection={handleRequestCreateCollection}
+          onRequestCreateDocument={handleRequestCreateDocument}
+          onRequestDuplicateDocument={handleRequestDuplicateDocument}
           onRequestRenameCollection={handleRequestRenameCollection}
           onRequestCreateSubcollection={handleRequestCreateSubcollection}
           onRequestDeleteSubcollection={handleRequestDeleteSubcollection}
@@ -1129,8 +1142,9 @@ function FirestorePageInner({
             onRenameCollection={handleRequestRenameCollection}
             onDuplicateCollection={(path) => void handleRequestDuplicateCollection(path)}
             onDeleteCollection={handleRequestDeleteSubcollection}
+            onCreateDocument={handleRequestCreateDocument}
             onFieldBulk={handleRequestFieldBulk}
-            onDuplicateDocument={(path) => void handleRequestDuplicateDocument(path)}
+            onDuplicateDocument={handleRequestDuplicateDocument}
             onDeleteDocument={(path) => void handleRequestDeleteDocument(path)}
             onCreateSubcollection={handleRequestCreateSubcollection}
             canRename={!status.readOnly}
@@ -1191,6 +1205,26 @@ function FirestorePageInner({
           open
           onClose={() => setCreateCollectionOpen(false)}
           onCreated={handleCollectionCreated}
+        />
+      )}
+
+      {createDocumentCollectionPath && (
+        <DocumentCreateDialog
+          projectId={projectId}
+          collectionPath={createDocumentCollectionPath}
+          open
+          onClose={() => setCreateDocumentCollectionPath(null)}
+          onCreated={handleDocumentCreated}
+        />
+      )}
+
+      {duplicateDocumentPath && (
+        <DocumentDuplicateDialog
+          projectId={projectId}
+          documentPath={duplicateDocumentPath}
+          open
+          onClose={() => setDuplicateDocumentPath(null)}
+          onDuplicated={handleDocumentCreated}
         />
       )}
 

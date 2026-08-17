@@ -20,6 +20,7 @@ type CollectionTreeProps = {
   onRenameCollection?: (collectionPath: string) => void
   onDuplicateCollection?: (collectionPath: string) => void
   onDeleteCollection?: (collectionPath: string) => void
+  onCreateDocument?: (collectionPath: string) => void
   onFieldBulk?: (collectionPath: string, mode: BulkFieldMode) => void
   onDuplicateDocument?: (documentPath: string) => void
   onDeleteDocument?: (documentPath: string) => void
@@ -57,6 +58,7 @@ function CollectionTree({
   onRenameCollection,
   onDuplicateCollection,
   onDeleteCollection,
+  onCreateDocument,
   onFieldBulk,
   onDuplicateDocument,
   onDeleteDocument,
@@ -386,6 +388,7 @@ function CollectionTree({
       !onRenameCollection &&
       !onDuplicateCollection &&
       !onDeleteCollection &&
+      !onCreateDocument &&
       !onFieldBulk
     ) {
       return
@@ -544,6 +547,21 @@ function CollectionTree({
         >
           {contextMenu.kind === 'document' ? (
             <>
+              <div className="collection-tree__context-header">サブコレクション</div>
+              <button
+                type="button"
+                className="collection-tree__context-item collection-tree__context-item--indent"
+                role="menuitem"
+                disabled={!onCreateSubcollection}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  const path = contextMenu.documentPath
+                  setContextMenu(null)
+                  onCreateSubcollection?.(path)
+                }}
+              >
+                作成
+              </button>
               <div className="collection-tree__context-header">ドキュメント</div>
               <button
                 type="button"
@@ -572,21 +590,6 @@ function CollectionTree({
                 }}
               >
                 削除
-              </button>
-              <div className="collection-tree__context-header">サブコレクション</div>
-              <button
-                type="button"
-                className="collection-tree__context-item collection-tree__context-item--indent"
-                role="menuitem"
-                disabled={!onCreateSubcollection}
-                onClick={(event) => {
-                  event.stopPropagation()
-                  const path = contextMenu.documentPath
-                  setContextMenu(null)
-                  onCreateSubcollection?.(path)
-                }}
-              >
-                作成
               </button>
             </>
           ) : (
@@ -635,6 +638,21 @@ function CollectionTree({
                 }}
               >
                 削除
+              </button>
+              <div className="collection-tree__context-header">ドキュメント</div>
+              <button
+                type="button"
+                className="collection-tree__context-item collection-tree__context-item--indent"
+                role="menuitem"
+                disabled={!onCreateDocument}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  const path = contextMenu.collectionPath
+                  setContextMenu(null)
+                  onCreateDocument?.(path)
+                }}
+              >
+                新規
               </button>
               <div className="collection-tree__context-header">フィールド一括</div>
               <button

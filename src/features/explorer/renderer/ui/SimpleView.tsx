@@ -6,10 +6,7 @@ import type { BulkFieldMode } from '@features/bulk_operations/shared/types'
 import type { DocumentSummary } from '@features/explorer/shared/types'
 import { LIST_DOCUMENTS_PAGE_SIZE } from '@features/explorer/shared/types'
 import { isSubcollectionPath } from '@features/explorer/shared/tree'
-import {
-  runDuplicateCollection,
-  runDuplicateDocument
-} from '@features/explorer/renderer/duplicateCollection'
+import { runDuplicateCollection } from '@features/explorer/renderer/duplicateCollection'
 import { useI18n } from '@shared/i18n/renderer/I18nProvider'
 import { useRegisterAppMenu } from '@shared/shell/AppMenuContext'
 import { confirmAction } from '@shared/ui/confirmAction'
@@ -26,6 +23,8 @@ type SimpleViewProps = {
   onSelectDocument: (documentPath: string | null) => void
   onRootCollectionsChanged: () => void
   onRequestCreateCollection: () => void
+  onRequestCreateDocument: (collectionPath: string) => void
+  onRequestDuplicateDocument: (documentPath: string) => void
   onRequestRenameCollection: (collectionPath: string) => void
   onRequestCreateSubcollection: (documentPath: string) => void
   onRequestDeleteSubcollection: (collectionPath: string) => void
@@ -55,6 +54,8 @@ function SimpleView({
   onSelectDocument,
   onRootCollectionsChanged,
   onRequestCreateCollection,
+  onRequestCreateDocument,
+  onRequestDuplicateDocument,
   onRequestRenameCollection,
   onRequestCreateSubcollection,
   onRequestDeleteSubcollection,
@@ -333,36 +334,15 @@ function SimpleView({
     }
   }
 
-  const handleCreate = async (): Promise<void> => {
-    if (!activeCollectionPath) {
+  const handleCreate = (): void => {
+    if (!activeCollectionPath || readOnly) {
       setError('コレクションを選択してください')
       return
     }
 
-    setLoading(true)
     setError(null)
-
-    try {
-      const result = await window.api.explorer.createDocument({
-        projectId,
-        collectionPath: activeCollectionPath,
-        data: {}
-      })
-
-      if (!result.ok) {
-        setError(result.error)
-        return
-      }
-
-      await loadDocumentsPage(activeCollectionPath, pageIndexRef.current)
-      void refreshTotalCount(activeCollectionPath)
-      onSelectDocument(`${activeCollectionPath}/${result.data}`)
-      onCollectionDocumentsChanged?.()
-    } catch (error) {
-      setError(error instanceof Error ? error.message : 'ドキュメントの作成に失敗しました')
-    } finally {
-      setLoading(false)
-    }
+    setSuccessMessage(null)
+    onRequestCreateDocument(activeCollectionPath)
   }
 
   const handleBulkToggle = (documentPath: string, checked: boolean): void => {
@@ -568,28 +548,14 @@ function SimpleView({
         ? `${rangeFrom}–${rangeTo} 件`
         : `${rangeFrom}–${rangeTo} / ${totalCount} 件`
 
-  const handleDuplicateDocument = async (): Promise<void> => {
-    if (!selectedDocumentPath || !activeCollectionPath) {
+  const handleDuplicateDocument = (): void => {
+    if (!selectedDocumentPath || readOnly) {
       return
     }
 
-    const outcome = await runDuplicateDocument(projectId, selectedDocumentPath)
-
-    if (outcome.status === 'canceled') {
-      return
-    }
-
-    if (outcome.status === 'error') {
-      setError(outcome.error)
-      return
-    }
-
-    await loadDocumentsPage(activeCollectionPath, pageIndexRef.current)
-    void refreshTotalCount(activeCollectionPath)
-    const newPath = `${activeCollectionPath}/${outcome.documentId}`
-    onSelectDocument(newPath)
-    onCollectionDocumentsChanged?.()
-    setSuccessMessage(`ドキュメントを複製しました: ${newPath}`)
+    setError(null)
+    setSuccessMessage(null)
+    onRequestDuplicateDocument(selectedDocumentPath)
   }
 
   const handleExportCollection = (): void => {
@@ -726,7 +692,7 @@ function SimpleView({
           canUpdateFieldBulk: !readOnly && Boolean(activeCollectionPath),
           canRenameFieldBulk: !readOnly && Boolean(activeCollectionPath),
           canDeleteFieldBulk: !readOnly && Boolean(activeCollectionPath),
-          onCreate: () => void handleCreate(),
+          onCreate: () => handleCreate(),
           onSave: () => void handleSave(),
           onDuplicate: () => void handleDuplicateDocument(),
           onDelete: () => void handleDelete(),
@@ -765,7 +731,7 @@ function SimpleView({
           canRenameFieldBulk: false,
           canDeleteFieldBulk: false
         },
-    [menuEnabled, readOnly, activeCollectionPath, selectedDocumentPath, jsonText, onOpenImpExp, onRequestFieldBulk]
+    [menuEnabled, readOnly, activeCollectionPath, selectedDocumentPath, jsonText, onOpenImpExp, onRequestFieldBulk, onRequestCreateDocument, onRequestDuplicateDocument]
   )
 
   if (!activeCollectionPath) {
@@ -843,7 +809,7 @@ function SimpleView({
           onChange={setJsonText}
           onSave={() => void handleSave()}
           onDelete={() => void handleDelete()}
-          onCreate={() => void handleCreate()}
+          onCreate={() => handleCreate()}
           onDuplicate={() => void handleDuplicateDocument()}
           onOpenReference={onOpenDocumentPath}
           readOnly={readOnly}

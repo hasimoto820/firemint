@@ -9,11 +9,6 @@ export type DuplicateCollectionOutcome =
   | { status: 'error'; error: string }
   | { status: 'ok'; copiedCount: number; targetCollectionPath: string }
 
-export type DuplicateDocumentOutcome =
-  | { status: 'canceled' }
-  | { status: 'error'; error: string }
-  | { status: 'ok'; documentId: string }
-
 export async function runDuplicateCollection(
   projectId: string,
   collectionPath: string
@@ -59,33 +54,4 @@ export async function runDuplicateCollection(
     copiedCount: result.data.copiedCount,
     targetCollectionPath: result.data.targetCollectionPath
   }
-}
-
-export async function runDuplicateDocument(
-  projectId: string,
-  documentPath: string
-): Promise<DuplicateDocumentOutcome> {
-  const segments = documentPath.split('/').filter(Boolean)
-  const documentId = segments[segments.length - 1] ?? documentPath
-  const prompt = await confirmActionWithCheckbox(`ドキュメント「${documentId}」を複製しますか？`, {
-    detail: INCLUDE_SUBCOLLECTIONS_DETAIL,
-    checkboxLabel: 'サブコレクションを含む',
-    checkboxChecked: false
-  })
-
-  if (!prompt.confirmed) {
-    return { status: 'canceled' }
-  }
-
-  const result = await window.api.explorer.duplicateDocument({
-    projectId,
-    documentPath,
-    includeSubcollections: prompt.checkboxChecked
-  })
-
-  if (!result.ok) {
-    return { status: 'error', error: result.error }
-  }
-
-  return { status: 'ok', documentId: result.data }
 }
