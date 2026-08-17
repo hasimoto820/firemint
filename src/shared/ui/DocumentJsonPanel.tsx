@@ -3,7 +3,13 @@ import Button from '@shared/ui/Button'
 import AutocompleteInput from '@shared/ui/AutocompleteInput'
 import GeopointPreview from '@shared/ui/GeopointPreview'
 import ImagePreview from '@shared/ui/ImagePreview'
-import { findGeopointFields, findImageUrlFields, formatTimestampIso } from '@shared/ui/firestore_display'
+import ReferencePreview from '@shared/ui/ReferencePreview'
+import {
+  findGeopointFields,
+  findImageUrlFields,
+  findReferenceFields,
+  formatTimestampIso
+} from '@shared/ui/firestore_display'
 
 type DocumentJsonPanelProps = {
   projectId?: string
@@ -21,6 +27,8 @@ type DocumentJsonPanelProps = {
   readOnly?: boolean
   /** false のとき新規ボタンを出さない（Query 結果編集など） */
   showCreate?: boolean
+  /** Reference をクリックしてドキュメントを開く */
+  onOpenReference?: (documentPath: string) => void
 }
 
 function DocumentJsonPanel({
@@ -37,10 +45,12 @@ function DocumentJsonPanel({
   onCreate,
   onDuplicate,
   readOnly = false,
-  showCreate = true
+  showCreate = true,
+  onOpenReference
 }: DocumentJsonPanelProps): React.JSX.Element {
   const geopoints = documentData ? findGeopointFields(documentData) : []
   const imageUrls = documentData ? findImageUrlFields(documentData) : []
+  const references = documentData ? findReferenceFields(documentData) : []
   const fieldItems = useFieldAutocompleteItems(projectId)
 
   return (
@@ -77,6 +87,7 @@ function DocumentJsonPanel({
       )}
       <GeopointPreview points={geopoints} />
       <ImagePreview images={imageUrls} />
+      <ReferencePreview references={references} onOpen={onOpenReference} />
       <h3 className="document-json-panel__json-label">JSON</h3>
       {readOnly ? (
         <textarea

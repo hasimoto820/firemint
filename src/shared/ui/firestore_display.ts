@@ -4,6 +4,11 @@ export type GeopointField = {
   longitude: number
 }
 
+export type ReferenceField = {
+  field: string
+  path: string
+}
+
 export type ImageUrlField = {
   field: string
   url: string
@@ -56,6 +61,17 @@ export function isGeopointValue(
   )
 }
 
+export function isReferenceValue(
+  value: unknown
+): value is { __firemint_type: 'reference'; path: string } {
+  return (
+    isRecord(value) &&
+    value.__firemint_type === 'reference' &&
+    typeof value.path === 'string' &&
+    value.path.trim() !== ''
+  )
+}
+
 export function formatTimestampIso(iso: string): string {
   const date = new Date(iso)
 
@@ -77,6 +93,10 @@ export function formatDisplayValue(value: unknown): string {
 
   if (isGeopointValue(value)) {
     return `${value.latitude}, ${value.longitude}`
+  }
+
+  if (isReferenceValue(value)) {
+    return value.path
   }
 
   if (typeof value === 'object') {
@@ -106,6 +126,48 @@ export function findGeopointFields(
 
     if (isRecord(value) && value.__firemint_type === undefined) {
       results.push(...findGeopointFields(value, field))
+    }
+  }
+
+  return results
+}
+
+export function findReferenceFields(
+  data: Record<string, unknown>,
+  prefix = ''
+): ReferenceField[] {
+  const results: ReferenceField[] = []
+
+  for (const [key, value] of Object.entries(data)) {
+    const field = prefix ? `${prefix}.${key}` : key
+
+    if (isReferenceValue(value)) {
+      results.push({
+        field,
+        path: value.path.trim()
+      })
+      continue
+    }
+
+    if (Array.isArray(value)) {
+      value.forEach((item, index) => {
+        if (isReferenceValue(item)) {
+          results.push({
+            field: `${field}[${index}]`,
+            path: item.path.trim()
+          })
+          return
+        }
+
+        if (isRecord(item) && item.__firemint_type === undefined) {
+          results.push(...findReferenceFields(item, `${field}[${index}]`))
+        }
+      })
+      continue
+    }
+
+    if (isRecord(value) && value.__firemint_type === undefined) {
+      results.push(...findReferenceFields(value, field))
     }
   }
 

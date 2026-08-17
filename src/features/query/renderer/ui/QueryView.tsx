@@ -29,6 +29,7 @@ type QueryViewProps = {
   queryLastSource: string | null
   queryResultSelectedPath: string | null
   onQueryDraftChange: (patch: WorkspaceTabQueryDraftPatch) => void
+  onOpenDocumentPath?: (documentPath: string) => void
 }
 
 const EMPTY_RESULTS_PATCH: WorkspaceTabQueryDraftPatch = {
@@ -54,7 +55,8 @@ function QueryView({
   queryResultCount,
   queryLastSource,
   queryResultSelectedPath,
-  onQueryDraftChange
+  onQueryDraftChange,
+  onOpenDocumentPath
 }: QueryViewProps): React.JSX.Element {
   const { t } = useI18n()
   const projectId = status.projectId
@@ -128,7 +130,13 @@ function QueryView({
 
     const previousSeed = buildDefaultJsQuerySource(querySeededPath)
 
+    // 未編集の seed のままコレクションが変わったときだけ結果を捨てて再 seed。
+    // 同じ path での再マウント（タブ切替など）では Run 結果を残す。
     if (querySource.trim() === previousSeed.trim()) {
+      if (querySeededPath === nextPath) {
+        return
+      }
+
       onQueryDraftChange({
         querySource: buildDefaultJsQuerySource(nextPath),
         querySeededPath: nextPath,
@@ -215,6 +223,17 @@ function QueryView({
       setLoading(false)
     }
   }
+
+  // Simple ⇄ Query やタブ切替で再マウントしたとき、選択中ドキュメントの JSON を復元
+  useEffect(() => {
+    if (!queryResultSelectedPath) {
+      return
+    }
+
+    void handleSelectDocument(queryResultSelectedPath)
+    // mount 時のみ。以降の選択は onSelectDocument → handleSelectDocument
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleSave = async (forceOverwrite = false): Promise<void> => {
     if (!queryResultSelectedPath || readOnly) {
@@ -543,6 +562,7 @@ function QueryView({
               onCreate={() => undefined}
               showCreate={false}
               readOnly={readOnly}
+              onOpenReference={onOpenDocumentPath}
             />
           </div>
         </>

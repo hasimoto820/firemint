@@ -30,6 +30,7 @@ type WorkspacePaneProps = {
   collectionDataReloadToken?: number
   onCollectionDocumentsChanged?: () => void
   onCollectionBecameEmpty?: (collectionPath: string) => void
+  onOpenDocumentPath?: (documentPath: string) => void
   onQueryDraftChange: (patch: WorkspaceTabQueryDraftPatch) => void
 }
 
@@ -59,6 +60,7 @@ function WorkspacePane({
   collectionDataReloadToken = 0,
   onCollectionDocumentsChanged,
   onCollectionBecameEmpty,
+  onOpenDocumentPath,
   onQueryDraftChange
 }: WorkspacePaneProps): React.JSX.Element {
   if (isImpExpTab(tab)) {
@@ -113,6 +115,7 @@ function WorkspacePane({
           queryLastSource={tab.queryLastSource}
           queryResultSelectedPath={tab.queryResultSelectedPath}
           onQueryDraftChange={onQueryDraftChange}
+          onOpenDocumentPath={onOpenDocumentPath}
         />
       ) : (
         <SimpleView
@@ -130,6 +133,7 @@ function WorkspacePane({
           collectionDataReloadToken={collectionDataReloadToken}
           onCollectionDocumentsChanged={onCollectionDocumentsChanged}
           onCollectionBecameEmpty={onCollectionBecameEmpty}
+          onOpenDocumentPath={onOpenDocumentPath}
           menuEnabled={menuEnabled}
           onOpenImpExp={onOpenImpExp}
         />

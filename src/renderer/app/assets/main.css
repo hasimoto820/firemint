@@ -2370,6 +2370,62 @@ code {
   background: rgba(0, 0, 0, 0.2);
 }
 
+.reference-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.reference-preview__title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.reference-preview__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.reference-preview__item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.reference-preview__field {
+  color: var(--ev-c-text-2);
+  min-width: 6em;
+}
+
+.reference-preview__link {
+  border: none;
+  background: transparent;
+  padding: 0;
+  color: #4ea1ff;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  text-decoration: underline;
+  word-break: break-all;
+}
+
+.reference-preview__link:hover {
+  color: #7bbbff;
+}
+
+.reference-preview__path {
+  font-size: 12px;
+  word-break: break-all;
+}
+
 .image-preview {
   display: flex;
   flex-direction: column;

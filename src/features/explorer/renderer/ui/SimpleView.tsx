@@ -35,6 +35,8 @@ type SimpleViewProps = {
   onCollectionDocumentsChanged?: () => void
   /** ドキュメント削除などでコレクションが空になった（Firestore 上は消滅） */
   onCollectionBecameEmpty?: (collectionPath: string) => void
+  /** Reference などから別ドキュメントを開く */
+  onOpenDocumentPath?: (documentPath: string) => void
   /** Split 時など、メニュー登録を行うのはフォーカス側のペインのみ */
   menuEnabled?: boolean
   onOpenImpExp?: (intent?: ImpExpIntent) => void
@@ -60,6 +62,7 @@ function SimpleView({
   collectionDataReloadToken = 0,
   onCollectionDocumentsChanged,
   onCollectionBecameEmpty,
+  onOpenDocumentPath,
   menuEnabled = true,
   onOpenImpExp
 }: SimpleViewProps): React.JSX.Element {
@@ -842,6 +845,7 @@ function SimpleView({
           onDelete={() => void handleDelete()}
           onCreate={() => void handleCreate()}
           onDuplicate={() => void handleDuplicateDocument()}
+          onOpenReference={onOpenDocumentPath}
           readOnly={readOnly}
         />
       </div>

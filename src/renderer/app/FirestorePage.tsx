@@ -230,22 +230,24 @@ function FirestorePageInner({
       const nextView = options?.view
       const nextDoc = options?.selectedDocumentPath
 
-      setTabs((current) => {
-        // 同じペイン内なら既存タブを再利用。左右で同じコレクションを開くのは許可する。
-        const existingInPane = current.find(
-          (tab) =>
-            isCollectionTab(tab) && tab.collectionPath === collectionPath && tab.pane === targetPane
-        )
-        if (existingInPane) {
-          const resolvedView = nextView ?? existingInPane.view
-          if (targetPane === 'primary') {
-            setPrimaryActiveId(existingInPane.id)
-          } else {
-            setSecondaryActiveId(existingInPane.id)
-          }
-          setFocusedPane(targetPane)
-          onNavigate(resolvedView)
-          return current.map((tab) =>
+      // setTabs の updater 内で onNavigate / setActiveId すると、まだ旧タブが
+      // focused のまま App の view だけ simple になり、旧タブの view が上書きされる。
+      // フォーカス切替とタブ更新を同バッチで行い、その後に navigate する。
+      const existingInPane = tabs.find(
+        (tab) =>
+          isCollectionTab(tab) && tab.collectionPath === collectionPath && tab.pane === targetPane
+      )
+
+      if (existingInPane) {
+        const resolvedView = nextView ?? existingInPane.view
+        if (targetPane === 'primary') {
+          setPrimaryActiveId(existingInPane.id)
+        } else {
+          setSecondaryActiveId(existingInPane.id)
+        }
+        setFocusedPane(targetPane)
+        setTabs((current) =>
+          current.map((tab) =>
             tab.id === existingInPane.id
               ? {
                   ...tab,
@@ -254,26 +256,28 @@ function FirestorePageInner({
                 }
               : tab
           )
-        }
+        )
+        onNavigate(resolvedView)
+        return
+      }
 
-        const created = createWorkspaceTab({
-          projectId,
-          collectionPath,
-          view: nextView ?? view,
-          selectedDocumentPath: nextDoc ?? null,
-          pane: targetPane
-        })
-        if (targetPane === 'primary') {
-          setPrimaryActiveId(created.id)
-        } else {
-          setSecondaryActiveId(created.id)
-        }
-        setFocusedPane(targetPane)
-        onNavigate(created.view)
-        return [...current, created]
+      const created = createWorkspaceTab({
+        projectId,
+        collectionPath,
+        view: nextView ?? view,
+        selectedDocumentPath: nextDoc ?? null,
+        pane: targetPane
       })
+      if (targetPane === 'primary') {
+        setPrimaryActiveId(created.id)
+      } else {
+        setSecondaryActiveId(created.id)
+      }
+      setFocusedPane(targetPane)
+      setTabs((current) => [...current, created])
+      onNavigate(created.view)
     },
-    [projectId, view, onNavigate, splitEnabled, focusedPane]
+    [projectId, view, onNavigate, splitEnabled, focusedPane, tabs]
   )
 
   const openImpExp = useCallback(
@@ -333,6 +337,39 @@ function FirestorePageInner({
       openCollection(collectionPath, { selectedDocumentPath: documentPath })
     },
     [openCollection]
+  )
+
+  const handleOpenDocumentPath = useCallback(
+    async (documentPath: string): Promise<void> => {
+      const trimmed = documentPath.trim()
+      const segments = trimmed.split('/').filter(Boolean)
+
+      if (segments.length === 0 || segments.length % 2 !== 0) {
+        await confirmAction(`ドキュメント path が不正です: ${documentPath}`, {
+          confirmLabel: '閉じる'
+        })
+        return
+      }
+
+      const collectionPath = parentCollectionPath(trimmed)
+      if (!collectionPath) {
+        return
+      }
+
+      const result = await window.api.explorer.getDocument(projectId, trimmed)
+      if (!result.ok) {
+        await confirmAction(result.error || 'ドキュメントを開けません', {
+          confirmLabel: '閉じる'
+        })
+        return
+      }
+
+      openCollection(collectionPath, {
+        view: 'simple',
+        selectedDocumentPath: trimmed
+      })
+    },
+    [openCollection, projectId]
   )
 
   const handleRequestDuplicateDocument = useCallback(
@@ -1057,6 +1094,7 @@ function FirestorePageInner({
             setTreeContentReloadToken((token) => token + 1)
           }
           onCollectionBecameEmpty={(path) => void handleCollectionBecameEmpty(path)}
+          onOpenDocumentPath={(path) => void handleOpenDocumentPath(path)}
           onQueryDraftChange={(patch) => updateTab(active.id, patch)}
         />
       ) : (
