@@ -29,6 +29,21 @@ Page → 必ず features/*/renderer/ui/
 
 
 
+名前
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+
+collection名, Imp/Exp                       コレクションタブ
+simple/query                                モードタブ
+current collection/collection group         グループタブ
+
+
+
+
+
+
+
 
 
 

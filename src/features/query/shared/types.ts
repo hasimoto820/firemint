@@ -45,6 +45,29 @@ export type SaveSavedQueryInput = {
 
 export type SavedQueryResult<T> = QueryResult<T>
 
+/** グループタブ。Query の種が「今の path 1 本」か Collection Group か。 */
+export type QueryGroupTab = 'collection' | 'group'
+
+function wrapJsQueryChain(chain: string): string {
+  return `// Query with JavaScript using the Firebase Admin SDK
+async function run() {
+  const query = await ${chain}
+    .limit(50)
+    .get();
+  return query;
+}
+`
+}
+
+export function collectionIdFromPath(collectionPath: string | null | undefined): string {
+  const segments = (collectionPath ?? '').split('/').filter(Boolean)
+  return segments[segments.length - 1] || 'collection'
+}
+
+function sourcesMatch(left: string, right: string): boolean {
+  return left.trim() === right.trim()
+}
+
 /** ツリー path から初期ソースを生成する。 */
 export function buildDefaultJsQuerySource(collectionPath: string | null | undefined): string {
   const segments = (collectionPath ?? '').split('/').filter(Boolean)
@@ -63,12 +86,27 @@ export function buildDefaultJsQuerySource(collectionPath: string | null | undefi
     }
   }
 
-  return `// Query with JavaScript using the Firebase Admin SDK
-async function run() {
-  const query = await ${chain}
-    .limit(50)
-    .get();
-  return query;
+  return wrapJsQueryChain(chain)
 }
-`
+
+/** 同名コレクションを横断する Collection Group の種。 */
+export function buildCollectionGroupJsQuerySource(
+  collectionPath: string | null | undefined
+): string {
+  return wrapJsQueryChain(`db.collectionGroup(${JSON.stringify(collectionIdFromPath(collectionPath))})`)
+}
+
+export function matchQueryGroupTab(
+  source: string,
+  collectionPath: string | null | undefined
+): QueryGroupTab | null {
+  if (sourcesMatch(source, buildDefaultJsQuerySource(collectionPath))) {
+    return 'collection'
+  }
+
+  if (sourcesMatch(source, buildCollectionGroupJsQuerySource(collectionPath))) {
+    return 'group'
+  }
+
+  return null
 }

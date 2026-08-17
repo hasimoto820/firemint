@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { useOptionalAutocompleteApi } from '@features/autocomplete/renderer/hooks'
+import type { QueryGroupTab } from '@features/query/shared/types'
 import Button from '@shared/ui/Button'
 import AutocompleteInput from '@shared/ui/AutocompleteInput'
 
@@ -7,7 +8,9 @@ type QueryEditorProps = {
   projectId: string
   source: string
   loading: boolean
+  groupTab: QueryGroupTab | null
   onChange: (source: string) => void
+  onSelectGroupTab: (tab: QueryGroupTab) => void
   onRun: () => void
 }
 
@@ -19,7 +22,9 @@ function QueryEditor({
   projectId,
   source,
   loading,
+  groupTab,
   onChange,
+  onSelectGroupTab,
   onRun
 }: QueryEditorProps): React.JSX.Element {
   const autocomplete = useOptionalAutocompleteApi()
@@ -33,6 +38,26 @@ function QueryEditor({
     <div className="query-editor">
       <div className="query-editor__toolbar">
         <span className="query-editor__title">JS Query</span>
+        <nav className="app-nav query-editor__group-tabs" aria-label="グループタブ">
+          <button
+            type="button"
+            className={
+              groupTab === 'collection' ? 'app-nav__item app-nav__item--active' : 'app-nav__item'
+            }
+            disabled={loading}
+            onClick={() => onSelectGroupTab('collection')}
+          >
+            current collection
+          </button>
+          <button
+            type="button"
+            className={groupTab === 'group' ? 'app-nav__item app-nav__item--active' : 'app-nav__item'}
+            disabled={loading}
+            onClick={() => onSelectGroupTab('group')}
+          >
+            collection group
+          </button>
+        </nav>
         <Button variant="primary" disabled={loading} onClick={onRun}>
           Run
         </Button>

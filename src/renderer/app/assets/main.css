@@ -2660,6 +2660,11 @@ code {
   background: rgba(0, 0, 0, 0.12);
 }
 
+.query-editor__group-tabs {
+  flex: 1;
+  justify-content: center;
+}
+
 .query-editor__title {
   font-size: 12px;
   font-weight: 600;

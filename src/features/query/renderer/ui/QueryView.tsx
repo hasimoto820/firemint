@@ -3,7 +3,10 @@ import { useOptionalAutocompleteApi } from '@features/autocomplete/renderer/hook
 import type { ConnectionStatus } from '@features/connection/shared/types'
 import type { DocumentSummary } from '@features/explorer/shared/types'
 import {
+  buildCollectionGroupJsQuerySource,
   buildDefaultJsQuerySource,
+  matchQueryGroupTab,
+  type QueryGroupTab,
   type SavedQuery
 } from '@features/query/shared/types'
 import { useI18n } from '@shared/i18n/renderer/I18nProvider'
@@ -63,6 +66,8 @@ function QueryView({
   const readOnly = status.readOnly
   const autocomplete = useOptionalAutocompleteApi()
   const source = querySource ?? buildDefaultJsQuerySource(activeCollectionPath)
+  const groupTab = matchQueryGroupTab(source, activeCollectionPath)
+  const showResultPath = /collectionGroup\s*\(/.test(source)
   const selectedDocument =
     queryDocuments.find((document) => document.path === queryResultSelectedPath) ?? null
   const [jsonText, setJsonText] = useState('{\n  \n}')
@@ -128,19 +133,35 @@ function QueryView({
       return
     }
 
-    const previousSeed = buildDefaultJsQuerySource(querySeededPath)
+    const previousCollectionSeed = buildDefaultJsQuerySource(querySeededPath)
+    const previousGroupSeed = buildCollectionGroupJsQuerySource(querySeededPath)
+    const nextCollectionSeed = buildDefaultJsQuerySource(nextPath)
+    const nextGroupSeed = buildCollectionGroupJsQuerySource(nextPath)
 
     // 未編集の seed のままコレクションが変わったときだけ結果を捨てて再 seed。
     // 同じ path での再マウント（タブ切替など）では Run 結果を残す。
-    if (querySource.trim() === previousSeed.trim()) {
+    if (querySource.trim() === previousCollectionSeed.trim()) {
       if (querySeededPath === nextPath) {
         return
       }
 
       onQueryDraftChange({
-        querySource: buildDefaultJsQuerySource(nextPath),
+        querySource: nextCollectionSeed,
         querySeededPath: nextPath,
         ...EMPTY_RESULTS_PATCH
+      })
+      return
+    }
+
+    if (querySource.trim() === previousGroupSeed.trim()) {
+      if (querySeededPath === nextPath) {
+        return
+      }
+
+      onQueryDraftChange({
+        querySource: nextGroupSeed,
+        querySeededPath: nextPath,
+        ...(previousGroupSeed.trim() === nextGroupSeed.trim() ? {} : EMPTY_RESULTS_PATCH)
       })
       return
     }
@@ -151,6 +172,26 @@ function QueryView({
     // パス変更時のみ。source を依存に入れると入力中に seed 比較がずれる
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeCollectionPath])
+
+  const handleSelectGroupTab = (tab: QueryGroupTab): void => {
+    const nextSource =
+      tab === 'group'
+        ? buildCollectionGroupJsQuerySource(activeCollectionPath)
+        : buildDefaultJsQuerySource(activeCollectionPath)
+
+    if (source.trim() === nextSource.trim()) {
+      return
+    }
+
+    onQueryDraftChange({
+      querySource: nextSource,
+      querySeededPath: activeCollectionPath ?? null,
+      ...EMPTY_RESULTS_PATCH
+    })
+    setBulkSelectedPaths(new Set())
+    setError(null)
+    setStatusMessage(null)
+  }
 
   const handleRun = async (): Promise<void> => {
     setLoading(true)
@@ -495,7 +536,9 @@ function QueryView({
         projectId={projectId}
         source={source}
         loading={loading}
+        groupTab={groupTab}
         onChange={(next) => onQueryDraftChange({ querySource: next })}
+        onSelectGroupTab={handleSelectGroupTab}
         onRun={() => void handleRun()}
       />
       <SavedQueriesBar
@@ -525,7 +568,7 @@ function QueryView({
             <DocumentTable
               documents={queryDocuments}
               selectedDocumentPath={queryResultSelectedPath}
-              showPath={false}
+              showPath={showResultPath}
               tableKey={`js-query:${queryResultCount}:${queryDocuments[0]?.path ?? 'empty'}`}
               projectId={projectId}
               selectable={!readOnly}
