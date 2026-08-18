@@ -1,25 +1,22 @@
-import { readFile } from 'fs/promises'
 import {
-  connectFirestore,
-  connectFirestoreWithGoogle,
   disconnectFirestore,
   getConnectionInfo,
   isFirestoreConnected,
-  listConnectedProjectIds,
-  logFirestoreState
+  listConnectedProjectIds
 } from '@shared/firestore/client'
 import { getFocusedProjectId, setFocusedProjectId } from '@shared/firestore/focused'
 import { logError } from '@shared/logging/logger'
-import { loadGoogleOAuthConfig } from '@features/connection/main/google_oauth_config'
 import {
+  connectGoogleProject,
+  connectServiceAccountFile,
+  connectWorkspaceEntry
+} from '@features/connection/main/connect_entry'
+import {
+  forgetGoogleToken,
   loadGoogleAccountProfile,
-  patchGoogleProjectProfile,
+  rememberGoogleProjectProfile,
   saveGoogleAccountProfile
-} from '@features/connection/main/google_profile_store'
-import {
-  loadGoogleRefreshToken,
-  removeGoogleRefreshToken
-} from '@features/connection/main/google_token_store'
+} from '@features/connection/main/google_account'
 import { loadWorkspaceStore, saveWorkspaceStore } from './store'
 import type {
   AddGoogleWorkspaceEntryInput,
@@ -37,7 +34,8 @@ const DEFAULT_ENTRY_COLOR = '#607D8B'
 let store: WorkspaceStore = {
   version: 1,
   entries: [],
-  focusedProjectId: null
+  focusedProjectId: null,
+  loadedProjectIds: []
 }
 
 function toWorkspaceError<T>(error: unknown): WorkspaceResult<T> {
@@ -74,71 +72,13 @@ function upsertEntry(entry: WorkspaceEntry): void {
   store.entries.push(entry)
 }
 
-async function connectFromServiceAccountPath(
-  serviceAccountPath: string,
-  existing?: WorkspaceEntry | null
-): Promise<WorkspaceResult<WorkspaceEntry>> {
+async function ensureConnected(entry: WorkspaceEntry): Promise<WorkspaceResult<WorkspaceEntry>> {
   try {
-    const json = await readFile(serviceAccountPath, 'utf-8')
-    const info = await connectFirestore(json)
-    logFirestoreState('after connectFromServiceAccountPath')
-
-    const entry: WorkspaceEntry = {
-      id: info.projectId,
-      label: existing?.label ?? info.projectId,
-      color: existing?.color ?? DEFAULT_ENTRY_COLOR,
-      authType: 'serviceAccount',
-      serviceAccountPath,
-      readOnly: existing?.readOnly ?? false
-    }
-
-    upsertEntry(entry)
+    await connectWorkspaceEntry(entry)
     return { ok: true, data: entry }
   } catch (error) {
     return toWorkspaceError(error)
   }
-}
-
-async function connectFromGoogleEntry(
-  entry: WorkspaceEntry
-): Promise<WorkspaceResult<WorkspaceEntry>> {
-  try {
-    if (!entry.googleAccountKey || !entry.googleAccountEmail) {
-      throw new Error('Google 接続情報が不足しています。再サインインしてください。')
-    }
-
-    const refreshToken = await loadGoogleRefreshToken(entry.googleAccountKey)
-
-    if (!refreshToken) {
-      throw new Error('保存済みの Google トークンがありません。再サインインしてください。')
-    }
-
-    const oauth = await loadGoogleOAuthConfig()
-    await connectFirestoreWithGoogle({
-      projectId: entry.id,
-      clientId: oauth.clientId,
-      clientSecret: oauth.clientSecret,
-      refreshToken,
-      accountEmail: entry.googleAccountEmail
-    })
-    logFirestoreState('after connectFromGoogleEntry')
-
-    return { ok: true, data: entry }
-  } catch (error) {
-    return toWorkspaceError(error)
-  }
-}
-
-async function connectWorkspaceEntry(entry: WorkspaceEntry): Promise<WorkspaceResult<WorkspaceEntry>> {
-  if (entry.authType === 'google') {
-    return connectFromGoogleEntry(entry)
-  }
-
-  if (!entry.serviceAccountPath) {
-    return { ok: false, error: 'サービスアカウント path がありません' }
-  }
-
-  return connectFromServiceAccountPath(entry.serviceAccountPath, entry)
 }
 
 export async function initializeWorkspace(): Promise<void> {
@@ -166,7 +106,7 @@ export async function initializeWorkspace(): Promise<void> {
       continue
     }
 
-    const result = await connectWorkspaceEntry(entry)
+    const result = await ensureConnected(entry)
 
     if (!result.ok) {
       logError('workspace', `auto reconnect failed project_id=${entry.id}`, result.error)
@@ -185,17 +125,15 @@ export async function addEntryAndLoad(
   input: AddWorkspaceEntryInput
 ): Promise<WorkspaceResult<WorkspaceEntry>> {
   try {
-    const result = await connectFromServiceAccountPath(input.serviceAccountPath)
-
-    if (!result.ok) {
-      return result
-    }
-
+    const info = await connectServiceAccountFile(input.serviceAccountPath)
+    const existing = getWorkspaceEntry(info.projectId)
     const entry: WorkspaceEntry = {
-      ...result.data,
-      label: input.label?.trim() || result.data.label,
-      color: input.color ?? result.data.color,
-      readOnly: input.readOnly ?? result.data.readOnly
+      id: info.projectId,
+      label: input.label?.trim() || existing?.label || info.projectId,
+      color: input.color ?? existing?.color ?? DEFAULT_ENTRY_COLOR,
+      authType: 'serviceAccount',
+      serviceAccountPath: input.serviceAccountPath,
+      readOnly: input.readOnly ?? existing?.readOnly ?? false
     }
 
     upsertEntry(entry)
@@ -217,21 +155,11 @@ export async function addGoogleEntryAndLoad(
 ): Promise<WorkspaceResult<WorkspaceEntry>> {
   try {
     const existing = getWorkspaceEntry(input.projectId)
-    const oauth = await loadGoogleOAuthConfig()
-    const refreshToken = await loadGoogleRefreshToken(input.accountKey)
-
-    if (!refreshToken) {
-      throw new Error('Google トークンがありません。先にサインインしてください。')
-    }
-
-    await connectFirestoreWithGoogle({
+    await connectGoogleProject({
       projectId: input.projectId,
-      clientId: oauth.clientId,
-      clientSecret: oauth.clientSecret,
-      refreshToken,
+      accountKey: input.accountKey,
       accountEmail: input.accountEmail
     })
-    logFirestoreState('after addGoogleEntryAndLoad')
 
     const entry: WorkspaceEntry = {
       id: input.projectId,
@@ -253,7 +181,7 @@ export async function addGoogleEntryAndLoad(
 
     await persistStore()
 
-    await patchGoogleProjectProfile(input.accountKey, input.accountEmail, entry.id, {
+    await rememberGoogleProjectProfile(input.accountKey, input.accountEmail, entry.id, {
       label: entry.label,
       color: entry.color,
       readOnly: entry.readOnly,
@@ -277,7 +205,7 @@ export async function loadProject(projectId: string): Promise<WorkspaceResult<Wo
     return { ok: true, data: entry }
   }
 
-  const result = await connectWorkspaceEntry(entry)
+  const result = await ensureConnected(entry)
 
   if (!result.ok) {
     return result
@@ -405,13 +333,9 @@ export async function importGoogleAccountProjects(input: {
     }
 
     const profile = await loadGoogleAccountProfile(input.accountKey)
-    const refreshToken = await loadGoogleRefreshToken(input.accountKey)
-
-    if (!refreshToken) {
-      throw new Error('Google トークンがありません。先にサインインしてください。')
-    }
 
     // 同じアカウントの古い取扱い分はいったん外す（プロファイルは import で上書き復元）
+    // 接続そのものは loadProject → connection.connectWorkspaceEntry に任せる。
     store.entries = store.entries.filter(
       (entry) =>
         !(entry.authType === 'google' && entry.googleAccountKey === input.accountKey)
@@ -469,7 +393,7 @@ export async function importGoogleAccountProjects(input: {
       const focusResult = await setFocusedProject(candidateId)
 
       if (focusResult.ok) {
-        await patchGoogleProjectProfile(input.accountKey, input.accountEmail, candidateId, {
+        await rememberGoogleProjectProfile(input.accountKey, input.accountEmail, candidateId, {
           lastFocused: true
         })
         return {
@@ -509,7 +433,7 @@ export async function removeEntry(projectId: string): Promise<WorkspaceResult<nu
       )
 
       if (!stillUsed) {
-        await removeGoogleRefreshToken(entry.googleAccountKey)
+        await forgetGoogleToken(entry.googleAccountKey)
       }
     }
 
@@ -540,7 +464,7 @@ export async function updateEntry(
   await persistStore()
 
   if (updated.authType === 'google' && updated.googleAccountKey) {
-    await patchGoogleProjectProfile(
+    await rememberGoogleProjectProfile(
       updated.googleAccountKey,
       updated.googleAccountEmail ?? updated.googleAccountKey,
       updated.id,
@@ -586,7 +510,7 @@ export async function setFocusedProject(
   await persistStore()
 
   if (entry.authType === 'google' && entry.googleAccountKey) {
-    await patchGoogleProjectProfile(
+    await rememberGoogleProjectProfile(
       entry.googleAccountKey,
       entry.googleAccountEmail ?? entry.googleAccountKey,
       projectId,

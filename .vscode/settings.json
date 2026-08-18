@@ -1,4 +1,10 @@
 {
+  "terminal.integrated.env.windows": {
+    "NODE_TLS_REJECT_UNAUTHORIZED": "0",
+    "JAVA_HOME": "C:\\Program Files\\Eclipse Adoptium\\jdk-21.0.12.8-hotspot",
+    "PATH": "C:\\Program Files\\Eclipse Adoptium\\jdk-21.0.12.8-hotspot\\bin;${env:PATH}",
+    "Path": "C:\\Program Files\\Eclipse Adoptium\\jdk-21.0.12.8-hotspot\\bin;${env:Path}"
+  },
   "[typescript]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
   },

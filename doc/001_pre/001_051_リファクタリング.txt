@@ -1,0 +1,65 @@
+
+リファクタリング
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+
+関連:
+  001_003 ディレクトリ構成
+  001_005 Phase 17
+  001_020_017 data_transfer / Emulator
+  001_050 追加仕様_修正  ver. 3
+
+
+================================================================================
+現状
+================================================================================
+
+  項目                         箱                                      今のまま進むと
+  ───────────────────────────  ─────────────────────────────────────   ──────────────────────────────────────────────
+  1. Emulator                  connection + workspace                  増える。
+                               + shared/firestore                      名簿は serviceAccount | google だけ。
+                                                                       workspace が Google の token を直接見ている。
+                                                                       3本目を足すと、繋ぎ方が workspace に染みる
+
+  2. プロジェクト間転送        data_transfer                           1 のあとなら増えない。
+                                                                       script_runner に本体を足すと増える
+
+  3. CSV import                data_transfer                           増えない
+
+  4. ショートカット            shared/settings                         増えない
+
+  5. diff ＊1                  data_transfer                           置き場所を間違えると増える。
+     （本番 ↔ import JSON）                                            既存の一括 before/after（＊2）に足さない
+
+  ※ 6. 一括操作の diff プレビューは保留（001_050）。本ファイルの対象外。
+
+
+================================================================================
+境界（Emulator の前に止める）
+================================================================================
+
+  connection         どう繋ぐか。token / JSON /（将来）ホストを読む。
+                     実行は connect_entry.ts。
+                     Emulator を足す分岐もここ。
+
+  workspace          名簿と load / unload。
+                     load のとき connection に「この行を繋げ」と頼む。
+                     token もホストも読まない。
+                     googleAccountKey は「どのアカウントの行か」の名簿欄。繋ぎ方ではない。
+
+  shared/firestore   渡された認証でプールに載せる。
+
+
+================================================================================
+実施
+================================================================================
+
+  ■ connect_entry.ts に JSON / Google の実行を移す
+  ■ workspace は connectWorkspaceEntry / connectServiceAccountFile /
+     connectGoogleProject を呼ぶだけにする
+  ■ token_store / oauth_config / profile_store を workspace から外す
+     （google_account.ts 経由。プロファイルの覚書は connection の仕事）
+  ■ Emulator はまだ足さない。authType は serviceAccount | google のまま
+
+

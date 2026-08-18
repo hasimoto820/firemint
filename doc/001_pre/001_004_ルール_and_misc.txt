@@ -89,7 +89,18 @@ npx firebase-tools deploy --only hosting --project firemint-e801f
 
 
 
+Emulator起動
+npm run emulators
 
+
+
+Emulator使用アドレス
+
+  127.0.0.1:8080
+    Emulator - サーバー間　API
+
+  127.0.0.1:4000
+    Emulator Suite ブラウザ閲覧用
 
 
 
