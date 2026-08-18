@@ -1,17 +1,19 @@
 import { readFile } from 'fs/promises'
 import {
   connectFirestore,
+  connectFirestoreWithEmulator,
   connectFirestoreWithGoogle,
   logFirestoreState
 } from '@shared/firestore/client'
 import type { FirestoreConnectionInfo } from '@shared/firestore/types'
 import type { WorkspaceEntry } from '@features/workspace/shared/types'
+import { parseEmulatorHost } from '@features/connection/shared/emulator'
 import { loadGoogleOAuthConfig } from './google_oauth_config'
 import { loadGoogleRefreshToken } from './google_token_store'
 
 /**
- * 繋ぎ方の実行。名簿（workspace）はここを呼ぶだけで、token も JSON も読まない。
- * Emulator を足すときは、この関数の分岐に 3 本目を置く。
+ * 繋ぎ方の実行。名簿（workspace）はここを呼ぶだけで、token も JSON もホストも読まない。
+ * Emulator は authType === 'emulator' の分岐。
  */
 export async function connectWorkspaceEntry(
   entry: WorkspaceEntry
@@ -25,6 +27,18 @@ export async function connectWorkspaceEntry(
       projectId: entry.id,
       accountKey: entry.googleAccountKey,
       accountEmail: entry.googleAccountEmail
+    })
+  }
+
+  if (entry.authType === 'emulator') {
+    if (!entry.emulatorHost || !entry.emulatorProjectId) {
+      throw new Error('Emulator 接続情報が不足しています')
+    }
+
+    return connectEmulator({
+      poolId: entry.id,
+      projectId: entry.emulatorProjectId,
+      host: entry.emulatorHost
     })
   }
 
@@ -64,5 +78,20 @@ export async function connectGoogleProject(input: {
     accountEmail: input.accountEmail
   })
   logFirestoreState('after connectGoogleProject')
+  return info
+}
+
+export async function connectEmulator(input: {
+  poolId: string
+  projectId: string
+  host: string
+}): Promise<FirestoreConnectionInfo> {
+  const host = parseEmulatorHost(input.host)
+  const info = await connectFirestoreWithEmulator({
+    poolId: input.poolId,
+    projectId: input.projectId,
+    host
+  })
+  logFirestoreState('after connectEmulator')
   return info
 }

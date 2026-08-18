@@ -4,6 +4,7 @@ import type { WorkspaceEntry } from '@features/workspace/shared/types'
 import ConnectionPanel from '@features/connection/renderer/ui/ConnectionPanel'
 import GoogleConnectDialog from '@features/connection/renderer/ui/GoogleConnectDialog'
 import ListConnectDialog from '@features/connection/renderer/ui/ListConnectDialog'
+import EmulatorPage from '@features/emulator/renderer/ui/EmulatorPage'
 import ProjectImportDialog from '@features/data_transfer/renderer/ui/ProjectImportDialog'
 import FirestorePage, { type ShellCommands } from './FirestorePage'
 import type { AppView } from '@shared/shell/AppNav'
@@ -31,6 +32,7 @@ function App(): React.JSX.Element {
   const [projectImportOpen, setProjectImportOpen] = useState(false)
   const [googleConnectOpen, setGoogleConnectOpen] = useState(false)
   const [listConnectOpen, setListConnectOpen] = useState(false)
+  const [emulatorPageOpen, setEmulatorPageOpen] = useState(false)
   const [rootsReloadToken, setRootsReloadToken] = useState(0)
 
   const refreshStatus = useCallback(async (): Promise<void> => {
@@ -47,9 +49,10 @@ function App(): React.JSX.Element {
     void refreshStatus()
   }, [refreshKey, refreshStatus])
 
-  const handleWorkspaceChanged = useCallback((): void => {
+  const handleWorkspaceChanged = useCallback(async (): Promise<void> => {
+    await refreshStatus()
     setRefreshKey((current) => current + 1)
-  }, [])
+  }, [refreshStatus])
 
   const handleDisconnect = useCallback(async (): Promise<void> => {
     if (!(await confirmAction(t('workspace.disconnect_confirm')))) {
@@ -101,6 +104,10 @@ function App(): React.JSX.Element {
     setGoogleConnectOpen(true)
   }, [])
 
+  const handleEmulatorConnect = useCallback((): void => {
+    setEmulatorPageOpen(true)
+  }, [])
+
   const handleJsonConnect = useCallback(async (): Promise<void> => {
     const filePath = await window.api.connection.selectServiceAccountFile()
 
@@ -139,6 +146,7 @@ function App(): React.JSX.Element {
         canListConnect,
         onGoogleConnect: handleGoogleConnect,
         onJsonConnect: () => void handleJsonConnect(),
+        onEmulatorConnect: handleEmulatorConnect,
         context: menuContext,
         shell: shellCommands
           ? {
@@ -178,6 +186,7 @@ function App(): React.JSX.Element {
       handleListConnect,
       handleGoogleConnect,
       handleJsonConnect,
+      handleEmulatorConnect,
       menuContext,
       shellCommands,
       useWindowMenuActions,
@@ -191,6 +200,15 @@ function App(): React.JSX.Element {
 
   if (!ready || connectionStatus === undefined) {
     content = <main className="app-shell app-shell--loading">{t('common.busy')}</main>
+  } else if (emulatorPageOpen) {
+    content = (
+      <main className="app-shell app-shell--landing">
+        <EmulatorPage
+          onClose={() => setEmulatorPageOpen(false)}
+          onWorkspaceChanged={handleWorkspaceChanged}
+        />
+      </main>
+    )
   } else if (!connectionStatus) {
     content = (
       <main className="app-shell app-shell--landing">

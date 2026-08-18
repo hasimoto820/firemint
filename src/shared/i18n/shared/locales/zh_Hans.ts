@@ -7,6 +7,7 @@ export const zhHans: MessageCatalog = {
   'common.disconnect': '断开连接',
   'common.reload': '重新加载',
   'common.busy': '处理中…',
+  'common.next': '下一步',
 
   'menu.file': 'File',
   'menu.edit': 'Edit',
@@ -22,6 +23,7 @@ export const zhHans: MessageCatalog = {
   'menu.connect_list': '从列表连接…',
   'menu.connect_json': '用 JSON 连接…',
   'menu.connect_google': '用 Google 连接…',
+  'menu.connect_emulator': '用模拟器连接…',
   'menu.disconnect': '断开连接',
   'menu.quit': '退出',
   'menu.documents': '文档',
@@ -107,5 +109,17 @@ export const zhHans: MessageCatalog = {
 
   'list_connect.title': '从列表连接',
   'list_connect.lead': '选择已注册的项目进行连接。',
-  'list_connect.empty': '尚无注册项。请先用 JSON 或 Google 连接。'
+  'list_connect.empty': '尚无注册项。请先用 JSON 或 Google 连接。',
+
+  'emulator.title': '用模拟器连接',
+  'emulator.lead': '确认 Firestore Emulator 已启动，然后输入主机。projectId 可留空。',
+  'emulator.process_hint':
+    'FireMint 不会启动模拟器。请先用 npm run emulators 等命令启动。',
+  'emulator.host': '主机',
+  'emulator.project_id': 'projectId',
+  'emulator.import_lead': '没有集合。请导入 JSON。',
+  'emulator.select_json': '选择 JSON',
+  'emulator.collection_path': '集合 path',
+  'emulator.import': '导入',
+  'emulator.skip': '跳过导入'
 }

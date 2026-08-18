@@ -7,7 +7,7 @@ export type ConnectResult =
       clientEmail: string
       environment: EnvironmentKind
       rootCollections: string[]
-      authType?: 'serviceAccount' | 'google'
+      authType?: 'serviceAccount' | 'google' | 'emulator'
     }
   | {
       ok: false
@@ -19,7 +19,12 @@ export type ConnectionStatus = {
   clientEmail: string
   environment: EnvironmentKind
   readOnly: boolean
-  authType?: 'serviceAccount' | 'google'
+  authType?: 'serviceAccount' | 'google' | 'emulator'
+}
+
+export type EmulatorConnectInput = {
+  projectId: string
+  host: string
 }
 
 export type GoogleSignInResult =

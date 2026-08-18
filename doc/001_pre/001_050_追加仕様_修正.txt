@@ -105,6 +105,8 @@ ver. 3
 
 
 
+7. タブをコレクションでグループ化 / タブドラッグで順番変更
+8. 描画領域をドラッグでサイズ変更
 
 
 
@@ -122,9 +124,9 @@ ver. 3
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
 
-関連:
+  関連:
   001_002          FireFoo（Local Emulator Suite / emulator 同期）
-  001_003          connection = どう繋ぐか（JSON / Google / Emulator）
+  001_003          emulator 箱。connection はホストで繋ぐ実行
   001_005          Phase 17
   001_020_017      設計（17-a / 17-b / 17-c）
   001_051          接続の境界（connect_entry に 3 本目を足す）
@@ -157,7 +159,8 @@ ver. 3
 
   つながったあと、その行は他の接続と同じ箱で扱える。
     explorer / query / bulk_operations / data_transfer / auth_users
-  「Emulator 専用の閲覧画面」は作らない。接続先が手元なだけ。
+  「Emulator 専用の閲覧画面」は作らない。閲覧は既存の箱。
+  独自ページは、操作 1〜4 を辿るため。
 
   ただし Auth Emulator は 17-a の対象外（001_020_014）。
   Firestore がつながれば 17-a の Done。Auth ユーザー管理が Emulator で
@@ -204,10 +207,14 @@ JSON / Google との違い（芯）
 箱（001_003 / 001_051 のあと）
 --------------------------------------------------------------------------------
 
+  emulator（src/features/emulator）
+    独自ページ。File → 接続 → エミュレーターで接続… から開く。
+    次へで操作 1〜4 を辿る。1 と 2 は同じ画面。3 と 4 は繋がったあとの分かれ。
+
   connection
-    どう繋ぐか。UI で JSON / Google / Emulator を選ぶ。
-    実行は connect_entry.ts。3 本目の分岐はここ。
-    ホスト文字列を読むのもここ。workspace は読まない。
+    ホストで繋ぐ実行。connect_entry.ts の 3 本目。
+    ホスト文字列を読む。workspace は読まない。
+    JSON / Google の接続 UI はここ。Emulator の独自ページは emulator。
 
   workspace
     名簿と load / unload。
@@ -243,9 +250,10 @@ JSON / Google との違い（芯）
 
   やる
     ■ 接続方式に Emulator がある
+    ■ File → 接続 → エミュレーターで接続… から独自ページを開く
     ■ HOST:PORT を指定して Firestore Emulator に繋がる
     ■ 名簿に載る。load / unload / 起動復元が JSON / Google と同じ経路
-    ■ 繋がった先で、既存の閲覧・Query・一括・Imp/Exp が動く（専用画面は作らない）
+    ■ 繋がった先で、既存の閲覧・Query・一括が動く（専用の閲覧画面は作らない）
     ■ 本番と区別できる（環境ラベル。誤って本番だと思わない）
 
   やらない（この見出しの外）
@@ -261,7 +269,16 @@ JSON / Google との違い（芯）
 --------------------------------------------------------------------------------
 
     ■ 接続 UI の置き場
-       ヘッダー → File → 接続の中に追加
+       ヘッダー → File → 接続の下に「エミュレーターで接続…」
+       独自ページ。次へで操作 1〜4 を辿る。
+       1 と 2 は同じ画面（起動確認 + ホスト）。
+       3 と 4 は繋がったあとの分かれ（空なら入れる、入っていれば見る）。
+
+    ■ 箱
+       src/features/emulator … 独自ページ
+       connection            … ホストで繋ぐ実行
+       workspace             … 名簿
+       shared/firestore      … プール
 
     ■ WorkspaceEntry.id
        独立した行。Google / JSON の id と被らない値にする。
@@ -274,6 +291,9 @@ JSON / Google との違い（芯）
     ■ read-only の初期値
        writable（readOnly: false）
 
+    ■ 入れる入力
+       JSON。CSV はこのページに含めない。
+
 
 
 
@@ -282,7 +302,7 @@ Done（17-a）
 --------------------------------------------------------------------------------
 
   □ Emulator ホストを指定して Firestore Emulator に接続できる
-  □ 接続方式に Emulator が含まれる（JSON / Google / Emulator）
+  □ File → 接続 → エミュレーターで接続… から独自ページを開ける
   □ 名簿に載り、再起動後も復元できる
   □ つながった先でコレクション一覧が見える
 
@@ -311,8 +331,8 @@ Done（17-a）
   3. emulatorにコレクションが存在すしないなら
      Emulator にコレクションを入れる
      FireMint が Emulator に繋がっている状態で行う。
-     入力（JSON ファイルか）と、UI の置き場（File のどこか）は未決。
-     決まってから、この行を具体にする。
+     UI は独自ページの中（次へ）。
+     入力は JSON。
 
   4. emulatorにコレクションが存在するなら
      利用者が projectId を入力する。値は Emulator 起動時の projectId と揃える。

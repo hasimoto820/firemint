@@ -20,7 +20,8 @@ function normalizeEntry(raw: Partial<WorkspaceEntry> & { id?: string }): Workspa
     return null
   }
 
-  const authType = raw.authType === 'google' ? 'google' : 'serviceAccount'
+  const authType =
+    raw.authType === 'emulator' ? 'emulator' : raw.authType === 'google' ? 'google' : 'serviceAccount'
 
   return {
     id: raw.id,
@@ -30,6 +31,8 @@ function normalizeEntry(raw: Partial<WorkspaceEntry> & { id?: string }): Workspa
     serviceAccountPath: raw.serviceAccountPath ?? '',
     googleAccountEmail: raw.googleAccountEmail,
     googleAccountKey: raw.googleAccountKey,
+    emulatorHost: raw.emulatorHost,
+    emulatorProjectId: raw.emulatorProjectId,
     readOnly: Boolean(raw.readOnly)
   }
 }

@@ -1,7 +1,7 @@
 export type FirestoreConnectionInfo = {
   projectId: string
   clientEmail: string
-  authType?: 'serviceAccount' | 'google'
+  authType?: 'serviceAccount' | 'google' | 'emulator'
 }
 
 export type ServiceAccountJson = {

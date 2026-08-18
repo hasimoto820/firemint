@@ -3416,3 +3416,12 @@ html.settings-window-root #root {
   margin: 0;
   color: var(--ev-c-text-2);
 }
+
+.emulator-page__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: var(--ev-c-text-2);
+}

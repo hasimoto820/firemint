@@ -27,6 +27,7 @@ const api: IpcApi = {
       ipcRenderer.invoke(IPC_CHANNELS.CONNECTION_GOOGLE_CONNECT_PROJECT, input),
     googleConnectAccount: (input) =>
       ipcRenderer.invoke(IPC_CHANNELS.CONNECTION_GOOGLE_CONNECT_ACCOUNT, input),
+    connectEmulator: (input) => ipcRenderer.invoke(IPC_CHANNELS.CONNECTION_EMULATOR_CONNECT, input),
     disconnect: () => ipcRenderer.invoke(IPC_CHANNELS.CONNECTION_DISCONNECT),
     getStatus: () => ipcRenderer.invoke(IPC_CHANNELS.CONNECTION_GET_STATUS)
   },

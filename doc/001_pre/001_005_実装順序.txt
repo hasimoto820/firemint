@@ -620,8 +620,9 @@ Phase 17 — Emulator 接続 / プロジェクト間転送 【後回し】
 
   作るもの（依存順）:
     17-a  Emulator 接続
-          features/connection/ + shared/firestore/
-            … Firebase Local Emulator Suite（ホスト指定・認識）
+          features/emulator/ + connection + workspace + shared/firestore/
+            … 独自ページ（操作 1〜4）
+            … connection はホストで繋ぐ実行
             … ワークスペースに Emulator を載せる
     17-b  プロジェクト間転送
           features/data_transfer/

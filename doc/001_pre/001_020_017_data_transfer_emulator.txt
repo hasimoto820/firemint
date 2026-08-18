@@ -33,8 +33,9 @@ data_transfer / Emulator 拡張 設計（Phase 17）
     Firebase Local Emulator Suite（Firestore Emulator）に FireMint から接続する。
     ホスト（例: 127.0.0.1:8080）を指定し、workspace に載せる。
 
-  作る場所（想定）:
-    features/connection/     … 接続 UI（JSON / Google / Emulator の選択）
+  作る場所:
+    features/emulator/       … 独自ページ（File → 接続 → エミュレーターで接続…）
+    features/connection/     … ホストで繋ぐ実行（connect_entry の 3 本目）
     shared/firestore/        … Emulator ホスト設定・接続プールへの載せ方
     features/workspace/      … 名簿に Emulator 由来のエントリをどう表すか
 
@@ -45,6 +46,7 @@ data_transfer / Emulator 拡張 設計（Phase 17）
 
   未策定:
     □ 接続 UI の置き場（接続画面 / workspace 追加フロー）
+       → 001_050 決定。File → 接続 → エミュレーターで接続…。独自ページ。
     □ projectId をどう扱うか（Emulator 起動時の projectId と workspace id）
     □ 自動検出（Discover）を v1 でやるか、手動 HOST:PORT のみか
     □ read-only デフォルトをどうするか

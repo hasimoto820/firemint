@@ -51,6 +51,7 @@ features/ 一覧
   9   auth_users             Firebase Auth ユーザー管理      ✓  Phase 14
   10  auth                   将来用（アプリ側認証・課金など）—  箱のみ・未着手
   11  onboarding             初回オンボーディングガイド      —  v1
+  12  emulator               Local Emulator Suite 独自ページ —  Phase 17-a
 
   後回し（001_002）の機能は、必要になるまで feature を増やさない。
     例: storage, audit, licensing, dashboard
@@ -105,6 +106,8 @@ features/ ツリー（全体）
         renderer/  main/  shared/
       onboarding/
         renderer/  main/  shared/
+      emulator/
+        renderer/  main/  shared/
 
 
 ================================================================================
@@ -132,8 +135,9 @@ shared/ 一覧（feature にしない横断モジュール）
 feature 間の責務メモ
 ================================================================================
 
-  connection       … どう繋ぐか（サービスアカウント JSON、v1: Google / Emulator）
+  connection       … どう繋ぐか（JSON / Google）。ホストで繋ぐ実行（Emulator の 3 本目もここ）
   workspace        … 繋いだ先の管理（複数、ラベル、read-only）
+  emulator         … 独自ページ（操作 1〜4。File → 接続 → エミュレーターで接続…）
   explorer         … コレクションを開いて見る・1件編集（Table / JSON、CRUD）
   query            … 条件を組んで検索（where / orderBy / limit、Collection Group）
   bulk_operations  … まとめて変える（一括削除・更新、diff プレビュー、バッチ 500）
@@ -176,6 +180,7 @@ MVP 実装順（箱は全 feature 先に用意）
 ================================================================================
 
   接続                         → connection
+  Local Emulator 独自ページ    → emulator
   プロジェクト管理             → workspace
   データ閲覧・編集             → explorer（+ shared/shell のタブ枠）
   クエリ                       → query

@@ -78,6 +78,7 @@ export type AppMenuHandlers = {
   canListConnect?: boolean
   onGoogleConnect?: () => void
   onJsonConnect?: () => void
+  onEmulatorConnect?: () => void
   onMinimize?: () => void
   onMaximizeToggle?: () => void
   context?: AppMenuContextActions | null
@@ -162,6 +163,14 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
           indent: true,
           disabled: !handlers.onGoogleConnect,
           onClick: handlers.onGoogleConnect
+        },
+        {
+          type: 'item',
+          id: 'file-emulator-connect',
+          label: t('menu.connect_emulator'),
+          indent: true,
+          disabled: !handlers.onEmulatorConnect,
+          onClick: handlers.onEmulatorConnect
         },
         {
           type: 'item',

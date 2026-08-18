@@ -1,9 +1,18 @@
 import admin from 'firebase-admin'
+import type { Credential } from 'firebase-admin/app'
 import { initializeFirestore, type Firestore } from 'firebase-admin/firestore'
 import { Firestore as GoogleCloudFirestore } from '@google-cloud/firestore'
+import { PassThroughClient } from 'google-auth-library'
 import { getFocusedProjectId, requireFocusedProjectId, setFocusedProjectId } from './focused'
 import { logInfo } from '@shared/logging/logger'
 import type { FirestoreConnectionInfo, GoogleAuthorizedUserJson, ServiceAccountJson } from './types'
+
+/** ADC を使わない。process-wide の FIRESTORE_EMULATOR_HOST も置かない。 */
+const EMULATOR_ADMIN_CREDENTIAL: Credential = {
+  async getAccessToken() {
+    return { access_token: 'owner', expires_in: 3600 }
+  }
+}
 
 type ConnectionEntry = {
   app: admin.app.App
@@ -126,6 +135,50 @@ export async function connectFirestoreWithGoogle(input: {
 
   connections.set(projectId, { app, firestore, info })
   logInfo('firestore', `firestore client initialized via google project_id=${projectId}`)
+
+  return info
+}
+
+export async function connectFirestoreWithEmulator(input: {
+  poolId: string
+  projectId: string
+  host: string
+}): Promise<FirestoreConnectionInfo> {
+  const poolId = input.poolId.trim()
+  const projectId = input.projectId.trim()
+  const host = input.host.trim()
+
+  if (!poolId || !projectId || !host) {
+    throw new Error('Emulator の host と projectId を指定してください')
+  }
+
+  logInfo('firestore', `connect emulator pool_id=${poolId} project_id=${projectId} host=${host}`)
+  await deleteExistingApp(poolId)
+
+  const firestore = new GoogleCloudFirestore({
+    projectId,
+    host,
+    ssl: false,
+    preferRest: true,
+    authClient: new PassThroughClient()
+  } as ConstructorParameters<typeof GoogleCloudFirestore>[0]) as unknown as Firestore
+
+  const app = admin.initializeApp(
+    {
+      projectId,
+      credential: EMULATOR_ADMIN_CREDENTIAL
+    },
+    poolId
+  )
+
+  const info: FirestoreConnectionInfo = {
+    projectId: poolId,
+    clientEmail: host,
+    authType: 'emulator'
+  }
+
+  connections.set(poolId, { app, firestore, info })
+  logInfo('firestore', `firestore client initialized via emulator pool_id=${poolId} host=${host}`)
 
   return info
 }

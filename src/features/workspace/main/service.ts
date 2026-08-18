@@ -7,10 +7,12 @@ import {
 import { getFocusedProjectId, setFocusedProjectId } from '@shared/firestore/focused'
 import { logError } from '@shared/logging/logger'
 import {
+  connectEmulator,
   connectGoogleProject,
   connectServiceAccountFile,
   connectWorkspaceEntry
 } from '@features/connection/main/connect_entry'
+import { emulatorEntryId, parseEmulatorHost, resolveEmulatorProjectId } from '@features/connection/shared/emulator'
 import {
   forgetGoogleToken,
   loadGoogleAccountProfile,
@@ -19,6 +21,7 @@ import {
 } from '@features/connection/main/google_account'
 import { loadWorkspaceStore, saveWorkspaceStore } from './store'
 import type {
+  AddEmulatorWorkspaceEntryInput,
   AddGoogleWorkspaceEntryInput,
   AddWorkspaceEntryInput,
   SetFocusedProjectOptions,
@@ -188,6 +191,46 @@ export async function addGoogleEntryAndLoad(
       lastFocused: input.setFocused ?? true
     })
 
+    return { ok: true, data: entry }
+  } catch (error) {
+    return toWorkspaceError(error)
+  }
+}
+
+export async function addEmulatorEntryAndLoad(
+  input: AddEmulatorWorkspaceEntryInput
+): Promise<WorkspaceResult<WorkspaceEntry>> {
+  try {
+    const emulatorProjectId = resolveEmulatorProjectId(input.projectId)
+    const host = parseEmulatorHost(input.host)
+    const id = emulatorEntryId(emulatorProjectId)
+    const existing = getWorkspaceEntry(id)
+
+    await connectEmulator({
+      poolId: id,
+      projectId: emulatorProjectId,
+      host
+    })
+
+    const entry: WorkspaceEntry = {
+      id,
+      label: input.label?.trim() || existing?.label || `${emulatorProjectId} emulator`,
+      color: input.color ?? existing?.color ?? DEFAULT_ENTRY_COLOR,
+      authType: 'emulator',
+      serviceAccountPath: '',
+      emulatorHost: host,
+      emulatorProjectId,
+      readOnly: input.readOnly ?? existing?.readOnly ?? false
+    }
+
+    upsertEntry(entry)
+
+    if (input.setFocused ?? true) {
+      store.focusedProjectId = entry.id
+      syncFocusedFromStore()
+    }
+
+    await persistStore()
     return { ok: true, data: entry }
   } catch (error) {
     return toWorkspaceError(error)

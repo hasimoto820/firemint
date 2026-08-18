@@ -293,19 +293,137 @@ async function findCollisions(
   }
 }
 
+function pathSegments(path: string): string[] {
+  return path.split('/').filter(Boolean)
+}
+
+function documentPathDepth(documentPath: string): number {
+  return pathSegments(documentPath).length
+}
+
+function ancestorDocumentPaths(documentPath: string): string[] {
+  const segments = pathSegments(documentPath)
+  const ancestors: string[] = []
+
+  for (let length = 2; length <= segments.length - 2; length += 2) {
+    ancestors.push(segments.slice(0, length).join('/'))
+  }
+
+  return ancestors
+}
+
+function parentDocumentOfCollection(collectionPath: string): string | null {
+  const segments = pathSegments(collectionPath)
+
+  if (segments.length < 3) {
+    return null
+  }
+
+  return segments.slice(0, -1).join('/')
+}
+
+function writeDepth(write: PlannedWrite): number {
+  if (write.kind === 'existingId') {
+    return documentPathDepth(write.documentPath)
+  }
+
+  return documentPathDepth(write.collectionPath) + 1
+}
+
+function writeKey(write: PlannedWrite): string {
+  return write.kind === 'existingId' ? write.documentPath : write.collectionPath
+}
+
+async function expandWritesWithMissingAncestors(
+  projectId: string,
+  planned: PlannedWrite[]
+): Promise<PlannedWrite[]> {
+  const existingPaths = new Set(
+    planned
+      .filter(
+        (write): write is Extract<PlannedWrite, { kind: 'existingId' }> =>
+          write.kind === 'existingId'
+      )
+      .map((write) => write.documentPath)
+  )
+  const needed = new Set<string>()
+
+  const addAncestors = (documentPath: string): void => {
+    for (const ancestor of ancestorDocumentPaths(documentPath)) {
+      if (!existingPaths.has(ancestor)) {
+        needed.add(ancestor)
+      }
+    }
+
+    if (!existingPaths.has(documentPath)) {
+      needed.add(documentPath)
+    }
+  }
+
+  for (const write of planned) {
+    if (write.kind === 'existingId') {
+      for (const ancestor of ancestorDocumentPaths(write.documentPath)) {
+        if (!existingPaths.has(ancestor)) {
+          needed.add(ancestor)
+        }
+      }
+    } else {
+      const parent = parentDocumentOfCollection(write.collectionPath)
+      if (parent) {
+        addAncestors(parent)
+      }
+    }
+  }
+
+  const extra: PlannedWrite[] = []
+
+  for (const documentPath of needed) {
+    const snapshot = await getDocumentRef(documentPath, projectId).get()
+    if (!snapshot.exists) {
+      extra.push({ kind: 'existingId', documentPath, data: {} })
+    }
+  }
+
+  return [...extra, ...planned]
+}
+
+function sortWritesByDepth(planned: PlannedWrite[]): PlannedWrite[] {
+  return [...planned].sort((left, right) => {
+    const depthDiff = writeDepth(left) - writeDepth(right)
+    if (depthDiff !== 0) {
+      return depthDiff
+    }
+
+    return writeKey(left).localeCompare(writeKey(right))
+  })
+}
+
 async function writePlannedDocuments(
   projectId: string,
   planned: PlannedWrite[],
   onProgress?: ProgressReporter,
   signal?: AbortSignal
 ): Promise<number> {
+  const expanded = sortWritesByDepth(await expandWritesWithMissingAncestors(projectId, planned))
   const db = getFirestore(projectId)
   let writtenCount = 0
-  const totalCount = planned.length
+  const totalCount = expanded.length
+  let offset = 0
 
-  for (let offset = 0; offset < planned.length; offset += FIRESTORE_BATCH_LIMIT) {
+  while (offset < expanded.length) {
     throwIfCanceled(signal)
-    const chunk = planned.slice(offset, offset + FIRESTORE_BATCH_LIMIT)
+    const depth = writeDepth(expanded[offset])
+    const chunk: PlannedWrite[] = []
+
+    while (
+      offset < expanded.length &&
+      writeDepth(expanded[offset]) === depth &&
+      chunk.length < FIRESTORE_BATCH_LIMIT
+    ) {
+      chunk.push(expanded[offset])
+      offset += 1
+    }
+
     const batch = db.batch()
 
     for (const write of chunk) {

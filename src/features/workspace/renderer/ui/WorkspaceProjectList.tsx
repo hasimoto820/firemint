@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
-import type { WorkspaceEntry, WorkspaceState } from '@features/workspace/shared/types'
+import {
+  workspaceAuthLabel,
+  type WorkspaceEntry,
+  type WorkspaceState
+} from '@features/workspace/shared/types'
 import Button from '@shared/ui/Button'
 import { confirmAction } from '@shared/ui/confirmAction'
 import { useT } from '@shared/i18n/renderer/I18nProvider'
@@ -267,7 +271,7 @@ function WorkspaceProjectList({
                   <span className="project-list__body">
                     <span className="project-list__label">{entry.label}</span>
                     <span className="project-list__meta">
-                      {entry.authType === 'google' ? 'google' : 'json'}
+                      {workspaceAuthLabel(entry.authType)}
                       {entry.readOnly ? ' · read-only' : ''}
                       {isLoaded ? ' · loaded' : ''}
                     </span>

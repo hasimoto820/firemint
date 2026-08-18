@@ -7,6 +7,7 @@ export const zhHant: MessageCatalog = {
   'common.disconnect': '中斷連線',
   'common.reload': '重新載入',
   'common.busy': '處理中…',
+  'common.next': '下一步',
 
   'menu.file': 'File',
   'menu.edit': 'Edit',
@@ -22,6 +23,7 @@ export const zhHant: MessageCatalog = {
   'menu.connect_list': '從清單連線…',
   'menu.connect_json': '以 JSON 連線…',
   'menu.connect_google': '以 Google 連線…',
+  'menu.connect_emulator': '以模擬器連線…',
   'menu.disconnect': '中斷連線',
   'menu.quit': '結束',
   'menu.documents': '文件',
@@ -107,5 +109,17 @@ export const zhHant: MessageCatalog = {
 
   'list_connect.title': '從清單連線',
   'list_connect.lead': '選擇已註冊的專案進行連線。',
-  'list_connect.empty': '尚無註冊項目。請先以 JSON 或 Google 連線。'
+  'list_connect.empty': '尚無註冊項目。請先以 JSON 或 Google 連線。',
+
+  'emulator.title': '以模擬器連線',
+  'emulator.lead': '確認 Firestore Emulator 已啟動，然後輸入主機。projectId 可留空。',
+  'emulator.process_hint':
+    'FireMint 不會啟動模擬器。請先以 npm run emulators 等指令啟動。',
+  'emulator.host': '主機',
+  'emulator.project_id': 'projectId',
+  'emulator.import_lead': '沒有集合。請匯入 JSON。',
+  'emulator.select_json': '選擇 JSON',
+  'emulator.collection_path': '集合 path',
+  'emulator.import': '匯入',
+  'emulator.skip': '略過匯入'
 }

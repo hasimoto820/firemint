@@ -2,6 +2,7 @@ import { getConnectionInfo, getFirestore, logFirestoreState } from '@shared/fire
 import { logError, logInfo, logWarn } from '@shared/logging/logger'
 import { detectEnvironment } from '@shared/safety/environment'
 import {
+  addEmulatorEntryAndLoad,
   addEntryAndLoad,
   addGoogleEntryAndLoad,
   getFocusedConnectionInfo,
@@ -13,6 +14,7 @@ import { getFocusedProjectId } from '@shared/firestore/focused'
 import type {
   ConnectResult,
   ConnectionStatus,
+  EmulatorConnectInput,
   GoogleConnectAccountInput,
   GoogleConnectProjectInput,
   GoogleSignInResult
@@ -67,6 +69,32 @@ function formatConnectionError(error: unknown): string {
 
   if (message.includes('タイムアウト')) {
     return message
+  }
+
+  return message
+}
+
+function formatEmulatorError(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error)
+
+  if (
+    message.includes('HOST:PORT') ||
+    message.includes('host と projectId') ||
+    message.includes('projectId を指定') ||
+    message.includes('接続情報が不足')
+  ) {
+    return message
+  }
+
+  if (
+    message.includes('ECONNREFUSED') ||
+    message.includes('ECONNRESET') ||
+    message.includes('ENOTFOUND') ||
+    message.includes('UNAVAILABLE') ||
+    message.includes('タイムアウト') ||
+    /timeout/i.test(message)
+  ) {
+    return 'Emulator に接続できません。HOST:PORT と起動状態を確認してください。'
   }
 
   return message
@@ -288,6 +316,47 @@ export async function connectWithGoogleAccount(
   }
 }
 
+export async function connectWithEmulator(input: EmulatorConnectInput): Promise<ConnectResult> {
+  const startedAt = Date.now()
+  logInfo('connection', `emulator connect start host=${input.host} project=${input.projectId}`)
+
+  try {
+    const addResult = await addEmulatorEntryAndLoad({
+      projectId: input.projectId,
+      host: input.host,
+      setFocused: true
+    })
+
+    if (!addResult.ok) {
+      return { ok: false, error: formatEmulatorError(new Error(addResult.error)) }
+    }
+
+    const entry = addResult.data
+    const rootCollections = await listRootCollectionsWithTimeout(entry.id)
+    const info = getConnectionInfo(entry.id)
+
+    logInfo(
+      'connection',
+      `emulator connect success in ${Date.now() - startedAt}ms pool_id=${entry.id}`
+    )
+
+    return {
+      ok: true,
+      projectId: entry.id,
+      clientEmail: info?.clientEmail ?? entry.emulatorHost ?? '',
+      environment: 'development',
+      rootCollections,
+      authType: 'emulator'
+    }
+  } catch (error) {
+    logError('connection', `emulator connect failed in ${Date.now() - startedAt}ms`, error)
+    return {
+      ok: false,
+      error: formatEmulatorError(error)
+    }
+  }
+}
+
 export async function disconnectFromFirestore(): Promise<void> {
   const projectId = getFocusedProjectId()
   const focused = projectId ? getWorkspaceEntry(projectId) : null
@@ -320,7 +389,10 @@ export function getConnectionStatus(): ConnectionStatus | null {
   return {
     projectId: focused.projectId,
     clientEmail: focused.info.clientEmail,
-    environment: detectEnvironment(focused.projectId),
+    environment:
+      focused.entry?.authType === 'emulator' || focused.info.authType === 'emulator'
+        ? 'development'
+        : detectEnvironment(focused.projectId),
     readOnly: focused.entry?.readOnly ?? false,
     authType: focused.info.authType ?? focused.entry?.authType
   }

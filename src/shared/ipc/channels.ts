@@ -14,6 +14,7 @@ export const IPC_CHANNELS = {
   CONNECTION_GOOGLE_CANCEL_SIGN_IN: 'connection:google_cancel_sign_in',
   CONNECTION_GOOGLE_CONNECT_PROJECT: 'connection:google_connect_project',
   CONNECTION_GOOGLE_CONNECT_ACCOUNT: 'connection:google_connect_account',
+  CONNECTION_EMULATOR_CONNECT: 'connection:emulator_connect',
   CONNECTION_DISCONNECT: 'connection:disconnect',
   CONNECTION_GET_STATUS: 'connection:get_status',
   EXPLORER_LIST_ROOT_COLLECTIONS: 'explorer:list_root_collections',

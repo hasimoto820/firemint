@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { WorkspaceEntry, WorkspaceState } from '@features/workspace/shared/types'
+import {
+  workspaceAuthLabel,
+  type WorkspaceEntry,
+  type WorkspaceState
+} from '@features/workspace/shared/types'
 import Button from '@shared/ui/Button'
 import { useT } from '@shared/i18n/renderer/I18nProvider'
 
@@ -91,7 +95,7 @@ function ListConnectDialog({
                     <span className="workspace-panel__item-body">
                       <span className="workspace-panel__label">{entry.label}</span>
                       <span className="workspace-panel__meta">
-                        {entry.authType === 'google' ? 'google' : 'json'}
+                        {workspaceAuthLabel(entry.authType)}
                         {entry.readOnly ? ' · read-only' : ''}
                         {isLoaded ? ' · loaded' : ''}
                       </span>

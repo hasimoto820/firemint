@@ -7,6 +7,7 @@ export const ja: MessageCatalog = {
   'common.disconnect': '切断',
   'common.reload': '再読込',
   'common.busy': '処理中…',
+  'common.next': '次へ',
 
   'menu.file': 'File',
   'menu.edit': 'Edit',
@@ -22,6 +23,7 @@ export const ja: MessageCatalog = {
   'menu.connect_list': 'リストから接続…',
   'menu.connect_json': 'JSON で接続…',
   'menu.connect_google': 'Google で接続…',
+  'menu.connect_emulator': 'エミュレーターで接続…',
   'menu.disconnect': '切断',
   'menu.quit': '終了',
   'menu.documents': 'ドキュメント',
@@ -109,5 +111,17 @@ export const ja: MessageCatalog = {
 
   'list_connect.title': 'リストから接続',
   'list_connect.lead': '登録済みプロジェクトを選んで接続します。',
-  'list_connect.empty': '登録済みがありません。先に JSON または Google で接続してください。'
+  'list_connect.empty': '登録済みがありません。先に JSON または Google で接続してください。',
+
+  'emulator.title': 'エミュレーターで接続',
+  'emulator.lead': 'Firestore Emulator の起動を確認し、ホストを入力します。projectId は空でも進めます。',
+  'emulator.process_hint':
+    'FireMint は Emulator を起動しません。先に npm run emulators などで起動してください。',
+  'emulator.host': 'ホスト',
+  'emulator.project_id': 'projectId',
+  'emulator.import_lead': 'コレクションがありません。JSON を入れてください。',
+  'emulator.select_json': 'JSON を選択',
+  'emulator.collection_path': 'コレクション path',
+  'emulator.import': '入れる',
+  'emulator.skip': '入れずに進む'
 }

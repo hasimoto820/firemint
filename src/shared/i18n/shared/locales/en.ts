@@ -5,6 +5,7 @@ export const en: Record<string, string> = {
   'common.disconnect': 'Disconnect',
   'common.reload': 'Reload',
   'common.busy': 'Working…',
+  'common.next': 'Next',
 
   'menu.file': 'File',
   'menu.edit': 'Edit',
@@ -20,6 +21,7 @@ export const en: Record<string, string> = {
   'menu.connect_list': 'Connect from list…',
   'menu.connect_json': 'Connect with JSON…',
   'menu.connect_google': 'Connect with Google…',
+  'menu.connect_emulator': 'Connect with emulator…',
   'menu.disconnect': 'Disconnect',
   'menu.quit': 'Quit',
   'menu.documents': 'Documents',
@@ -107,5 +109,17 @@ export const en: Record<string, string> = {
 
   'list_connect.title': 'Connect from list',
   'list_connect.lead': 'Choose a registered project to connect.',
-  'list_connect.empty': 'Nothing registered. Connect with JSON or Google first.'
+  'list_connect.empty': 'Nothing registered. Connect with JSON or Google first.',
+
+  'emulator.title': 'Connect with emulator',
+  'emulator.lead': 'Confirm Firestore Emulator is running, then enter the host. projectId may be empty.',
+  'emulator.process_hint':
+    'FireMint does not start the emulator. Start it first (for example npm run emulators).',
+  'emulator.host': 'Host',
+  'emulator.project_id': 'projectId',
+  'emulator.import_lead': 'No collections. Import JSON.',
+  'emulator.select_json': 'Select JSON',
+  'emulator.collection_path': 'Collection path',
+  'emulator.import': 'Import',
+  'emulator.skip': 'Skip import'
 }

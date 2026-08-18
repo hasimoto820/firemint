@@ -62,4 +62,10 @@
      （google_account.ts 経由。プロファイルの覚書は connection の仕事）
   ■ Emulator はまだ足さない。authType は serviceAccount | google のまま
 
+  17-a の箱（001_050）:
+    emulator（src/features/emulator）  独自ページ
+    connection                         ホストで繋ぐ実行
+    workspace                          名簿
+    shared/firestore                   プール
+
 

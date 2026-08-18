@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { ConnectResult, ConnectionStatus } from '@features/connection/shared/types'
-import type { WorkspaceState } from '@features/workspace/shared/types'
+import { workspaceAuthLabel, type WorkspaceState } from '@features/workspace/shared/types'
 import EnvironmentBadge from '@shared/ui/EnvironmentBadge'
 
 type ConnectionPanelProps = {
@@ -194,7 +194,7 @@ function ConnectionPanel({
                       <span className="workspace-panel__item-body">
                         <span className="workspace-panel__label">{entry.label}</span>
                         <span className="workspace-panel__meta">
-                          {entry.authType === 'google' ? 'google' : 'json'}
+                          {workspaceAuthLabel(entry.authType)}
                           {entry.readOnly ? ' · read-only' : ''}
                           {isLoaded ? ' · loaded' : ''}
                         </span>
@@ -256,8 +256,12 @@ function ConnectionPanel({
             <EnvironmentBadge environment={status.environment} />
           </p>
           <p>
-            {status.authType === 'google' ? 'Google アカウント' : 'サービスアカウント'}:{' '}
-            {status.clientEmail}
+            {status.authType === 'emulator'
+              ? 'Emulator'
+              : status.authType === 'google'
+                ? 'Google アカウント'
+                : 'サービスアカウント'}
+            : {status.clientEmail}
           </p>
           {status.environment === 'production' && (
             <p className="connection-panel__warning">

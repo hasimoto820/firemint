@@ -1,9 +1,14 @@
 import { dialog, ipcMain, BrowserWindow } from 'electron'
 import { IPC_CHANNELS } from '@shared/ipc/channels'
 import { logInfo } from '@shared/logging/logger'
-import type { GoogleConnectAccountInput, GoogleConnectProjectInput } from '@features/connection/shared/types'
+import type {
+  EmulatorConnectInput,
+  GoogleConnectAccountInput,
+  GoogleConnectProjectInput
+} from '@features/connection/shared/types'
 import {
   cancelGoogleSignIn,
+  connectWithEmulator,
   connectWithGoogleAccount,
   connectWithGoogleProject,
   connectWithServiceAccountFile,
@@ -68,6 +73,17 @@ export function registerConnectionHandlers(): void {
         `googleConnectAccount invoked account=${input.accountEmail} projects=${input.projects.length}`
       )
       return connectWithGoogleAccount(input)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.CONNECTION_EMULATOR_CONNECT,
+    async (_event, input: EmulatorConnectInput) => {
+      logInfo(
+        'ipc:connection',
+        `emulatorConnect invoked host=${input.host} project=${input.projectId}`
+      )
+      return connectWithEmulator(input)
     }
   )
 

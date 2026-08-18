@@ -1,17 +1,33 @@
-export type WorkspaceAuthType = 'serviceAccount' | 'google'
+export type WorkspaceAuthType = 'serviceAccount' | 'google' | 'emulator'
 
 export type WorkspaceEntry = {
   id: string
   label: string
   color: string
   authType: WorkspaceAuthType
-  /** serviceAccount のとき必須。google のときは空文字 */
+  /** serviceAccount のとき必須。google / emulator のときは空文字 */
   serviceAccountPath: string
   /** google のとき表示用 */
   googleAccountEmail?: string
   /** google_oauth_tokens.json のキー */
   googleAccountKey?: string
+  /** emulator のとき HOST:PORT。例: 127.0.0.1:8080 */
+  emulatorHost?: string
+  /** emulator のとき Emulator に渡す projectId。id とは別 */
+  emulatorProjectId?: string
   readOnly: boolean
+}
+
+export function workspaceAuthLabel(authType: WorkspaceAuthType): string {
+  if (authType === 'google') {
+    return 'google'
+  }
+
+  if (authType === 'emulator') {
+    return 'emulator'
+  }
+
+  return 'json'
 }
 
 export type WorkspaceStore = {
@@ -46,6 +62,15 @@ export type AddGoogleWorkspaceEntryInput = {
   projectId: string
   accountKey: string
   accountEmail: string
+  label?: string
+  color?: string
+  readOnly?: boolean
+  setFocused?: boolean
+}
+
+export type AddEmulatorWorkspaceEntryInput = {
+  projectId: string
+  host: string
   label?: string
   color?: string
   readOnly?: boolean
