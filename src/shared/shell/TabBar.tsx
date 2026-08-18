@@ -5,6 +5,8 @@ type TabBarProps = {
   activeTabId: string | null
   ariaLabel?: string
   impExpBusy?: boolean
+  projectLabelFor?: (projectId: string) => string
+  showProjectLabel?: boolean
   onActivate: (tabId: string) => void
   onClose: (tabId: string) => void
 }
@@ -14,6 +16,8 @@ function TabBar({
   activeTabId,
   ariaLabel = 'コレクションタブ',
   impExpBusy = false,
+  projectLabelFor,
+  showProjectLabel = false,
   onActivate,
   onClose
 }: TabBarProps): React.JSX.Element {
@@ -25,7 +29,9 @@ function TabBar({
     <div className="tab-bar" role="tablist" aria-label={ariaLabel}>
       {tabs.map((tab) => {
         const active = tab.id === activeTabId
-        const label = workspaceTabLabel(tab)
+        const projectLabel =
+          showProjectLabel && !isImpExpTab(tab) ? projectLabelFor?.(tab.projectId) : undefined
+        const label = workspaceTabLabel(tab, projectLabel)
         const className = [
           'tab-bar__tab',
           active ? 'tab-bar__tab--active' : '',
@@ -41,7 +47,13 @@ function TabBar({
             className={className}
             role="tab"
             aria-selected={active}
-            title={isImpExpTab(tab) ? label : tab.collectionPath}
+            title={
+              isImpExpTab(tab)
+                ? label
+                : projectLabel
+                  ? `${tab.projectId} / ${tab.collectionPath}`
+                  : tab.collectionPath
+            }
           >
             <button type="button" className="tab-bar__label" onClick={() => onActivate(tab.id)}>
               <span className="tab-bar__name">{label}</span>

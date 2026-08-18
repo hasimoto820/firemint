@@ -23,6 +23,7 @@ function App(): React.JSX.Element {
     undefined
   )
   const [workspaceEntries, setWorkspaceEntries] = useState<WorkspaceEntry[]>([])
+  const [loadedProjectIds, setLoadedProjectIds] = useState<string[]>([])
   const [view, setView] = useState<AppView>('simple')
   const [refreshKey, setRefreshKey] = useState(0)
   const [menuContext, setMenuContext] = useState<AppMenuContextActions | null>(null)
@@ -39,6 +40,7 @@ function App(): React.JSX.Element {
     ])
     setConnectionStatus(status)
     setWorkspaceEntries(workspace.entries)
+    setLoadedProjectIds(workspace.loadedProjectIds)
   }, [])
 
   useEffect(() => {
@@ -202,7 +204,6 @@ function App(): React.JSX.Element {
   } else {
     content = (
       <FirestorePage
-        key={connectionStatus.projectId}
         status={connectionStatus}
         view={view}
         onNavigate={setView}
@@ -210,6 +211,8 @@ function App(): React.JSX.Element {
         onShellCommandsChange={setShellCommands}
         rootsReloadToken={rootsReloadToken}
         workspaceRefreshToken={refreshKey}
+        workspaceEntries={workspaceEntries}
+        loadedProjectIds={loadedProjectIds}
       />
     )
   }

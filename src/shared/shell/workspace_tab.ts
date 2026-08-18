@@ -108,14 +108,21 @@ export function isImpExpTab(tab: WorkspaceTab): boolean {
   return tab.kind === 'imp_exp'
 }
 
-/** タブ見出し。コレクションはパス末尾、Imp/Exp は固定名。 */
-export function workspaceTabLabel(tab: WorkspaceTab): string {
+/** タブ見出し。コレクションはパス末尾、Imp/Exp は固定名。混在時は projectLabel を付ける。 */
+export function workspaceTabLabel(tab: WorkspaceTab, projectLabel?: string): string {
   if (tab.kind === 'imp_exp') {
     return IMP_EXP_TAB_LABEL
   }
 
   const segments = tab.collectionPath.split('/').filter(Boolean)
-  return segments[segments.length - 1] ?? tab.collectionPath
+  const name = segments[segments.length - 1] ?? tab.collectionPath
+  const trimmed = projectLabel?.trim()
+
+  if (!trimmed) {
+    return name
+  }
+
+  return `${name} · ${trimmed}`
 }
 
 /** ドキュメント path の親コレクション path。 */

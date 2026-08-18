@@ -6,7 +6,9 @@ import {
 import type { BulkFieldMode } from '@features/bulk_operations/shared/types'
 import AuthUsersView from '@features/auth_users/renderer/ui/AuthUsersView'
 import type { ConnectionStatus } from '@features/connection/shared/types'
+import type { WorkspaceEntry } from '@features/workspace/shared/types'
 import { useT } from '@shared/i18n/renderer/I18nProvider'
+import { detectEnvironment } from '@shared/safety/environment'
 import { confirmAction } from '@shared/ui/confirmAction'
 import CollectionCreateDialog from '@features/explorer/renderer/ui/CollectionCreateDialog'
 import CollectionRenameDialog from '@features/explorer/renderer/ui/CollectionRenameDialog'
@@ -69,6 +71,27 @@ type FirestorePageProps = {
   rootsReloadToken?: number
   /** インクリメントすると左ツリーのプロジェクト一覧を再取得 */
   workspaceRefreshToken?: number
+  workspaceEntries?: WorkspaceEntry[]
+  loadedProjectIds?: string[]
+}
+
+function connectionStatusForTab(
+  focused: ConnectionStatus,
+  tab: WorkspaceTab,
+  entries: WorkspaceEntry[]
+): ConnectionStatus {
+  if (tab.projectId === focused.projectId) {
+    return focused
+  }
+
+  const entry = entries.find((item) => item.id === tab.projectId)
+  return {
+    projectId: tab.projectId,
+    clientEmail: focused.clientEmail,
+    environment: detectEnvironment(tab.projectId),
+    readOnly: entry?.readOnly ?? false,
+    authType: entry?.authType
+  }
 }
 
 /**
@@ -83,7 +106,9 @@ function FirestorePageInner({
   onWorkspaceChanged,
   onShellCommandsChange,
   rootsReloadToken = 0,
-  workspaceRefreshToken = 0
+  workspaceRefreshToken = 0,
+  workspaceEntries = [],
+  loadedProjectIds = []
 }: FirestorePageProps): React.JSX.Element {
   const projectId = status.projectId
   const t = useT()
@@ -110,6 +135,7 @@ function FirestorePageInner({
     null
   )
   const [deleteSubcollectionPath, setDeleteSubcollectionPath] = useState<string | null>(null)
+  const [dialogProjectId, setDialogProjectId] = useState(projectId)
   const [mainSection, setMainSection] = useState<'firestore' | 'auth'>('firestore')
   const [impExpJob, setImpExpJob] = useState<ScriptJobSnapshot | null>(null)
   const [impExpDraft, setImpExpDraft] = useState<ImpExpDraft>(() => createImpExpDraft(projectId))
@@ -125,15 +151,75 @@ function FirestorePageInner({
   const focusedActiveId = focusedPane === 'primary' ? primaryActiveId : secondaryActiveId
   const focusedTab = tabs.find((tab) => tab.id === focusedActiveId) ?? null
   const treeCollectionPath =
-    focusedTab && isCollectionTab(focusedTab) ? focusedTab.collectionPath : null
+    focusedTab && isCollectionTab(focusedTab) && focusedTab.projectId === projectId
+      ? focusedTab.collectionPath
+      : null
   const treeDocumentPath =
-    focusedTab && isCollectionTab(focusedTab) ? focusedTab.selectedDocumentPath : null
+    focusedTab && isCollectionTab(focusedTab) && focusedTab.projectId === projectId
+      ? focusedTab.selectedDocumentPath
+      : null
 
   useEffect(() => {
     if (focusedTab && isCollectionTab(focusedTab)) {
       lastCollectionPathRef.current = focusedTab.collectionPath
     }
   }, [focusedTab])
+
+  const projectLabelFor = useCallback(
+    (id: string): string => workspaceEntries.find((entry) => entry.id === id)?.label || id,
+    [workspaceEntries]
+  )
+  const showProjectLabel = useMemo(() => {
+    const ids = new Set(tabs.filter((tab) => isCollectionTab(tab)).map((tab) => tab.projectId))
+    return ids.size > 1
+  }, [tabs])
+  const isReadOnlyProject = useCallback(
+    (id: string): boolean => {
+      if (id === status.projectId) {
+        return status.readOnly
+      }
+
+      return workspaceEntries.find((entry) => entry.id === id)?.readOnly ?? false
+    },
+    [status.projectId, status.readOnly, workspaceEntries]
+  )
+
+  useEffect(() => {
+    setTabs((current) =>
+      current.map((tab) => (isImpExpTab(tab) ? { ...tab, projectId } : tab))
+    )
+    setImpExpDraft((current) =>
+      current.destinationProjectId === projectId
+        ? current
+        : { ...current, destinationProjectId: projectId }
+    )
+  }, [projectId])
+
+  useEffect(() => {
+    if (loadedProjectIds.length === 0) {
+      return
+    }
+
+    const loaded = new Set(loadedProjectIds)
+    setTabs((current) => {
+      const next = current.filter((tab) => isImpExpTab(tab) || loaded.has(tab.projectId))
+      if (next.length === current.length) {
+        return current
+      }
+
+      setPrimaryActiveId((active) =>
+        active && next.some((tab) => tab.id === active)
+          ? active
+          : (next.find((tab) => tab.pane === 'primary')?.id ?? null)
+      )
+      setSecondaryActiveId((active) =>
+        active && next.some((tab) => tab.id === active)
+          ? active
+          : (next.find((tab) => tab.pane === 'secondary')?.id ?? null)
+      )
+      return next
+    })
+  }, [loadedProjectIds])
 
   const loadRootCollections = useCallback(async (): Promise<void> => {
     setTreeLoading(true)
@@ -226,19 +312,28 @@ function FirestorePageInner({
   const openCollection = useCallback(
     (
       collectionPath: string,
-      options?: { view?: AppView; selectedDocumentPath?: string | null; pane?: WorkspacePaneId }
+      options?: {
+        view?: AppView
+        selectedDocumentPath?: string | null
+        pane?: WorkspacePaneId
+        projectId?: string
+      }
     ): void => {
       setMainSection('firestore')
       const targetPane = options?.pane ?? (splitEnabled ? focusedPane : 'primary')
       const nextView = options?.view
       const nextDoc = options?.selectedDocumentPath
+      const tabProjectId = options?.projectId ?? projectId
 
       // setTabs の updater 内で onNavigate / setActiveId すると、まだ旧タブが
       // focused のまま App の view だけ simple になり、旧タブの view が上書きされる。
       // フォーカス切替とタブ更新を同バッチで行い、その後に navigate する。
       const existingInPane = tabs.find(
         (tab) =>
-          isCollectionTab(tab) && tab.collectionPath === collectionPath && tab.pane === targetPane
+          isCollectionTab(tab) &&
+          tab.projectId === tabProjectId &&
+          tab.collectionPath === collectionPath &&
+          tab.pane === targetPane
       )
 
       if (existingInPane) {
@@ -265,7 +360,7 @@ function FirestorePageInner({
       }
 
       const created = createWorkspaceTab({
-        projectId,
+        projectId: tabProjectId,
         collectionPath,
         view: nextView ?? view,
         selectedDocumentPath: nextDoc ?? null,
@@ -343,7 +438,7 @@ function FirestorePageInner({
   )
 
   const handleOpenDocumentPath = useCallback(
-    async (documentPath: string): Promise<void> => {
+    async (documentPath: string, targetProjectId = projectId): Promise<void> => {
       const trimmed = documentPath.trim()
       const segments = trimmed.split('/').filter(Boolean)
 
@@ -359,7 +454,7 @@ function FirestorePageInner({
         return
       }
 
-      const result = await window.api.explorer.getDocument(projectId, trimmed)
+      const result = await window.api.explorer.getDocument(targetProjectId, trimmed)
       if (!result.ok) {
         await confirmAction(result.error || 'ドキュメントを開けません', {
           confirmLabel: '閉じる'
@@ -369,15 +464,16 @@ function FirestorePageInner({
 
       openCollection(collectionPath, {
         view: 'simple',
-        selectedDocumentPath: trimmed
+        selectedDocumentPath: trimmed,
+        projectId: targetProjectId
       })
     },
     [openCollection, projectId]
   )
 
   const handleRequestDuplicateDocument = useCallback(
-    (documentPath: string): void => {
-      if (status.readOnly) {
+    (documentPath: string, targetProjectId = projectId): void => {
+      if (isReadOnlyProject(targetProjectId)) {
         return
       }
 
@@ -386,59 +482,64 @@ function FirestorePageInner({
         return
       }
 
-      openCollection(collectionPath, { selectedDocumentPath: documentPath })
+      openCollection(collectionPath, { selectedDocumentPath: documentPath, projectId: targetProjectId })
+      setDialogProjectId(targetProjectId)
       setDuplicateDocumentPath(documentPath)
     },
-    [openCollection, status.readOnly]
+    [isReadOnlyProject, openCollection, projectId]
   )
 
   const handleRequestRenameCollection = useCallback(
-    (collectionPath: string): void => {
-      if (status.readOnly) {
+    (collectionPath: string, targetProjectId = projectId): void => {
+      if (isReadOnlyProject(targetProjectId)) {
         return
       }
 
-      openCollection(collectionPath, { selectedDocumentPath: null })
+      openCollection(collectionPath, { selectedDocumentPath: null, projectId: targetProjectId })
+      setDialogProjectId(targetProjectId)
       setRenameCollectionPath(collectionPath)
     },
-    [openCollection, status.readOnly]
+    [isReadOnlyProject, openCollection, projectId]
   )
 
   const handleRequestFieldBulk = useCallback(
-    (collectionPath: string, mode: BulkFieldMode): void => {
-      if (status.readOnly) {
+    (collectionPath: string, mode: BulkFieldMode, targetProjectId = projectId): void => {
+      if (isReadOnlyProject(targetProjectId)) {
         return
       }
 
-      openCollection(collectionPath, { selectedDocumentPath: null })
+      openCollection(collectionPath, { selectedDocumentPath: null, projectId: targetProjectId })
+      setDialogProjectId(targetProjectId)
       setFieldBulk({ path: collectionPath, mode })
     },
-    [openCollection, status.readOnly]
+    [isReadOnlyProject, openCollection, projectId]
   )
 
   const handleRequestCreateDocument = useCallback(
-    (collectionPath: string): void => {
-      if (status.readOnly) {
+    (collectionPath: string, targetProjectId = projectId): void => {
+      if (isReadOnlyProject(targetProjectId)) {
         return
       }
 
-      openCollection(collectionPath)
+      openCollection(collectionPath, { projectId: targetProjectId })
+      setDialogProjectId(targetProjectId)
       setCreateDocumentCollectionPath(collectionPath)
     },
-    [openCollection, status.readOnly]
+    [isReadOnlyProject, openCollection, projectId]
   )
 
   const handleRequestCreateCollection = useCallback((): void => {
-    if (status.readOnly) {
+    if (isReadOnlyProject(projectId)) {
       return
     }
 
+    setDialogProjectId(projectId)
     setCreateCollectionOpen(true)
-  }, [status.readOnly])
+  }, [isReadOnlyProject, projectId])
 
   const handleRequestCreateSubcollection = useCallback(
-    (documentPath: string): void => {
-      if (status.readOnly) {
+    (documentPath: string, targetProjectId = projectId): void => {
+      if (isReadOnlyProject(targetProjectId)) {
         return
       }
 
@@ -447,21 +548,22 @@ function FirestorePageInner({
         return
       }
 
-      openCollection(collectionPath, { selectedDocumentPath: documentPath })
+      openCollection(collectionPath, { selectedDocumentPath: documentPath, projectId: targetProjectId })
+      setDialogProjectId(targetProjectId)
       setCreateSubcollectionDocumentPath(documentPath)
     },
-    [openCollection, status.readOnly]
+    [isReadOnlyProject, openCollection, projectId]
   )
 
   const handleRequestDuplicateCollection = useCallback(
-    async (collectionPath: string): Promise<void> => {
-      if (status.readOnly) {
+    async (collectionPath: string, targetProjectId = projectId): Promise<void> => {
+      if (isReadOnlyProject(targetProjectId)) {
         return
       }
 
-      openCollection(collectionPath, { selectedDocumentPath: null })
+      openCollection(collectionPath, { selectedDocumentPath: null, projectId: targetProjectId })
 
-      const outcome = await runDuplicateCollection(projectId, collectionPath)
+      const outcome = await runDuplicateCollection(targetProjectId, collectionPath)
 
       if (outcome.status === 'canceled') {
         return
@@ -472,40 +574,49 @@ function FirestorePageInner({
         return
       }
 
-      autocomplete.addCollectionPaths(projectId, [outcome.targetCollectionPath])
-      void loadRootCollections()
-      setTreeContentReloadToken((token) => token + 1)
-      openCollection(outcome.targetCollectionPath, { selectedDocumentPath: null })
+      autocomplete.addCollectionPaths(targetProjectId, [outcome.targetCollectionPath])
+      if (targetProjectId === projectId) {
+        void loadRootCollections()
+        setTreeContentReloadToken((token) => token + 1)
+      }
+      openCollection(outcome.targetCollectionPath, {
+        selectedDocumentPath: null,
+        projectId: targetProjectId
+      })
     },
-    [autocomplete, loadRootCollections, openCollection, projectId, status.readOnly]
+    [autocomplete, isReadOnlyProject, loadRootCollections, openCollection, projectId]
   )
 
   const handleRequestDeleteSubcollection = useCallback(
-    (collectionPath: string): void => {
-      if (status.readOnly) {
+    (collectionPath: string, targetProjectId = projectId): void => {
+      if (isReadOnlyProject(targetProjectId)) {
         return
       }
 
-      openCollection(collectionPath, { selectedDocumentPath: null })
+      openCollection(collectionPath, { selectedDocumentPath: null, projectId: targetProjectId })
+      setDialogProjectId(targetProjectId)
       setDeleteSubcollectionPath(collectionPath)
     },
-    [openCollection, status.readOnly]
+    [isReadOnlyProject, openCollection, projectId]
   )
 
   const handleSubcollectionCreated = useCallback(
     (subcollectionPath: string, documentId: string): void => {
-      autocomplete.addCollectionPaths(projectId, [subcollectionPath])
-      setTreeReloadToken((token) => token + 1)
+      autocomplete.addCollectionPaths(dialogProjectId, [subcollectionPath])
+      if (dialogProjectId === projectId) {
+        setTreeReloadToken((token) => token + 1)
+      }
       openCollection(subcollectionPath, {
-        selectedDocumentPath: `${subcollectionPath}/${documentId}`
+        selectedDocumentPath: `${subcollectionPath}/${documentId}`,
+        projectId: dialogProjectId
       })
     },
-    [autocomplete, openCollection, projectId]
+    [autocomplete, dialogProjectId, openCollection, projectId]
   )
 
   const handleSubcollectionDeleted = useCallback(
-    (collectionPath: string): void => {
-      autocomplete.removeCollectionPaths(projectId, [collectionPath])
+    (collectionPath: string, targetProjectId = dialogProjectId): void => {
+      autocomplete.removeCollectionPaths(targetProjectId, [collectionPath])
       const prefix = `${collectionPath}/`
 
       setTabs((current) => {
@@ -513,19 +624,26 @@ function FirestorePageInner({
           .filter(
             (tab) =>
               isImpExpTab(tab) ||
+              tab.projectId !== targetProjectId ||
               (tab.collectionPath !== collectionPath && !tab.collectionPath.startsWith(prefix))
           )
-          .map((tab) => ({
-            ...tab,
-            selectedDocumentPath:
-              tab.selectedDocumentPath?.startsWith(prefix) ||
-              tab.selectedDocumentPath === collectionPath
+          .map((tab) => {
+            if (tab.projectId !== targetProjectId) {
+              return tab
+            }
+
+            return {
+              ...tab,
+              selectedDocumentPath:
+                tab.selectedDocumentPath?.startsWith(prefix) ||
+                tab.selectedDocumentPath === collectionPath
+                  ? null
+                  : tab.selectedDocumentPath,
+              queryResultSelectedPath: tab.queryResultSelectedPath?.startsWith(prefix)
                 ? null
-                : tab.selectedDocumentPath,
-            queryResultSelectedPath: tab.queryResultSelectedPath?.startsWith(prefix)
-              ? null
-              : tab.queryResultSelectedPath
-          }))
+                : tab.queryResultSelectedPath
+            }
+          })
 
         setPrimaryActiveId((active) =>
           active && filtered.some((tab) => tab.id === active)
@@ -541,21 +659,24 @@ function FirestorePageInner({
         return filtered
       })
 
-      setTreeReloadToken((token) => token + 1)
-      void loadRootCollections()
+      if (targetProjectId === projectId) {
+        setTreeReloadToken((token) => token + 1)
+        void loadRootCollections()
+      }
 
       const parentDocument = parentDocumentPathOfSubcollection(collectionPath)
       if (parentDocument) {
         openCollection(parentCollectionPath(parentDocument), {
-          selectedDocumentPath: parentDocument
+          selectedDocumentPath: parentDocument,
+          projectId: targetProjectId
         })
       }
     },
-    [autocomplete, loadRootCollections, openCollection, projectId]
+    [autocomplete, dialogProjectId, loadRootCollections, openCollection, projectId]
   )
 
   const handleCollectionBecameEmpty = useCallback(
-    async (collectionPath: string): Promise<void> => {
+    async (collectionPath: string, targetProjectId = dialogProjectId): Promise<void> => {
       const segments = collectionPath.split('/').filter(Boolean)
       const collectionName = segments[segments.length - 1] ?? collectionPath
       const kindLabel = collectionKindLabel(collectionPath)
@@ -565,14 +686,14 @@ function FirestorePageInner({
         { confirmLabel: '閉じる' }
       )
 
-      handleSubcollectionDeleted(collectionPath)
+      handleSubcollectionDeleted(collectionPath, targetProjectId)
     },
-    [handleSubcollectionDeleted]
+    [dialogProjectId, handleSubcollectionDeleted]
   )
 
   const handleRequestDeleteDocument = useCallback(
-    async (documentPath: string): Promise<void> => {
-      if (status.readOnly) {
+    async (documentPath: string, targetProjectId = projectId): Promise<void> => {
+      if (isReadOnlyProject(targetProjectId)) {
         return
       }
 
@@ -585,64 +706,76 @@ function FirestorePageInner({
         return
       }
 
-      const result = await window.api.explorer.deleteDocument(projectId, documentPath)
+      const result = await window.api.explorer.deleteDocument(targetProjectId, documentPath)
 
       if (!result.ok) {
         await confirmAction(result.error, { confirmLabel: '閉じる' })
         return
       }
 
-      const listed = await window.api.explorer.listDocuments(projectId, collectionPath)
+      const listed = await window.api.explorer.listDocuments(targetProjectId, collectionPath)
       if (listed.ok && listed.data.documents.length === 0) {
-        await handleCollectionBecameEmpty(collectionPath)
+        await handleCollectionBecameEmpty(collectionPath, targetProjectId)
         return
       }
 
-      setTreeContentReloadToken((token) => token + 1)
+      if (targetProjectId === projectId) {
+        setTreeContentReloadToken((token) => token + 1)
+      }
       setCollectionDataReloadToken((token) => token + 1)
-      openCollection(collectionPath, { selectedDocumentPath: null })
+      openCollection(collectionPath, { selectedDocumentPath: null, projectId: targetProjectId })
     },
-    [handleCollectionBecameEmpty, openCollection, projectId, status.readOnly]
+    [handleCollectionBecameEmpty, isReadOnlyProject, openCollection, projectId]
   )
 
   const handleCollectionCreated = useCallback(
     (collectionPath: string, documentId: string): void => {
-      autocomplete.addCollectionPaths(projectId, [collectionPath])
-      void loadRootCollections().then(() => {
+      autocomplete.addCollectionPaths(dialogProjectId, [collectionPath])
+      const reload =
+        dialogProjectId === projectId
+          ? loadRootCollections()
+          : Promise.resolve()
+      void reload.then(() => {
         openCollection(collectionPath, {
-          selectedDocumentPath: `${collectionPath}/${documentId}`
+          selectedDocumentPath: `${collectionPath}/${documentId}`,
+          projectId: dialogProjectId
         })
       })
     },
-    [autocomplete, loadRootCollections, openCollection, projectId]
+    [autocomplete, dialogProjectId, loadRootCollections, openCollection, projectId]
   )
 
   const handleDocumentCreated = useCallback(
     (collectionPath: string, documentId: string): void => {
-      setTreeContentReloadToken((token) => token + 1)
+      if (dialogProjectId === projectId) {
+        setTreeContentReloadToken((token) => token + 1)
+      }
       setCollectionDataReloadToken((token) => token + 1)
       openCollection(collectionPath, {
-        selectedDocumentPath: `${collectionPath}/${documentId}`
+        selectedDocumentPath: `${collectionPath}/${documentId}`,
+        projectId: dialogProjectId
       })
     },
-    [openCollection]
+    [dialogProjectId, openCollection, projectId]
   )
 
   const handleCollectionRenamed = useCallback(
     (sourceCollectionPath: string, targetCollectionPath: string): void => {
-      autocomplete.removeCollectionPaths(projectId, [sourceCollectionPath])
-      autocomplete.addCollectionPaths(projectId, [targetCollectionPath])
+      autocomplete.removeCollectionPaths(dialogProjectId, [sourceCollectionPath])
+      autocomplete.addCollectionPaths(dialogProjectId, [targetCollectionPath])
 
-      setImpExpDraft((current) => ({
-        ...current,
-        collectionPath:
-          remapFirestorePath(current.collectionPath, sourceCollectionPath, targetCollectionPath) ??
-          current.collectionPath
-      }))
+      if (dialogProjectId === projectId) {
+        setImpExpDraft((current) => ({
+          ...current,
+          collectionPath:
+            remapFirestorePath(current.collectionPath, sourceCollectionPath, targetCollectionPath) ??
+            current.collectionPath
+        }))
+      }
 
       setTabs((current) => {
         const remapped = current.map((tab) => {
-          if (isImpExpTab(tab)) {
+          if (isImpExpTab(tab) || tab.projectId !== dialogProjectId) {
             return tab
           }
 
@@ -678,6 +811,7 @@ function FirestorePageInner({
             deduped.some(
               (existing) =>
                 isCollectionTab(existing) &&
+                existing.projectId === tab.projectId &&
                 existing.pane === tab.pane &&
                 existing.collectionPath === tab.collectionPath
             )
@@ -690,12 +824,17 @@ function FirestorePageInner({
         return deduped
       })
 
-      setTreeReloadToken((token) => token + 1)
-      void loadRootCollections()
+      if (dialogProjectId === projectId) {
+        setTreeReloadToken((token) => token + 1)
+        void loadRootCollections()
+      }
 
-      openCollection(targetCollectionPath, { selectedDocumentPath: null })
+      openCollection(targetCollectionPath, {
+        selectedDocumentPath: null,
+        projectId: dialogProjectId
+      })
     },
-    [autocomplete, loadRootCollections, openCollection, projectId]
+    [autocomplete, dialogProjectId, loadRootCollections, openCollection, projectId]
   )
 
   const handleRenameDialogCompleted = useCallback(
@@ -932,6 +1071,7 @@ function FirestorePageInner({
       const existingInPane = tabs.find(
         (tab) =>
           isCollectionTab(tab) &&
+          tab.projectId === currentTab.projectId &&
           tab.collectionPath === collectionPath &&
           tab.pane === currentTab.pane &&
           tab.id !== tabId
@@ -1003,7 +1143,10 @@ function FirestorePageInner({
     }
 
     for (const tab of tabs) {
-      const label = workspaceTabLabel(tab)
+      const label = workspaceTabLabel(
+        tab,
+        showProjectLabel && isCollectionTab(tab) ? projectLabelFor(tab.projectId) : undefined
+      )
       items.push({
         id: `focus-tab-${tab.id}`,
         group: '開いているタブ',
@@ -1046,7 +1189,9 @@ function FirestorePageInner({
     onNavigate,
     openCollection,
     openImpExp,
+    projectLabelFor,
     rootCollections,
+    showProjectLabel,
     splitEnabled,
     tabs
   ])
@@ -1070,13 +1215,19 @@ function FirestorePageInner({
         activeTabId={activeId}
         ariaLabel={pane === 'primary' ? '左ペインのタブ' : '右ペインのタブ'}
         impExpBusy={impExpJob?.status === 'running'}
+        projectLabelFor={projectLabelFor}
+        showProjectLabel={showProjectLabel}
         onActivate={(tabId) => activateInPane(tabId, pane)}
         onClose={handleCloseTab}
       />
 
       {active ? (
         <WorkspacePane
-          status={status}
+          status={
+            isImpExpTab(active)
+              ? status
+              : connectionStatusForTab(status, active, workspaceEntries)
+          }
           tab={active}
           menuEnabled={
             focusedPane === pane && isCollectionTab(active) && active.view === 'simple'
@@ -1090,24 +1241,36 @@ function FirestorePageInner({
           onChangeView={(nextView) => handlePaneViewChange(active.id, nextView)}
           onSelectCollection={(path) => handlePaneCollectionChange(active.id, path)}
           onSelectDocument={(path) => handlePaneDocumentChange(active.id, path)}
-          onRootCollectionsChanged={() => void loadRootCollections()}
+          onRootCollectionsChanged={() => {
+            if (active.projectId === projectId) {
+              void loadRootCollections()
+            }
+          }}
           onRequestCreateCollection={handleRequestCreateCollection}
-          onRequestCreateDocument={handleRequestCreateDocument}
-          onRequestDuplicateDocument={handleRequestDuplicateDocument}
-          onRequestRenameCollection={handleRequestRenameCollection}
-          onRequestCreateSubcollection={handleRequestCreateSubcollection}
-          onRequestDeleteSubcollection={handleRequestDeleteSubcollection}
+          onRequestCreateDocument={(path) => handleRequestCreateDocument(path, active.projectId)}
+          onRequestDuplicateDocument={(path) =>
+            handleRequestDuplicateDocument(path, active.projectId)
+          }
+          onRequestRenameCollection={(path) => handleRequestRenameCollection(path, active.projectId)}
+          onRequestCreateSubcollection={(path) =>
+            handleRequestCreateSubcollection(path, active.projectId)
+          }
+          onRequestDeleteSubcollection={(path) =>
+            handleRequestDeleteSubcollection(path, active.projectId)
+          }
           onRequestFieldBulk={(mode) => {
             if (isCollectionTab(active) && active.collectionPath) {
-              handleRequestFieldBulk(active.collectionPath, mode)
+              handleRequestFieldBulk(active.collectionPath, mode, active.projectId)
             }
           }}
           collectionDataReloadToken={collectionDataReloadToken}
-          onCollectionDocumentsChanged={() =>
-            setTreeContentReloadToken((token) => token + 1)
-          }
-          onCollectionBecameEmpty={(path) => void handleCollectionBecameEmpty(path)}
-          onOpenDocumentPath={(path) => void handleOpenDocumentPath(path)}
+          onCollectionDocumentsChanged={() => {
+            if (active.projectId === projectId) {
+              setTreeContentReloadToken((token) => token + 1)
+            }
+          }}
+          onCollectionBecameEmpty={(path) => void handleCollectionBecameEmpty(path, active.projectId)}
+          onOpenDocumentPath={(path) => void handleOpenDocumentPath(path, active.projectId)}
           onQueryDraftChange={(patch) => updateTab(active.id, patch)}
         />
       ) : (
@@ -1180,7 +1343,7 @@ function FirestorePageInner({
 
       {renameCollectionPath && (
         <CollectionRenameDialog
-          projectId={projectId}
+          projectId={dialogProjectId}
           collectionPath={renameCollectionPath}
           open
           onClose={() => setRenameCollectionPath(null)}
@@ -1190,7 +1353,7 @@ function FirestorePageInner({
 
       {fieldBulk && (
         <FieldBulkRenameDialog
-          projectId={projectId}
+          projectId={dialogProjectId}
           collectionPath={fieldBulk.path}
           initialMode={fieldBulk.mode}
           open
@@ -1201,7 +1364,7 @@ function FirestorePageInner({
 
       {createCollectionOpen && (
         <CollectionCreateDialog
-          projectId={projectId}
+          projectId={dialogProjectId}
           open
           onClose={() => setCreateCollectionOpen(false)}
           onCreated={handleCollectionCreated}
@@ -1210,7 +1373,7 @@ function FirestorePageInner({
 
       {createDocumentCollectionPath && (
         <DocumentCreateDialog
-          projectId={projectId}
+          projectId={dialogProjectId}
           collectionPath={createDocumentCollectionPath}
           open
           onClose={() => setCreateDocumentCollectionPath(null)}
@@ -1220,7 +1383,7 @@ function FirestorePageInner({
 
       {duplicateDocumentPath && (
         <DocumentDuplicateDialog
-          projectId={projectId}
+          projectId={dialogProjectId}
           documentPath={duplicateDocumentPath}
           open
           onClose={() => setDuplicateDocumentPath(null)}
@@ -1230,7 +1393,7 @@ function FirestorePageInner({
 
       {createSubcollectionDocumentPath && (
         <SubcollectionCreateDialog
-          projectId={projectId}
+          projectId={dialogProjectId}
           documentPath={createSubcollectionDocumentPath}
           open
           onClose={() => setCreateSubcollectionDocumentPath(null)}
@@ -1240,12 +1403,12 @@ function FirestorePageInner({
 
       {deleteSubcollectionPath && (
         <SubcollectionDeleteDialog
-          projectId={projectId}
+          projectId={dialogProjectId}
           collectionPath={deleteSubcollectionPath}
           open
           onClose={() => setDeleteSubcollectionPath(null)}
           onDeleted={() => {
-            handleSubcollectionDeleted(deleteSubcollectionPath)
+            handleSubcollectionDeleted(deleteSubcollectionPath, dialogProjectId)
             setDeleteSubcollectionPath(null)
           }}
         />
