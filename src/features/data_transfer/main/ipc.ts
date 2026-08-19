@@ -8,11 +8,13 @@ import type {
   ExportProjectProgress,
   ImportCollectionJsonInput,
   ImportCollectionProgress,
+  ImportDocumentsJsonInput,
   ImportProjectInput,
   ImportProjectProgress
 } from '@features/data_transfer/shared/types'
 import {
   importCollectionJson,
+  importDocumentsJson,
   peekCollectionImportJson,
   selectCollectionImportJson,
   validateCollectionImport
@@ -96,6 +98,17 @@ export function registerDataTransferHandlers(): void {
         event.sender.send(IPC_CHANNELS.DATA_TRANSFER_IMPORT_COLLECTION_PROGRESS, progress)
       }
       return importCollectionJson(input, reportProgress)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.DATA_TRANSFER_IMPORT_DOCUMENTS_JSON,
+    async (event, input: ImportDocumentsJsonInput) => {
+      logInfo('ipc:data_transfer', `importDocumentsJson file=${input.filePath}`)
+      const reportProgress = (progress: ImportCollectionProgress): void => {
+        event.sender.send(IPC_CHANNELS.DATA_TRANSFER_IMPORT_COLLECTION_PROGRESS, progress)
+      }
+      return importDocumentsJson(input, reportProgress)
     }
   )
 

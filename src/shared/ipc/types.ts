@@ -56,6 +56,7 @@ import type {
   ExportProjectResult,
   ExportResult,
   ImportCollectionJsonInput,
+  ImportDocumentsJsonInput,
   ImportCollectionProgress,
   ImportCollectionValidationResult,
   ImportProjectInput,
@@ -217,6 +218,7 @@ export type DataTransferIpcApi = {
     input: ImportCollectionJsonInput
   ) => Promise<ImportCollectionValidationResult>
   importCollectionJson: (input: ImportCollectionJsonInput) => Promise<ImportResult>
+  importDocumentsJson: (input: ImportDocumentsJsonInput) => Promise<ImportResult>
   onImportCollectionProgress: (
     listener: (progress: ImportCollectionProgress) => void
   ) => () => void

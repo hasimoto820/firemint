@@ -16,7 +16,6 @@ function EmulatorPage({ onClose, onWorkspaceChanged }: EmulatorPageProps): React
   const [projectId, setProjectId] = useState('')
   const [poolId, setPoolId] = useState<string | null>(null)
   const [filePath, setFilePath] = useState<string | null>(null)
-  const [collectionPath, setCollectionPath] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -62,17 +61,15 @@ function EmulatorPage({ onClose, onWorkspaceChanged }: EmulatorPageProps): React
       return
     }
 
-    setFilePath(selected.filePath)
     const peek = await window.api.dataTransfer.peekCollectionImportJson(selected.filePath)
 
     if (!peek.ok) {
+      setFilePath(null)
       setError(peek.error)
       return
     }
 
-    if (peek.collectionPath) {
-      setCollectionPath(peek.collectionPath)
-    }
+    setFilePath(selected.filePath)
   }
 
   const handleImport = async (): Promise<void> => {
@@ -86,22 +83,13 @@ function EmulatorPage({ onClose, onWorkspaceChanged }: EmulatorPageProps): React
       return
     }
 
-    const path = collectionPath.trim()
-
-    if (!path) {
-      setError(t('emulator.collection_path'))
-      return
-    }
-
     setBusy(true)
     setError(null)
 
     try {
-      const result = await window.api.dataTransfer.importCollectionJson({
+      const result = await window.api.dataTransfer.importDocumentsJson({
         projectId: poolId,
-        collectionPath: path,
-        filePath,
-        includeSubcollections: true
+        filePath
       })
 
       if (!result.ok) {
@@ -164,16 +152,6 @@ function EmulatorPage({ onClose, onWorkspaceChanged }: EmulatorPageProps): React
             </Button>
           </div>
           {filePath && <p className="connection-panel__file">{filePath}</p>}
-          <label className="emulator-page__field">
-            <span>{t('emulator.collection_path')}</span>
-            <input
-              className="workspace-panel__input"
-              value={collectionPath}
-              onChange={(event) => setCollectionPath(event.target.value)}
-              disabled={busy}
-              spellCheck={false}
-            />
-          </label>
           <div className="connection-panel__actions">
             <Button
               onClick={() => void handleImport()}

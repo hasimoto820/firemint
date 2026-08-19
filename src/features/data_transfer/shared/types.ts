@@ -59,6 +59,12 @@ export type ImportCollectionJsonInput = {
   includeSubcollections: boolean
 }
 
+/** JSON 丸ごと。各ドキュメントの path のまま書く */
+export type ImportDocumentsJsonInput = {
+  projectId: string
+  filePath: string
+}
+
 export type ImportCollectionProgress = {
   phase: 'loading' | 'validating' | 'writing' | 'done'
   processedCount: number

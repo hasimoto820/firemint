@@ -10,6 +10,7 @@ import { isCanceledError, throwIfCanceled } from '@shared/safety/canceled'
 import { logError, logInfo } from '@shared/logging/logger'
 import type {
   ImportCollectionJsonInput,
+  ImportDocumentsJsonInput,
   ImportCollectionProgress,
   ImportCollectionValidation,
   ImportCollectionValidationResult,
@@ -453,6 +454,52 @@ async function writePlannedDocuments(
   return writtenCount
 }
 
+function planWritesFromPaths(documents: ImportDocument[]): PlannedWrite[] {
+  return documents.map((document, index) => {
+    const path = document.path?.trim() ?? ''
+
+    if (!path) {
+      throw new Error(`${index + 1} 件目に path がありません`)
+    }
+
+    if (!isDocumentPath(path)) {
+      throw new Error(`${index + 1} 件目の path が不正です: ${path}`)
+    }
+
+    return {
+      kind: 'existingId' as const,
+      documentPath: path,
+      data: document.data
+    }
+  })
+}
+
+async function loadAndPlanFromPaths(
+  filePath: string,
+  onProgress?: ProgressReporter
+): Promise<PlannedWrite[]> {
+  if (!filePath.trim()) {
+    throw new Error('JSON ファイルを指定してください')
+  }
+
+  onProgress?.({
+    phase: 'loading',
+    processedCount: 0,
+    totalCount: 0,
+    percent: 5,
+    detail: 'JSON を読み込み中…'
+  })
+
+  const raw = await readFile(filePath, 'utf8')
+  const planned = planWritesFromPaths(parseImportDocuments(raw))
+
+  if (planned.length === 0) {
+    throw new Error('インポート対象のドキュメントがありません')
+  }
+
+  return planned
+}
+
 async function loadAndPlan(
   input: ImportCollectionJsonInput,
   onProgress?: ProgressReporter
@@ -640,6 +687,60 @@ export async function importCollectionJson(
         skippedOutsideCount: loaded.skippedOutsideCount,
         includeSubcollections: loaded.includeSubcollections,
         filePath: loaded.filePath
+      }
+    }
+  } catch (error) {
+    return toImportError(error)
+  }
+}
+
+export async function importDocumentsJson(
+  input: ImportDocumentsJsonInput,
+  onProgress?: ProgressReporter,
+  signal?: AbortSignal
+): Promise<ImportResult> {
+  try {
+    ensureConnected(input.projectId)
+    ensureWritable(input.projectId)
+    throwIfCanceled(signal)
+
+    logInfo(
+      'data_transfer',
+      `importDocumentsJson projectId=${input.projectId} file=${input.filePath}`
+    )
+
+    const planned = await loadAndPlanFromPaths(input.filePath, onProgress)
+    throwIfCanceled(signal)
+    const collisions = await findCollisions(input.projectId, planned, onProgress, signal)
+
+    if (collisions.hasCollisions) {
+      throw new Error(
+        `既存ドキュメントと衝突したため中止しました: ${collisions.collisionSamples.join(', ')}`
+      )
+    }
+
+    const writtenCount = await writePlannedDocuments(
+      input.projectId,
+      planned,
+      onProgress,
+      signal
+    )
+
+    onProgress?.({
+      phase: 'done',
+      processedCount: writtenCount,
+      totalCount: planned.length,
+      percent: 100,
+      detail: '完了'
+    })
+
+    return {
+      ok: true,
+      data: {
+        writtenCount,
+        skippedOutsideCount: 0,
+        includeSubcollections: true,
+        filePath: input.filePath
       }
     }
   } catch (error) {

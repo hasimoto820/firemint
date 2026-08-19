@@ -117,9 +117,8 @@ export const zhHant: MessageCatalog = {
     'FireMint 不會啟動模擬器。請先以 npm run emulators 等指令啟動。',
   'emulator.host': '主機',
   'emulator.project_id': 'projectId',
-  'emulator.import_lead': '沒有集合。請匯入 JSON。',
+  'emulator.import_lead': '沒有集合。請原樣匯入 JSON。',
   'emulator.select_json': '選擇 JSON',
-  'emulator.collection_path': '集合 path',
   'emulator.import': '匯入',
   'emulator.skip': '略過匯入'
 }

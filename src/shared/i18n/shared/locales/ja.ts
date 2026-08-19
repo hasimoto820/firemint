@@ -119,9 +119,8 @@ export const ja: MessageCatalog = {
     'FireMint は Emulator を起動しません。先に npm run emulators などで起動してください。',
   'emulator.host': 'ホスト',
   'emulator.project_id': 'projectId',
-  'emulator.import_lead': 'コレクションがありません。JSON を入れてください。',
+  'emulator.import_lead': 'コレクションがありません。JSON を丸ごと入れてください。',
   'emulator.select_json': 'JSON を選択',
-  'emulator.collection_path': 'コレクション path',
   'emulator.import': '入れる',
   'emulator.skip': '入れずに進む'
 }

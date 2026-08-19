@@ -50,6 +50,7 @@ export const IPC_CHANNELS = {
   DATA_TRANSFER_EXPORT_DOCUMENTS_JSON: 'data_transfer:export_documents_json',
   DATA_TRANSFER_EXPORT_DOCUMENTS_CSV: 'data_transfer:export_documents_csv',
   DATA_TRANSFER_IMPORT_COLLECTION_JSON: 'data_transfer:import_collection_json',
+  DATA_TRANSFER_IMPORT_DOCUMENTS_JSON: 'data_transfer:import_documents_json',
   DATA_TRANSFER_SELECT_COLLECTION_IMPORT_JSON: 'data_transfer:select_collection_import_json',
   DATA_TRANSFER_PEEK_COLLECTION_IMPORT_JSON: 'data_transfer:peek_collection_import_json',
   DATA_TRANSFER_VALIDATE_COLLECTION_IMPORT: 'data_transfer:validate_collection_import',

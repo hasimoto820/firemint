@@ -117,9 +117,8 @@ export const en: Record<string, string> = {
     'FireMint does not start the emulator. Start it first (for example npm run emulators).',
   'emulator.host': 'Host',
   'emulator.project_id': 'projectId',
-  'emulator.import_lead': 'No collections. Import JSON.',
+  'emulator.import_lead': 'No collections. Import the JSON as-is.',
   'emulator.select_json': 'Select JSON',
-  'emulator.collection_path': 'Collection path',
   'emulator.import': 'Import',
   'emulator.skip': 'Skip import'
 }

@@ -113,6 +113,8 @@ const api: IpcApi = {
       ipcRenderer.invoke(IPC_CHANNELS.DATA_TRANSFER_VALIDATE_COLLECTION_IMPORT, input),
     importCollectionJson: (input) =>
       ipcRenderer.invoke(IPC_CHANNELS.DATA_TRANSFER_IMPORT_COLLECTION_JSON, input),
+    importDocumentsJson: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.DATA_TRANSFER_IMPORT_DOCUMENTS_JSON, input),
     onImportCollectionProgress: (listener) => {
       const handler = (
         _event: Electron.IpcRendererEvent,
