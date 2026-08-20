@@ -118,6 +118,12 @@ export const zhHans: MessageCatalog = {
   'emulator.title': '用模拟器连接',
   'emulator.lead': '确认 Firestore Emulator 已启动，然后输入主机。',
   'emulator.lead_known': '确认主机，然后从 workspace 列表选择 projectId。',
+  'emulator.discover_lead': '正在查找运行中的模拟器。',
+  'emulator.discovering': '正在检测…',
+  'emulator.discover_none': '未找到运行中的模拟器。',
+  'emulator.discover_retry': '重新检测',
+  'emulator.discover_pick': '请选择要连接的模拟器。',
+  'emulator.discover_unnamed': '(无 projectId)',
   'emulator.process_hint':
     'FireMint 不会启动模拟器。请先用 npm run emulators 等命令启动。',
   'emulator.host': '主机',

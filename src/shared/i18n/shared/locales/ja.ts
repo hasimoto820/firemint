@@ -120,6 +120,12 @@ export const ja: MessageCatalog = {
   'emulator.title': 'エミュレーターで接続',
   'emulator.lead': 'Firestore Emulator の起動を確認し、ホストを入力します。',
   'emulator.lead_known': 'ホストを確認し、workspace の projectId をリストから選びます。',
+  'emulator.discover_lead': '起動中の Emulator を探します。',
+  'emulator.discovering': '検出しています…',
+  'emulator.discover_none': '起動中の Emulator が見つかりませんでした。',
+  'emulator.discover_retry': '再検出',
+  'emulator.discover_pick': '接続する Emulator を選んでください。',
+  'emulator.discover_unnamed': '(projectId なし)',
   'emulator.process_hint':
     'FireMint は Emulator を起動しません。先に npm run emulators などで起動してください。',
   'emulator.host': 'ホスト',

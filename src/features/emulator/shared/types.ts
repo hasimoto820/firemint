@@ -53,3 +53,19 @@ export type DeleteEmulatorProjectResult =
       ok: false
       error: string
     }
+
+export type DiscoveredEmulator = {
+  hubHost: string
+  firestoreHost: string
+  projectId: string
+}
+
+export type DiscoverEmulatorsResult =
+  | {
+      ok: true
+      data: DiscoveredEmulator[]
+    }
+  | {
+      ok: false
+      error: string
+    }

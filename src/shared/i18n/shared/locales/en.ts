@@ -118,6 +118,12 @@ export const en: Record<string, string> = {
   'emulator.title': 'Connect with emulator',
   'emulator.lead': 'Confirm Firestore Emulator is running, then enter the host.',
   'emulator.lead_known': 'Confirm the host, then choose a projectId from the workspace list.',
+  'emulator.discover_lead': 'Looking for a running emulator.',
+  'emulator.discovering': 'Discovering…',
+  'emulator.discover_none': 'No running emulator was found.',
+  'emulator.discover_retry': 'Discover again',
+  'emulator.discover_pick': 'Choose an emulator to connect.',
+  'emulator.discover_unnamed': '(no projectId)',
   'emulator.process_hint':
     'FireMint does not start the emulator. Start it first (for example npm run emulators).',
   'emulator.host': 'Host',

@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ConnectionStatus } from '@features/connection/shared/types'
-import { DEFAULT_EMULATOR_HOST } from '@features/connection/shared/emulator'
 import type { WorkspaceEntry } from '@features/workspace/shared/types'
 import ConnectionPanel from '@features/connection/renderer/ui/ConnectionPanel'
 import GoogleConnectDialog from '@features/connection/renderer/ui/GoogleConnectDialog'
@@ -89,11 +88,6 @@ function App(): React.JSX.Element {
   const loadedEmulator = workspaceEntries.find(
     (entry) => entry.authType === 'emulator' && loadedProjectIds.includes(entry.id)
   )
-  const focusedEntry = workspaceEntries.find((entry) => entry.id === connectionStatus?.projectId)
-  const emulatorHost =
-    (focusedIsEmulator ? focusedEntry?.emulatorHost : undefined) ??
-    loadedEmulator?.emulatorHost ??
-    DEFAULT_EMULATOR_HOST
   const canEmulatorImportProject = Boolean(loadedEmulator)
   const emulatorHasCollections = focusedIsEmulator && shellCommands?.hasRootCollections === true
   const canEmulatorImportCollection = emulatorHasCollections
@@ -289,7 +283,6 @@ function App(): React.JSX.Element {
           open={emulatorConnectOpen}
           onClose={() => setEmulatorConnectOpen(false)}
           onConnected={handleWorkspaceChanged}
-          defaultHost={emulatorHost}
         />
         <ProjectImportDialog
           projectId={connectionStatus?.projectId ?? null}

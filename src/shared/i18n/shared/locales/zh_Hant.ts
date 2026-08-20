@@ -118,6 +118,12 @@ export const zhHant: MessageCatalog = {
   'emulator.title': '以模擬器連線',
   'emulator.lead': '確認 Firestore Emulator 已啟動，然後輸入主機。',
   'emulator.lead_known': '確認主機，然後從 workspace 列表選擇 projectId。',
+  'emulator.discover_lead': '正在尋找執行中的模擬器。',
+  'emulator.discovering': '正在偵測…',
+  'emulator.discover_none': '找不到執行中的模擬器。',
+  'emulator.discover_retry': '重新偵測',
+  'emulator.discover_pick': '請選取要連線的模擬器。',
+  'emulator.discover_unnamed': '(無 projectId)',
   'emulator.process_hint':
     'FireMint 不會啟動模擬器。請先以 npm run emulators 等指令啟動。',
   'emulator.host': '主機',

@@ -79,7 +79,8 @@ import type {
   ImportEmulatorProjectZipInput,
   ImportEmulatorProjectZipResult,
   DeleteEmulatorProjectInput,
-  DeleteEmulatorProjectResult
+  DeleteEmulatorProjectResult,
+  DiscoverEmulatorsResult
 } from '@features/emulator/shared/types'
 
 import type {
@@ -288,6 +289,7 @@ export type EmulatorIpcApi = {
   ) => Promise<ImportEmulatorProjectZipResult>
   importCollectionJson: (input: ImportEmulatorCollectionJsonInput) => Promise<ImportResult>
   deleteProject: (input: DeleteEmulatorProjectInput) => Promise<DeleteEmulatorProjectResult>
+  discover: () => Promise<DiscoverEmulatorsResult>
 }
 
 export type SettingsIpcApi = {

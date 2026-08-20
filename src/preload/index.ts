@@ -165,7 +165,8 @@ const api: IpcApi = {
       ipcRenderer.invoke(IPC_CHANNELS.EMULATOR_IMPORT_PROJECT_ZIP, input),
     importCollectionJson: (input) =>
       ipcRenderer.invoke(IPC_CHANNELS.EMULATOR_IMPORT_COLLECTION_JSON, input),
-    deleteProject: (input) => ipcRenderer.invoke(IPC_CHANNELS.EMULATOR_DELETE_PROJECT, input)
+    deleteProject: (input) => ipcRenderer.invoke(IPC_CHANNELS.EMULATOR_DELETE_PROJECT, input),
+    discover: () => ipcRenderer.invoke(IPC_CHANNELS.EMULATOR_DISCOVER)
   },
   scriptRunner: {
     start: (input) => ipcRenderer.invoke(IPC_CHANNELS.SCRIPT_RUNNER_START, input),

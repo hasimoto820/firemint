@@ -1,4 +1,5 @@
 export const DEFAULT_EMULATOR_HOST = '127.0.0.1:8080'
+export const DEFAULT_EMULATOR_HUB = '127.0.0.1:4400'
 
 /** 画面上は空でよい。SDK と左ツリーに渡すときの仮の projectId。demo-firemint は使わない。 */
 export const EMPTY_EMULATOR_PROJECT_ID = 'emulator'

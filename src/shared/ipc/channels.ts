@@ -18,6 +18,7 @@ export const IPC_CHANNELS = {
   EMULATOR_IMPORT_PROJECT_ZIP: 'emulator:import_project_zip',
   EMULATOR_IMPORT_COLLECTION_JSON: 'emulator:import_collection_json',
   EMULATOR_DELETE_PROJECT: 'emulator:delete_project',
+  EMULATOR_DISCOVER: 'emulator:discover',
   CONNECTION_DISCONNECT: 'connection:disconnect',
   CONNECTION_GET_STATUS: 'connection:get_status',
   EXPLORER_LIST_ROOT_COLLECTIONS: 'explorer:list_root_collections',

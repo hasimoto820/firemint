@@ -8,6 +8,7 @@ import type {
 } from '@features/emulator/shared/types'
 import {
   deleteEmulatorProject,
+  discoverEmulators,
   importEmulatorCollectionJson,
   importEmulatorProjectZip
 } from './service'
@@ -39,4 +40,9 @@ export function registerEmulatorHandlers(): void {
       return deleteEmulatorProject(input)
     }
   )
+
+  ipcMain.handle(IPC_CHANNELS.EMULATOR_DISCOVER, async () => {
+    logInfo('ipc:emulator', 'discover')
+    return discoverEmulators()
+  })
 }
