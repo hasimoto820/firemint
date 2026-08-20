@@ -1,15 +1,20 @@
 export const DEFAULT_EMULATOR_HOST = '127.0.0.1:8080'
 
-/** 画面上は空でよい。SDK と名簿 id に渡すときの仮の projectId。 */
-export const DEFAULT_EMULATOR_PROJECT_ID = 'demo-firemint'
+/** 画面上は空でよい。SDK と左ツリーに渡すときの仮の projectId。demo-firemint は使わない。 */
+export const EMPTY_EMULATOR_PROJECT_ID = 'emulator'
 
 export function resolveEmulatorProjectId(raw: string): string {
   const id = raw.trim()
-  return id || DEFAULT_EMULATOR_PROJECT_ID
+  return id || EMPTY_EMULATOR_PROJECT_ID
 }
 
 export function emulatorEntryId(projectId: string): string {
   const id = resolveEmulatorProjectId(projectId)
+
+  if (id === EMPTY_EMULATOR_PROJECT_ID) {
+    return EMPTY_EMULATOR_PROJECT_ID
+  }
+
   return id.endsWith('_emulator') ? id : `${id}_emulator`
 }
 

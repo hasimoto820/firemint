@@ -13,6 +13,7 @@ import type { ScriptJobSnapshot } from '@features/script_runner/shared/types'
 import type { WorkspaceEntry } from '@features/workspace/shared/types'
 import AutocompleteInput from '@shared/ui/AutocompleteInput'
 import Button from '@shared/ui/Button'
+import { useT } from '@shared/i18n/renderer/I18nProvider'
 
 type ImpExpViewProps = {
   projectId: string
@@ -102,6 +103,7 @@ function ImpExpView({
   onCancel
 }: ImpExpViewProps): React.JSX.Element {
   const autocomplete = useOptionalAutocompleteApi()
+  const t = useT()
   const jobRunning = job?.status === 'running'
   const formDisabled = jobRunning
   const collectionValidation = draft.collectionValidation
@@ -578,6 +580,7 @@ function ImpExpView({
   return (
     <div className="imp-exp-view imp-exp-view--job">
       <div className="imp-exp-form">
+        <h1 className="imp-exp-form__title">{t('menu.cloud')}</h1>
         <div className="imp-exp-form__toggles">
           <ToggleBar
             ariaLabel="向き"

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import {
+  DEFAULT_ENTRY_COLOR,
   workspaceAuthLabel,
   type WorkspaceEntry,
   type WorkspaceState
@@ -36,7 +37,7 @@ function WorkspaceProjectList({
   const [state, setState] = useState<WorkspaceState | null>(null)
   const [settingsFor, setSettingsFor] = useState<string | null>(null)
   const [labelDraft, setLabelDraft] = useState('')
-  const [colorDraft, setColorDraft] = useState('#607D8B')
+  const [colorDraft, setColorDraft] = useState(DEFAULT_ENTRY_COLOR)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -164,6 +165,30 @@ function WorkspaceProjectList({
 
     try {
       const result = await window.api.workspace.unloadProject(projectId)
+
+      if (!result.ok) {
+        setError(result.error)
+        return
+      }
+
+      setSettingsFor(null)
+      await refresh()
+      onChanged()
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleDeleteEmulator = async (projectId: string): Promise<void> => {
+    if (!(await confirmAction(t('emulator.delete_project_confirm')))) {
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+
+    try {
+      const result = await window.api.emulator.deleteProject({ projectId })
 
       if (!result.ok) {
         setError(result.error)
@@ -338,13 +363,23 @@ function WorkspaceProjectList({
                     >
                       {t('common.disconnect')}
                     </Button>
-                    <Button
-                      variant="danger"
-                      onClick={() => void handleRemove(entry.id)}
-                      disabled={busy}
-                    >
-                      {t('workspace.unregister')}
-                    </Button>
+                    {entry.authType === 'emulator' ? (
+                      <Button
+                        variant="danger"
+                        onClick={() => void handleDeleteEmulator(entry.id)}
+                        disabled={busy || entry.readOnly}
+                      >
+                        {t('common.delete')}
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="danger"
+                        onClick={() => void handleRemove(entry.id)}
+                        disabled={busy}
+                      >
+                        {t('workspace.unregister')}
+                      </Button>
+                    )}
                   </div>
                 </div>
               )}

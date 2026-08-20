@@ -106,6 +106,18 @@ export type PeekCollectionImportResult =
       error: string
     }
 
+export type PeekProjectImportResult =
+  | {
+      ok: true
+      projectId: string
+      documentCount: number
+      rootCollectionIds: string[]
+    }
+  | {
+      ok: false
+      error: string
+    }
+
 export type ImportSummary = {
   writtenCount: number
   skippedOutsideCount: number

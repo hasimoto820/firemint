@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ConnectionStatus } from '@features/connection/shared/types'
+import { DEFAULT_EMULATOR_HOST } from '@features/connection/shared/emulator'
 import type { WorkspaceEntry } from '@features/workspace/shared/types'
 import ConnectionPanel from '@features/connection/renderer/ui/ConnectionPanel'
 import GoogleConnectDialog from '@features/connection/renderer/ui/GoogleConnectDialog'
 import ListConnectDialog from '@features/connection/renderer/ui/ListConnectDialog'
-import EmulatorPage from '@features/emulator/renderer/ui/EmulatorPage'
+import EmulatorConnectDialog from '@features/emulator/renderer/ui/EmulatorConnectDialog'
 import ProjectImportDialog from '@features/data_transfer/renderer/ui/ProjectImportDialog'
 import FirestorePage, { type ShellCommands } from './FirestorePage'
 import type { AppView } from '@shared/shell/AppNav'
@@ -32,7 +33,7 @@ function App(): React.JSX.Element {
   const [projectImportOpen, setProjectImportOpen] = useState(false)
   const [googleConnectOpen, setGoogleConnectOpen] = useState(false)
   const [listConnectOpen, setListConnectOpen] = useState(false)
-  const [emulatorPageOpen, setEmulatorPageOpen] = useState(false)
+  const [emulatorConnectOpen, setEmulatorConnectOpen] = useState(false)
   const [rootsReloadToken, setRootsReloadToken] = useState(0)
 
   const refreshStatus = useCallback(async (): Promise<void> => {
@@ -84,6 +85,18 @@ function App(): React.JSX.Element {
   const canDisconnect = connected
   const canImportProject = workspaceEntries.length > 0
   const canListConnect = workspaceEntries.length > 0
+  const focusedIsEmulator = connectionStatus?.authType === 'emulator'
+  const loadedEmulator = workspaceEntries.find(
+    (entry) => entry.authType === 'emulator' && loadedProjectIds.includes(entry.id)
+  )
+  const focusedEntry = workspaceEntries.find((entry) => entry.id === connectionStatus?.projectId)
+  const emulatorHost =
+    (focusedIsEmulator ? focusedEntry?.emulatorHost : undefined) ??
+    loadedEmulator?.emulatorHost ??
+    DEFAULT_EMULATOR_HOST
+  const canEmulatorImportProject = Boolean(loadedEmulator)
+  const canEmulatorImportCollection = focusedIsEmulator
+  const canEmulatorExport = focusedIsEmulator && Boolean(shellCommands?.openEmulatorImpExp)
   const platform = window.electron.process.platform
   const useWindowMenuActions = platform === 'linux'
 
@@ -105,8 +118,24 @@ function App(): React.JSX.Element {
   }, [])
 
   const handleEmulatorConnect = useCallback((): void => {
-    setEmulatorPageOpen(true)
+    setEmulatorConnectOpen(true)
   }, [])
+
+  const handleEmulatorImportProject = useCallback((): void => {
+    shellCommands?.openEmulatorImpExp('import-project')
+  }, [shellCommands])
+
+  const handleEmulatorImportCollection = useCallback((): void => {
+    shellCommands?.openEmulatorImpExp('import-collection')
+  }, [shellCommands])
+
+  const handleEmulatorExportProject = useCallback((): void => {
+    shellCommands?.openEmulatorImpExp('export-project')
+  }, [shellCommands])
+
+  const handleEmulatorExportCollection = useCallback((): void => {
+    shellCommands?.openEmulatorImpExp('export-collection')
+  }, [shellCommands])
 
   const handleJsonConnect = useCallback(async (): Promise<void> => {
     const filePath = await window.api.connection.selectServiceAccountFile()
@@ -147,6 +176,13 @@ function App(): React.JSX.Element {
         onGoogleConnect: handleGoogleConnect,
         onJsonConnect: () => void handleJsonConnect(),
         onEmulatorConnect: handleEmulatorConnect,
+        onEmulatorImportProject: handleEmulatorImportProject,
+        onEmulatorImportCollection: handleEmulatorImportCollection,
+        onEmulatorExportProject: handleEmulatorExportProject,
+        onEmulatorExportCollection: handleEmulatorExportCollection,
+        canEmulatorImportProject,
+        canEmulatorImportCollection,
+        canEmulatorExport,
         context: menuContext,
         shell: shellCommands
           ? {
@@ -187,6 +223,13 @@ function App(): React.JSX.Element {
       handleGoogleConnect,
       handleJsonConnect,
       handleEmulatorConnect,
+      handleEmulatorImportProject,
+      handleEmulatorImportCollection,
+      handleEmulatorExportProject,
+      handleEmulatorExportCollection,
+      canEmulatorImportProject,
+      canEmulatorImportCollection,
+      canEmulatorExport,
       menuContext,
       shellCommands,
       useWindowMenuActions,
@@ -200,15 +243,6 @@ function App(): React.JSX.Element {
 
   if (!ready || connectionStatus === undefined) {
     content = <main className="app-shell app-shell--loading">{t('common.busy')}</main>
-  } else if (emulatorPageOpen) {
-    content = (
-      <main className="app-shell app-shell--landing">
-        <EmulatorPage
-          onClose={() => setEmulatorPageOpen(false)}
-          onWorkspaceChanged={handleWorkspaceChanged}
-        />
-      </main>
-    )
   } else if (!connectionStatus) {
     content = (
       <main className="app-shell app-shell--landing">
@@ -248,6 +282,12 @@ function App(): React.JSX.Element {
           open={googleConnectOpen}
           onClose={() => setGoogleConnectOpen(false)}
           onConnected={handleWorkspaceChanged}
+        />
+        <EmulatorConnectDialog
+          open={emulatorConnectOpen}
+          onClose={() => setEmulatorConnectOpen(false)}
+          onConnected={handleWorkspaceChanged}
+          defaultHost={emulatorHost}
         />
         <ProjectImportDialog
           projectId={connectionStatus?.projectId ?? null}

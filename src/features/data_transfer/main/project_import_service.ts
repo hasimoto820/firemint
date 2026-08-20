@@ -18,7 +18,8 @@ import type {
   ImportProjectProgress,
   ImportProjectResult,
   ImportProjectValidation,
-  ImportProjectValidationResult
+  ImportProjectValidationResult,
+  PeekProjectImportResult
 } from '@features/data_transfer/shared/types'
 
 type ProgressReporter = (progress: ImportProjectProgress) => void
@@ -341,6 +342,37 @@ export async function validateProjectImport(
     }
   } catch (error) {
     return toValidationError(error)
+  } finally {
+    if (tempDir) {
+      await rm(tempDir, { recursive: true, force: true }).catch(() => undefined)
+    }
+  }
+}
+
+export async function peekProjectImportZip(filePath: string): Promise<PeekProjectImportResult> {
+  let tempDir: string | null = null
+
+  try {
+    const trimmed = filePath.trim()
+    if (!trimmed) {
+      throw new Error('ZIP ファイルを指定してください')
+    }
+
+    const loaded = await loadProjectArchive(trimmed)
+    tempDir = loaded.tempDir
+
+    return {
+      ok: true,
+      projectId: loaded.archive.manifest.projectId,
+      documentCount: loaded.archive.documents.length,
+      rootCollectionIds: loaded.archive.manifest.rootCollectionIds
+    }
+  } catch (error) {
+    logError('data_transfer', 'peekProjectImportZip failed', error)
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'ZIP を読み取れませんでした'
+    }
   } finally {
     if (tempDir) {
       await rm(tempDir, { recursive: true, force: true }).catch(() => undefined)

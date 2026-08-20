@@ -160,6 +160,13 @@ const api: IpcApi = {
       }
     }
   },
+  emulator: {
+    importProjectZip: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.EMULATOR_IMPORT_PROJECT_ZIP, input),
+    importCollectionJson: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.EMULATOR_IMPORT_COLLECTION_JSON, input),
+    deleteProject: (input) => ipcRenderer.invoke(IPC_CHANNELS.EMULATOR_DELETE_PROJECT, input)
+  },
   scriptRunner: {
     start: (input) => ipcRenderer.invoke(IPC_CHANNELS.SCRIPT_RUNNER_START, input),
     cancel: () => ipcRenderer.invoke(IPC_CHANNELS.SCRIPT_RUNNER_CANCEL),

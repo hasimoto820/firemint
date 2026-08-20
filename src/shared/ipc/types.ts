@@ -75,6 +75,14 @@ import type {
 } from '@features/script_runner/shared/types'
 
 import type {
+  ImportEmulatorCollectionJsonInput,
+  ImportEmulatorProjectZipInput,
+  ImportEmulatorProjectZipResult,
+  DeleteEmulatorProjectInput,
+  DeleteEmulatorProjectResult
+} from '@features/emulator/shared/types'
+
+import type {
   AddWorkspaceEntryInput,
   SetFocusedProjectOptions,
   UpdateWorkspaceEntryInput,
@@ -274,6 +282,14 @@ export type AuthUsersIpcApi = {
   ) => Promise<AuthUsersResult<ExportAuthUsersResult>>
 }
 
+export type EmulatorIpcApi = {
+  importProjectZip: (
+    input: ImportEmulatorProjectZipInput
+  ) => Promise<ImportEmulatorProjectZipResult>
+  importCollectionJson: (input: ImportEmulatorCollectionJsonInput) => Promise<ImportResult>
+  deleteProject: (input: DeleteEmulatorProjectInput) => Promise<DeleteEmulatorProjectResult>
+}
+
 export type SettingsIpcApi = {
   get: () => Promise<AppSettings>
   setLocale: (locale: Locale) => Promise<AppSettings>
@@ -292,6 +308,7 @@ export interface IpcApi {
   query: QueryIpcApi
   bulk: BulkOperationsIpcApi
   dataTransfer: DataTransferIpcApi
+  emulator: EmulatorIpcApi
   scriptRunner: ScriptRunnerIpcApi
   authUsers: AuthUsersIpcApi
   settings: SettingsIpcApi

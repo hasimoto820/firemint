@@ -17,6 +17,8 @@ export const ja: MessageCatalog = {
   'menu.help': 'Help',
   'menu.import': 'インポート',
   'menu.export': 'エクスポート',
+  'menu.cloud': 'クラウド',
+  'menu.emulator': 'エミュレーター',
   'menu.connection': '接続',
   'menu.project': 'プロジェクト',
   'menu.collection': 'コレクション',
@@ -24,6 +26,8 @@ export const ja: MessageCatalog = {
   'menu.connect_json': 'JSON で接続…',
   'menu.connect_google': 'Google で接続…',
   'menu.connect_emulator': 'エミュレーターで接続…',
+  'menu.emulator_import': 'エミュレーターインポート',
+  'menu.emulator_export': 'エミュレーターエクスポート',
   'menu.disconnect': '切断',
   'menu.quit': '終了',
   'menu.documents': 'ドキュメント',
@@ -114,13 +118,29 @@ export const ja: MessageCatalog = {
   'list_connect.empty': '登録済みがありません。先に JSON または Google で接続してください。',
 
   'emulator.title': 'エミュレーターで接続',
-  'emulator.lead': 'Firestore Emulator の起動を確認し、ホストを入力します。projectId は空でも進めます。',
+  'emulator.lead': 'Firestore Emulator の起動を確認し、ホストを入力します。',
+  'emulator.lead_known': 'ホストを確認し、workspace の projectId をリストから選びます。',
   'emulator.process_hint':
     'FireMint は Emulator を起動しません。先に npm run emulators などで起動してください。',
   'emulator.host': 'ホスト',
-  'emulator.project_id': 'projectId',
+  'emulator.select_known': 'リストから projectId を選択',
   'emulator.import_lead': 'コレクションがありません。JSON を丸ごと入れてください。',
   'emulator.select_json': 'JSON を選択',
-  'emulator.import': '入れる',
-  'emulator.skip': '入れずに進む'
+  'emulator.select_zip': 'ZIP を選択',
+  'emulator.import': '接続',
+  'emulator.skip': '入れずに進む',
+  'emulator.connect_import_lead':
+    'zip は任意です。空のまま接続できます。zip を選ぶと Emulator に入れて左ツリーに出します。',
+  'emulator.import_project_title': 'エミュレーターにプロジェクトを追加',
+  'emulator.import_project_lead': 'zip を選びます。左ツリーに新しい行として表示し、workspace に書き込みます。',
+  'emulator.import_collection_title': 'エミュレーターにコレクションを追加',
+  'emulator.import_collection_lead':
+    'json を選びます。インポート先は左ツリーで選択中のエミュレータープロジェクトです。',
+  'emulator.export_project_lead': 'フォーカス中のエミュレータープロジェクトを zip で出します。',
+  'emulator.export_collection_lead':
+    'フォーカス中のエミュレータープロジェクトから、コレクションを JSON で出します。',
+  'emulator.destination': 'インポート先',
+  'emulator.no_destination': '左ツリーでエミュレーターのプロジェクトを選んでください。',
+  'emulator.delete_project_confirm':
+    'Emulator 上のこのプロジェクトを削除しますか？ 中身は消え、workspace からも消えます。'
 }

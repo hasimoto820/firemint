@@ -79,6 +79,13 @@ export type AppMenuHandlers = {
   onGoogleConnect?: () => void
   onJsonConnect?: () => void
   onEmulatorConnect?: () => void
+  onEmulatorImportProject?: () => void
+  onEmulatorImportCollection?: () => void
+  onEmulatorExportProject?: () => void
+  onEmulatorExportCollection?: () => void
+  canEmulatorImportProject?: boolean
+  canEmulatorImportCollection?: boolean
+  canEmulatorExport?: boolean
   onMinimize?: () => void
   onMaximizeToggle?: () => void
   context?: AppMenuContextActions | null
@@ -98,12 +105,13 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
       id: 'file',
       label: t('menu.file'),
       items: [
-        { type: 'header', label: t('menu.import') },
+        { type: 'header', label: t('menu.cloud') },
+        { type: 'header', label: t('menu.import'), indent: true },
         {
           type: 'item',
           id: 'file-import-project',
           label: t('menu.project'),
-          indent: true,
+          indent: 2,
           disabled: !(handlers.canImportProject ?? handlers.connected),
           onClick: () => {
             if (shell?.openImpExp) {
@@ -117,16 +125,16 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
           type: 'item',
           id: 'file-import',
           label: t('menu.collection'),
-          indent: true,
+          indent: 2,
           disabled: !handlers.connected,
           onClick: () => shell?.openImpExp?.({ direction: 'import', target: 'collection' })
         },
-        { type: 'header', label: t('menu.export') },
+        { type: 'header', label: t('menu.export'), indent: true },
         {
           type: 'item',
           id: 'file-export-project',
           label: t('menu.project'),
-          indent: true,
+          indent: 2,
           disabled: !handlers.connected,
           onClick: () => shell?.openImpExp?.({ direction: 'export', target: 'project' })
         },
@@ -134,9 +142,45 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
           type: 'item',
           id: 'file-export',
           label: t('menu.collection'),
-          indent: true,
+          indent: 2,
           disabled: !handlers.connected,
           onClick: () => shell?.openImpExp?.({ direction: 'export', target: 'collection' })
+        },
+        { type: 'separator' },
+        { type: 'header', label: t('menu.emulator') },
+        { type: 'header', label: t('menu.import'), indent: true },
+        {
+          type: 'item',
+          id: 'file-emulator-import-project',
+          label: t('menu.project'),
+          indent: 2,
+          disabled: !(handlers.canEmulatorImportProject ?? false),
+          onClick: handlers.onEmulatorImportProject
+        },
+        {
+          type: 'item',
+          id: 'file-emulator-import-collection',
+          label: t('menu.collection'),
+          indent: 2,
+          disabled: !(handlers.canEmulatorImportCollection ?? false),
+          onClick: handlers.onEmulatorImportCollection
+        },
+        { type: 'header', label: t('menu.export'), indent: true },
+        {
+          type: 'item',
+          id: 'file-emulator-export-project',
+          label: t('menu.project'),
+          indent: 2,
+          disabled: !(handlers.canEmulatorExport ?? false),
+          onClick: handlers.onEmulatorExportProject
+        },
+        {
+          type: 'item',
+          id: 'file-emulator-export-collection',
+          label: t('menu.collection'),
+          indent: 2,
+          disabled: !(handlers.canEmulatorExport ?? false),
+          onClick: handlers.onEmulatorExportCollection
         },
         { type: 'separator' },
         { type: 'header', label: t('menu.connection') },

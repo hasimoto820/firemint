@@ -1,56 +1,88 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { DEFAULT_EMULATOR_HOST } from '@features/connection/shared/emulator'
-import type { EmulatorWizardStep } from '@features/emulator/shared/types'
+import {
+  emulatorPageIntent,
+  emulatorPageModeFromIntent,
+  type EmulatorPageDirection,
+  type EmulatorPageMode,
+  type EmulatorPageTarget
+} from '@features/emulator/shared/types'
 import Button from '@shared/ui/Button'
 import { useT } from '@shared/i18n/renderer/I18nProvider'
 
 type EmulatorPageProps = {
+  mode: EmulatorPageMode
+  onModeChange?: (mode: EmulatorPageMode) => void
   onClose: () => void
   onWorkspaceChanged: () => void | Promise<void>
+  defaultHost?: string
+  destinationPoolId?: string | null
+  destinationLabel?: string | null
 }
 
-function EmulatorPage({ onClose, onWorkspaceChanged }: EmulatorPageProps): React.JSX.Element {
+function ToggleBar<T extends string>({
+  value,
+  options,
+  disabled,
+  ariaLabel,
+  onChange
+}: {
+  value: T
+  options: { id: T; label: string }[]
+  disabled: boolean
+  ariaLabel: string
+  onChange: (value: T) => void
+}): React.JSX.Element {
+  return (
+    <nav className="app-nav" aria-label={ariaLabel}>
+      {options.map((option) => (
+        <button
+          key={option.id}
+          type="button"
+          className={value === option.id ? 'app-nav__item app-nav__item--active' : 'app-nav__item'}
+          disabled={disabled}
+          onClick={() => onChange(option.id)}
+        >
+          {option.label}
+        </button>
+      ))}
+    </nav>
+  )
+}
+
+function EmulatorPage({
+  mode,
+  onModeChange,
+  onClose,
+  onWorkspaceChanged,
+  defaultHost = DEFAULT_EMULATOR_HOST,
+  destinationPoolId = null,
+  destinationLabel = null
+}: EmulatorPageProps): React.JSX.Element {
   const t = useT()
-  const [step, setStep] = useState<EmulatorWizardStep>('connect')
-  const [host, setHost] = useState(DEFAULT_EMULATOR_HOST)
-  const [projectId, setProjectId] = useState('')
-  const [poolId, setPoolId] = useState<string | null>(null)
+  const host = defaultHost
+  const poolId = destinationPoolId
+  const { direction, target } = emulatorPageIntent(mode)
   const [filePath, setFilePath] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  useEffect(() => {
+    setFilePath(null)
+    setError(null)
+  }, [mode])
+
+  const setDirection = (next: EmulatorPageDirection): void => {
+    onModeChange?.(emulatorPageModeFromIntent(next, target))
+  }
+
+  const setTarget = (next: EmulatorPageTarget): void => {
+    onModeChange?.(emulatorPageModeFromIntent(direction, next))
+  }
+
   const finish = async (): Promise<void> => {
     await onWorkspaceChanged()
     onClose()
-  }
-
-  const handleConnect = async (): Promise<void> => {
-    setBusy(true)
-    setError(null)
-
-    try {
-      const result = await window.api.connection.connectEmulator({
-        host,
-        projectId
-      })
-
-      if (!result.ok) {
-        setError(result.error)
-        return
-      }
-
-      await onWorkspaceChanged()
-
-      if (result.rootCollections.length > 0) {
-        onClose()
-        return
-      }
-
-      setPoolId(result.projectId)
-      setStep('import')
-    } finally {
-      setBusy(false)
-    }
   }
 
   const handleSelectJson = async (): Promise<void> => {
@@ -72,9 +104,20 @@ function EmulatorPage({ onClose, onWorkspaceChanged }: EmulatorPageProps): React
     setFilePath(selected.filePath)
   }
 
-  const handleImport = async (): Promise<void> => {
+  const handleSelectZip = async (): Promise<void> => {
+    setError(null)
+    const selected = await window.api.dataTransfer.selectProjectImportZip()
+
+    if (selected.canceled || !selected.filePath) {
+      return
+    }
+
+    setFilePath(selected.filePath)
+  }
+
+  const handleImportJson = async (): Promise<void> => {
     if (!poolId) {
-      setError('接続情報がありません')
+      setError(t('emulator.no_destination'))
       return
     }
 
@@ -87,7 +130,7 @@ function EmulatorPage({ onClose, onWorkspaceChanged }: EmulatorPageProps): React
     setError(null)
 
     try {
-      const result = await window.api.dataTransfer.importDocumentsJson({
+      const result = await window.api.emulator.importCollectionJson({
         projectId: poolId,
         filePath
       })
@@ -103,39 +146,83 @@ function EmulatorPage({ onClose, onWorkspaceChanged }: EmulatorPageProps): React
     }
   }
 
+  const handleImportZip = async (): Promise<void> => {
+    if (!filePath) {
+      setError(t('emulator.select_zip'))
+      return
+    }
+
+    setBusy(true)
+    setError(null)
+
+    try {
+      const result = await window.api.emulator.importProjectZip({
+        host,
+        filePath
+      })
+
+      if (!result.ok) {
+        setError(result.error)
+        return
+      }
+
+      finish()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const lead =
+    mode === 'import-project'
+      ? t('emulator.import_project_lead')
+      : mode === 'import-collection'
+        ? t('emulator.import_collection_lead')
+        : mode === 'export-project'
+          ? t('emulator.export_project_lead')
+          : t('emulator.export_collection_lead')
+
   return (
     <section className="connection-panel emulator-page">
-      <h1 className="connection-panel__brand">{t('emulator.title')}</h1>
-      <p className="connection-panel__lead">
-        {step === 'connect' ? t('emulator.lead') : t('emulator.import_lead')}
-      </p>
+      <h1 className="imp-exp-form__title">{t('menu.emulator')}</h1>
+      <div className="imp-exp-form__toggles">
+        <ToggleBar
+          ariaLabel="向き"
+          value={direction}
+          disabled={busy}
+          options={[
+            { id: 'import', label: 'Import' },
+            { id: 'export', label: 'Export' }
+          ]}
+          onChange={setDirection}
+        />
+        <ToggleBar
+          ariaLabel="対象"
+          value={target}
+          disabled={busy}
+          options={[
+            { id: 'collection', label: 'Collection' },
+            { id: 'project', label: 'Project' }
+          ]}
+          onChange={setTarget}
+        />
+      </div>
+      <p className="connection-panel__lead">{lead}</p>
 
-      {step === 'connect' && (
+      {mode === 'import-project' && (
         <>
-          <p className="connection-panel__hint">{t('emulator.process_hint')}</p>
-          <label className="emulator-page__field">
-            <span>{t('emulator.host')}</span>
-            <input
-              className="workspace-panel__input"
-              value={host}
-              onChange={(event) => setHost(event.target.value)}
-              disabled={busy}
-              spellCheck={false}
-            />
-          </label>
-          <label className="emulator-page__field">
-            <span>{t('emulator.project_id')}</span>
-            <input
-              className="workspace-panel__input"
-              value={projectId}
-              onChange={(event) => setProjectId(event.target.value)}
-              disabled={busy}
-              spellCheck={false}
-            />
-          </label>
           <div className="connection-panel__actions">
-            <Button onClick={() => void handleConnect()} disabled={busy} variant="primary">
-              {t('common.next')}
+            <Button onClick={() => void handleSelectZip()} disabled={busy}>
+              {t('emulator.select_zip')}
+            </Button>
+          </div>
+          {filePath && <p className="connection-panel__file">{filePath}</p>}
+          <div className="connection-panel__actions">
+            <Button
+              onClick={() => void handleImportZip()}
+              disabled={busy || !filePath}
+              variant="primary"
+            >
+              {t('emulator.import')}
             </Button>
             <Button onClick={onClose} disabled={busy}>
               {t('common.cancel')}
@@ -144,24 +231,40 @@ function EmulatorPage({ onClose, onWorkspaceChanged }: EmulatorPageProps): React
         </>
       )}
 
-      {step === 'import' && (
+      {mode === 'import-collection' && (
         <>
+          <p className="emulator-page__destination">
+            {t('emulator.destination')}: {destinationLabel ?? destinationPoolId ?? t('emulator.no_destination')}
+          </p>
           <div className="connection-panel__actions">
-            <Button onClick={() => void handleSelectJson()} disabled={busy}>
+            <Button onClick={() => void handleSelectJson()} disabled={busy || !poolId}>
               {t('emulator.select_json')}
             </Button>
           </div>
           {filePath && <p className="connection-panel__file">{filePath}</p>}
           <div className="connection-panel__actions">
             <Button
-              onClick={() => void handleImport()}
-              disabled={busy || !filePath}
+              onClick={() => void handleImportJson()}
+              disabled={busy || !filePath || !poolId}
               variant="primary"
             >
               {t('emulator.import')}
             </Button>
-            <Button onClick={finish} disabled={busy}>
-              {t('emulator.skip')}
+            <Button onClick={onClose} disabled={busy}>
+              {t('common.cancel')}
+            </Button>
+          </div>
+        </>
+      )}
+
+      {(mode === 'export-project' || mode === 'export-collection') && (
+        <>
+          <p className="emulator-page__destination">
+            {t('emulator.destination')}: {destinationLabel ?? destinationPoolId ?? t('emulator.no_destination')}
+          </p>
+          <div className="connection-panel__actions">
+            <Button onClick={onClose} disabled={busy}>
+              {t('common.cancel')}
             </Button>
           </div>
         </>

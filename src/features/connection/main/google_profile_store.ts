@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from 'fs/promises'
 import { dirname, join } from 'path'
 import { logInfo } from '@shared/logging/logger'
+import { DEFAULT_ENTRY_COLOR } from '@features/workspace/shared/types'
 
 export type GoogleProjectProfile = {
   label: string
@@ -101,7 +102,7 @@ export async function patchGoogleProjectProfile(
   const projects = { ...(existing?.projects ?? {}) }
   const current = projects[projectId] ?? {
     label: projectId,
-    color: '#607D8B',
+    color: DEFAULT_ENTRY_COLOR,
     readOnly: false
   }
 

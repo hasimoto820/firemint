@@ -3,10 +3,11 @@ import type { AppView } from '@shared/shell/AppNav'
 
 export type WorkspacePaneId = 'primary' | 'secondary'
 
-/** 上段タブの種別。Imp/Exp はコレクションに紐づかない。 */
-export type WorkspaceTabKind = 'collection' | 'imp_exp'
+/** 上段タブの種別。Imp/Exp と Emulator はコレクションに紐づかない。 */
+export type WorkspaceTabKind = 'collection' | 'imp_exp' | 'emulator_imp_exp'
 
 export const IMP_EXP_TAB_LABEL = 'Imp/Exp'
+export const EMULATOR_IMP_EXP_TAB_LABEL = 'Emulator'
 
 /**
  * 作業面 1 枚分。Phase 9 のタブ / Split の単位。
@@ -108,10 +109,38 @@ export function isImpExpTab(tab: WorkspaceTab): boolean {
   return tab.kind === 'imp_exp'
 }
 
-/** タブ見出し。コレクションはパス末尾、Imp/Exp は固定名。混在時は projectLabel を付ける。 */
+export function isEmulatorImpExpTab(tab: WorkspaceTab): boolean {
+  return tab.kind === 'emulator_imp_exp'
+}
+
+/** Imp/Exp / Emulator。コレクションタブではない。 */
+export function isWorkspaceToolTab(tab: WorkspaceTab): boolean {
+  return tab.kind === 'imp_exp' || tab.kind === 'emulator_imp_exp'
+}
+
+/** ウィンドウに 1 つだけの Emulator Imp/Exp タブ。 */
+export function createEmulatorImpExpTab(input: {
+  projectId: string
+  pane?: WorkspacePaneId
+}): WorkspaceTab {
+  return {
+    ...createWorkspaceTab({
+      projectId: input.projectId,
+      collectionPath: '',
+      pane: input.pane ?? 'primary'
+    }),
+    kind: 'emulator_imp_exp'
+  }
+}
+
+/** タブ見出し。コレクションはパス末尾、Imp/Exp・Emulator は固定名。混在時は projectLabel を付ける。 */
 export function workspaceTabLabel(tab: WorkspaceTab, projectLabel?: string): string {
   if (tab.kind === 'imp_exp') {
     return IMP_EXP_TAB_LABEL
+  }
+
+  if (tab.kind === 'emulator_imp_exp') {
+    return EMULATOR_IMP_EXP_TAB_LABEL
   }
 
   const segments = tab.collectionPath.split('/').filter(Boolean)

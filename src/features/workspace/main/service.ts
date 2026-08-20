@@ -12,7 +12,7 @@ import {
   connectServiceAccountFile,
   connectWorkspaceEntry
 } from '@features/connection/main/connect_entry'
-import { emulatorEntryId, parseEmulatorHost, resolveEmulatorProjectId } from '@features/connection/shared/emulator'
+import { emulatorEntryId, parseEmulatorHost, resolveEmulatorProjectId, EMPTY_EMULATOR_PROJECT_ID } from '@features/connection/shared/emulator'
 import {
   forgetGoogleToken,
   loadGoogleAccountProfile,
@@ -20,19 +20,18 @@ import {
   saveGoogleAccountProfile
 } from '@features/connection/main/google_account'
 import { loadWorkspaceStore, saveWorkspaceStore } from './store'
-import type {
-  AddEmulatorWorkspaceEntryInput,
-  AddGoogleWorkspaceEntryInput,
-  AddWorkspaceEntryInput,
-  SetFocusedProjectOptions,
-  UpdateWorkspaceEntryInput,
-  WorkspaceEntry,
-  WorkspaceResult,
-  WorkspaceState,
-  WorkspaceStore
+import {
+  defaultWorkspaceEntryColor,
+  type AddEmulatorWorkspaceEntryInput,
+  type AddGoogleWorkspaceEntryInput,
+  type AddWorkspaceEntryInput,
+  type SetFocusedProjectOptions,
+  type UpdateWorkspaceEntryInput,
+  type WorkspaceEntry,
+  type WorkspaceResult,
+  type WorkspaceState,
+  type WorkspaceStore
 } from '@features/workspace/shared/types'
-
-const DEFAULT_ENTRY_COLOR = '#607D8B'
 
 let store: WorkspaceStore = {
   version: 1,
@@ -71,8 +70,94 @@ export function getWorkspaceState(): WorkspaceState {
 }
 
 function upsertEntry(entry: WorkspaceEntry): void {
-  store.entries = store.entries.filter((item) => item.id !== entry.id)
+  const index = store.entries.findIndex((item) => item.id === entry.id)
+
+  if (index >= 0) {
+    store.entries = store.entries.map((item) => (item.id === entry.id ? entry : item))
+    return
+  }
+
   store.entries.push(entry)
+}
+
+function emptyEmulatorOnHost(host: string): WorkspaceEntry | null {
+  const emptyId = emulatorEntryId(EMPTY_EMULATOR_PROJECT_ID)
+  const empty = getWorkspaceEntry(emptyId)
+
+  if (!empty || empty.authType !== 'emulator') {
+    return null
+  }
+
+  if (!empty.emulatorHost) {
+    return empty
+  }
+
+  try {
+    return parseEmulatorHost(empty.emulatorHost) === host ? empty : null
+  } catch {
+    return null
+  }
+}
+
+/** 同じホストの空の入れ物を、今回の projectId の行にする。別行は足さない。 */
+async function adoptEmptyEmulatorContainer(
+  host: string,
+  next: {
+    id: string
+    emulatorProjectId: string
+    label?: string
+    color?: string
+    readOnly?: boolean
+  }
+): Promise<WorkspaceEntry | null> {
+  const empty = emptyEmulatorOnHost(host)
+
+  if (!empty) {
+    return null
+  }
+
+  if (empty.id === next.id) {
+    return empty
+  }
+
+  const taken = getWorkspaceEntry(next.id)
+
+  if (isFirestoreConnected(empty.id)) {
+    await disconnectFirestore(empty.id)
+  }
+
+  if (taken) {
+    store.entries = store.entries.filter((item) => item.id !== empty.id)
+
+    if (store.focusedProjectId === empty.id) {
+      store.focusedProjectId = taken.id
+      syncFocusedFromStore()
+    }
+
+    return taken
+  }
+
+  const adopted: WorkspaceEntry = {
+    ...empty,
+    id: next.id,
+    emulatorHost: host,
+    emulatorProjectId: next.emulatorProjectId,
+    label: next.label?.trim() || `${next.emulatorProjectId} emulator`,
+    color: defaultWorkspaceEntryColor('emulator', {
+      existing: empty.color,
+      override: next.color
+    }),
+    readOnly: next.readOnly ?? empty.readOnly
+  }
+
+  store.entries = store.entries.map((item) => (item.id === empty.id ? adopted : item))
+
+  if (store.focusedProjectId === empty.id) {
+    store.focusedProjectId = adopted.id
+    syncFocusedFromStore()
+  }
+
+  return adopted
 }
 
 async function ensureConnected(entry: WorkspaceEntry): Promise<WorkspaceResult<WorkspaceEntry>> {
@@ -133,7 +218,10 @@ export async function addEntryAndLoad(
     const entry: WorkspaceEntry = {
       id: info.projectId,
       label: input.label?.trim() || existing?.label || info.projectId,
-      color: input.color ?? existing?.color ?? DEFAULT_ENTRY_COLOR,
+      color: defaultWorkspaceEntryColor('serviceAccount', {
+        existing: existing?.color,
+        override: input.color
+      }),
       authType: 'serviceAccount',
       serviceAccountPath: input.serviceAccountPath,
       readOnly: input.readOnly ?? existing?.readOnly ?? false
@@ -167,7 +255,10 @@ export async function addGoogleEntryAndLoad(
     const entry: WorkspaceEntry = {
       id: input.projectId,
       label: input.label?.trim() || existing?.label || input.projectId,
-      color: input.color ?? existing?.color ?? DEFAULT_ENTRY_COLOR,
+      color: defaultWorkspaceEntryColor('google', {
+        existing: existing?.color,
+        override: input.color
+      }),
       authType: 'google',
       serviceAccountPath: '',
       googleAccountEmail: input.accountEmail,
@@ -204,6 +295,17 @@ export async function addEmulatorEntryAndLoad(
     const emulatorProjectId = resolveEmulatorProjectId(input.projectId)
     const host = parseEmulatorHost(input.host)
     const id = emulatorEntryId(emulatorProjectId)
+
+    if (emulatorProjectId !== EMPTY_EMULATOR_PROJECT_ID) {
+      await adoptEmptyEmulatorContainer(host, {
+        id,
+        emulatorProjectId,
+        label: input.label,
+        color: input.color,
+        readOnly: input.readOnly
+      })
+    }
+
     const existing = getWorkspaceEntry(id)
 
     await connectEmulator({
@@ -214,8 +316,14 @@ export async function addEmulatorEntryAndLoad(
 
     const entry: WorkspaceEntry = {
       id,
-      label: input.label?.trim() || existing?.label || `${emulatorProjectId} emulator`,
-      color: input.color ?? existing?.color ?? DEFAULT_ENTRY_COLOR,
+      label:
+        input.label?.trim() ||
+        existing?.label ||
+        (emulatorProjectId === EMPTY_EMULATOR_PROJECT_ID ? 'emulator' : `${emulatorProjectId} emulator`),
+      color: defaultWorkspaceEntryColor('emulator', {
+        existing: existing?.color,
+        override: input.color
+      }),
       authType: 'emulator',
       serviceAccountPath: '',
       emulatorHost: host,
@@ -389,7 +497,7 @@ export async function importGoogleAccountProjects(input: {
       const entry: WorkspaceEntry = {
         id: project.projectId,
         label: pref?.label?.trim() || project.displayName || project.projectId,
-        color: pref?.color ?? DEFAULT_ENTRY_COLOR,
+        color: defaultWorkspaceEntryColor('google', { existing: pref?.color }),
         authType: 'google',
         serviceAccountPath: '',
         googleAccountEmail: input.accountEmail,

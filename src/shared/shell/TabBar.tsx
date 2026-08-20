@@ -1,4 +1,4 @@
-import { isImpExpTab, workspaceTabLabel, type WorkspaceTab } from './workspace_tab'
+import { isWorkspaceToolTab, workspaceTabLabel, type WorkspaceTab } from './workspace_tab'
 
 type TabBarProps = {
   tabs: WorkspaceTab[]
@@ -30,13 +30,13 @@ function TabBar({
       {tabs.map((tab) => {
         const active = tab.id === activeTabId
         const projectLabel =
-          showProjectLabel && !isImpExpTab(tab) ? projectLabelFor?.(tab.projectId) : undefined
+          showProjectLabel && !isWorkspaceToolTab(tab) ? projectLabelFor?.(tab.projectId) : undefined
         const label = workspaceTabLabel(tab, projectLabel)
         const className = [
           'tab-bar__tab',
           active ? 'tab-bar__tab--active' : '',
-          isImpExpTab(tab) ? 'tab-bar__tab--imp-exp' : '',
-          isImpExpTab(tab) && impExpBusy ? 'tab-bar__tab--busy' : ''
+          isWorkspaceToolTab(tab) ? 'tab-bar__tab--imp-exp' : '',
+          tab.kind === 'imp_exp' && impExpBusy ? 'tab-bar__tab--busy' : ''
         ]
           .filter(Boolean)
           .join(' ')
@@ -48,7 +48,7 @@ function TabBar({
             role="tab"
             aria-selected={active}
             title={
-              isImpExpTab(tab)
+              isWorkspaceToolTab(tab)
                 ? label
                 : projectLabel
                   ? `${tab.projectId} / ${tab.collectionPath}`
@@ -57,7 +57,7 @@ function TabBar({
           >
             <button type="button" className="tab-bar__label" onClick={() => onActivate(tab.id)}>
               <span className="tab-bar__name">{label}</span>
-              {isImpExpTab(tab) ? null : (
+              {isWorkspaceToolTab(tab) ? null : (
                 <span className="tab-bar__mode">{tab.view === 'query' ? 'Q' : 'S'}</span>
               )}
             </button>

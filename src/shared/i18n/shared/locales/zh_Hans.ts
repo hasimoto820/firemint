@@ -17,6 +17,8 @@ export const zhHans: MessageCatalog = {
   'menu.help': 'Help',
   'menu.import': '导入',
   'menu.export': '导出',
+  'menu.cloud': '云',
+  'menu.emulator': '模拟器',
   'menu.connection': '连接',
   'menu.project': '项目',
   'menu.collection': '集合',
@@ -24,6 +26,8 @@ export const zhHans: MessageCatalog = {
   'menu.connect_json': '用 JSON 连接…',
   'menu.connect_google': '用 Google 连接…',
   'menu.connect_emulator': '用模拟器连接…',
+  'menu.emulator_import': '模拟器导入',
+  'menu.emulator_export': '模拟器导出',
   'menu.disconnect': '断开连接',
   'menu.quit': '退出',
   'menu.documents': '文档',
@@ -112,13 +116,27 @@ export const zhHans: MessageCatalog = {
   'list_connect.empty': '尚无注册项。请先用 JSON 或 Google 连接。',
 
   'emulator.title': '用模拟器连接',
-  'emulator.lead': '确认 Firestore Emulator 已启动，然后输入主机。projectId 可留空。',
+  'emulator.lead': '确认 Firestore Emulator 已启动，然后输入主机。',
+  'emulator.lead_known': '确认主机，然后从 workspace 列表选择 projectId。',
   'emulator.process_hint':
     'FireMint 不会启动模拟器。请先用 npm run emulators 等命令启动。',
   'emulator.host': '主机',
-  'emulator.project_id': 'projectId',
+  'emulator.select_known': '从列表选择 projectId',
   'emulator.import_lead': '没有集合。请原样导入 JSON。',
   'emulator.select_json': '选择 JSON',
-  'emulator.import': '导入',
-  'emulator.skip': '跳过导入'
+  'emulator.select_zip': '选择 ZIP',
+  'emulator.import': '连接',
+  'emulator.skip': '跳过导入',
+  'emulator.connect_import_lead':
+    'zip 可选。不选也可以连接。选择 zip 后会写入模拟器并显示在左侧树。',
+  'emulator.import_project_title': '向模拟器添加项目',
+  'emulator.import_project_lead': '选择 zip。会作为新行显示在左侧树，并写入 workspace。',
+  'emulator.import_collection_title': '向模拟器添加集合',
+  'emulator.import_collection_lead': '选择 json。目标是左侧树中选中的模拟器项目。',
+  'emulator.export_project_lead': '将当前模拟器项目导出为 zip。',
+  'emulator.export_collection_lead': '从当前模拟器项目将集合导出为 JSON。',
+  'emulator.destination': '目标',
+  'emulator.no_destination': '请在左侧树中选择模拟器项目。',
+  'emulator.delete_project_confirm':
+    '要从模拟器删除此项目吗？数据会消失，也会从 workspace 中移除。'
 }

@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { WorkspaceEntry, WorkspaceState } from '@features/workspace/shared/types'
+import {
+  DEFAULT_ENTRY_COLOR,
+  type WorkspaceEntry,
+  type WorkspaceState
+} from '@features/workspace/shared/types'
 import Button from '@shared/ui/Button'
 import { confirmAction } from '@shared/ui/confirmAction'
 
@@ -12,7 +16,7 @@ function WorkspacePanel({ onChanged, disabled = false }: WorkspacePanelProps): R
   const [state, setState] = useState<WorkspaceState | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [labelDraft, setLabelDraft] = useState('')
-  const [colorDraft, setColorDraft] = useState('#607D8B')
+  const [colorDraft, setColorDraft] = useState(DEFAULT_ENTRY_COLOR)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 

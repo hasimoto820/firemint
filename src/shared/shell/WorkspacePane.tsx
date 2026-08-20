@@ -2,11 +2,18 @@ import type { BulkFieldMode } from '@features/bulk_operations/shared/types'
 import type { ConnectionStatus } from '@features/connection/shared/types'
 import ImpExpView from '@features/data_transfer/renderer/ui/ImpExpView'
 import type { ImpExpDraft, ImpExpIntent } from '@features/data_transfer/shared/imp_exp'
+import type { EmulatorPageMode } from '@features/emulator/shared/types'
+import EmulatorPage from '@features/emulator/renderer/ui/EmulatorPage'
 import SimpleView from '@features/explorer/renderer/ui/SimpleView'
 import QueryView from '@features/query/renderer/ui/QueryView'
 import type { ScriptJobSnapshot } from '@features/script_runner/shared/types'
 import type { AppView } from '@shared/shell/AppNav'
-import { isImpExpTab, type WorkspaceTab, type WorkspaceTabQueryDraftPatch } from '@shared/shell/workspace_tab'
+import {
+  isEmulatorImpExpTab,
+  isImpExpTab,
+  type WorkspaceTab,
+  type WorkspaceTabQueryDraftPatch
+} from '@shared/shell/workspace_tab'
 
 type WorkspacePaneProps = {
   status: ConnectionStatus
@@ -18,6 +25,13 @@ type WorkspacePaneProps = {
   onImpExpDraftChange: (patch: Partial<ImpExpDraft>) => void
   onCancelImpExp: () => void
   onOpenImpExp: (intent?: ImpExpIntent) => void
+  emulatorPageMode?: EmulatorPageMode
+  onEmulatorModeChange?: (mode: EmulatorPageMode) => void
+  emulatorHost?: string
+  emulatorDestinationPoolId?: string | null
+  emulatorDestinationLabel?: string | null
+  onEmulatorWorkspaceChanged?: () => void | Promise<void>
+  onCloseEmulatorImpExp?: () => void
   onChangeView: (view: AppView) => void
   onSelectCollection: (collectionPath: string) => void
   onSelectDocument: (documentPath: string | null) => void
@@ -50,6 +64,13 @@ function WorkspacePane({
   onImpExpDraftChange,
   onCancelImpExp,
   onOpenImpExp,
+  emulatorPageMode = 'import-project',
+  onEmulatorModeChange,
+  emulatorHost,
+  emulatorDestinationPoolId = null,
+  emulatorDestinationLabel = null,
+  onEmulatorWorkspaceChanged,
+  onCloseEmulatorImpExp,
   onChangeView,
   onSelectCollection,
   onSelectDocument,
@@ -78,6 +99,22 @@ function WorkspacePane({
           onDraftChange={onImpExpDraftChange}
           job={impExpJob}
           onCancel={onCancelImpExp}
+        />
+      </div>
+    )
+  }
+
+  if (isEmulatorImpExpTab(tab)) {
+    return (
+      <div className="workspace-pane">
+        <EmulatorPage
+          mode={emulatorPageMode}
+          onModeChange={onEmulatorModeChange}
+          onClose={() => onCloseEmulatorImpExp?.()}
+          onWorkspaceChanged={onEmulatorWorkspaceChanged ?? (async () => undefined)}
+          defaultHost={emulatorHost}
+          destinationPoolId={emulatorDestinationPoolId}
+          destinationLabel={emulatorDestinationLabel}
         />
       </div>
     )

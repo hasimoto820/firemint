@@ -15,6 +15,8 @@ export const en: Record<string, string> = {
   'menu.help': 'Help',
   'menu.import': 'Import',
   'menu.export': 'Export',
+  'menu.cloud': 'Cloud',
+  'menu.emulator': 'Emulator',
   'menu.connection': 'Connection',
   'menu.project': 'Project',
   'menu.collection': 'Collection',
@@ -22,6 +24,8 @@ export const en: Record<string, string> = {
   'menu.connect_json': 'Connect with JSON…',
   'menu.connect_google': 'Connect with Google…',
   'menu.connect_emulator': 'Connect with emulator…',
+  'menu.emulator_import': 'Emulator import',
+  'menu.emulator_export': 'Emulator export',
   'menu.disconnect': 'Disconnect',
   'menu.quit': 'Quit',
   'menu.documents': 'Documents',
@@ -112,13 +116,30 @@ export const en: Record<string, string> = {
   'list_connect.empty': 'Nothing registered. Connect with JSON or Google first.',
 
   'emulator.title': 'Connect with emulator',
-  'emulator.lead': 'Confirm Firestore Emulator is running, then enter the host. projectId may be empty.',
+  'emulator.lead': 'Confirm Firestore Emulator is running, then enter the host.',
+  'emulator.lead_known': 'Confirm the host, then choose a projectId from the workspace list.',
   'emulator.process_hint':
     'FireMint does not start the emulator. Start it first (for example npm run emulators).',
   'emulator.host': 'Host',
-  'emulator.project_id': 'projectId',
+  'emulator.select_known': 'Choose a projectId from the list',
   'emulator.import_lead': 'No collections. Import the JSON as-is.',
   'emulator.select_json': 'Select JSON',
-  'emulator.import': 'Import',
-  'emulator.skip': 'Skip import'
+  'emulator.select_zip': 'Select ZIP',
+  'emulator.import': 'Connect',
+  'emulator.skip': 'Skip import',
+  'emulator.connect_import_lead':
+    'ZIP is optional. You can connect without one. If you select a ZIP, it is written to the emulator and appears in the left tree.',
+  'emulator.import_project_title': 'Add a project to the emulator',
+  'emulator.import_project_lead':
+    'Select a zip. It will appear as a new row in the left tree and be written to the workspace.',
+  'emulator.import_collection_title': 'Add a collection to the emulator',
+  'emulator.import_collection_lead':
+    'Select a JSON. The destination is the emulator project selected in the left tree.',
+  'emulator.export_project_lead': 'Export the focused emulator project as a zip.',
+  'emulator.export_collection_lead':
+    'Export a collection from the focused emulator project as JSON.',
+  'emulator.destination': 'Destination',
+  'emulator.no_destination': 'Select an emulator project in the left tree.',
+  'emulator.delete_project_confirm':
+    'Delete this project from the emulator? Its data will be removed, and it will leave the workspace too.'
 }

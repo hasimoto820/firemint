@@ -1,6 +1,10 @@
 import { mkdir, readFile, writeFile } from 'fs/promises'
 import { dirname, join } from 'path'
-import type { WorkspaceEntry, WorkspaceStore } from '@features/workspace/shared/types'
+import {
+  defaultWorkspaceEntryColor,
+  type WorkspaceEntry,
+  type WorkspaceStore
+} from '@features/workspace/shared/types'
 
 const STORE_FILE_NAME = 'workspaces.json'
 
@@ -26,7 +30,7 @@ function normalizeEntry(raw: Partial<WorkspaceEntry> & { id?: string }): Workspa
   return {
     id: raw.id,
     label: raw.label?.trim() || raw.id,
-    color: raw.color || '#607D8B',
+    color: defaultWorkspaceEntryColor(authType, { existing: raw.color }),
     authType,
     serviceAccountPath: raw.serviceAccountPath ?? '',
     googleAccountEmail: raw.googleAccountEmail,
@@ -51,6 +55,7 @@ export async function loadWorkspaceStore(): Promise<WorkspaceStore> {
     const entries = parsed.entries
       .map((entry) => normalizeEntry(entry as Partial<WorkspaceEntry>))
       .filter((entry): entry is WorkspaceEntry => entry !== null)
+      .filter((entry) => entry.authType !== 'emulator')
 
     const entryIds = new Set(entries.map((entry) => entry.id))
     const focusedProjectId =
@@ -88,7 +93,20 @@ export async function loadWorkspaceStore(): Promise<WorkspaceStore> {
 }
 
 export async function saveWorkspaceStore(store: WorkspaceStore): Promise<void> {
+  const entries = store.entries.filter((entry) => entry.authType !== 'emulator')
+  const entryIds = new Set(entries.map((entry) => entry.id))
+  const focusedProjectId =
+    store.focusedProjectId && entryIds.has(store.focusedProjectId)
+      ? store.focusedProjectId
+      : null
+  const loadedProjectIds = store.loadedProjectIds.filter((id) => entryIds.has(id))
+  const persisted: WorkspaceStore = {
+    version: 1,
+    entries,
+    focusedProjectId,
+    loadedProjectIds
+  }
   const storePath = getStorePath()
   await mkdir(dirname(storePath), { recursive: true })
-  await writeFile(storePath, JSON.stringify(store, null, 2), 'utf-8')
+  await writeFile(storePath, JSON.stringify(persisted, null, 2), 'utf-8')
 }

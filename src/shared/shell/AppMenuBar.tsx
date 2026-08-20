@@ -5,6 +5,18 @@ type AppMenuBarProps = {
   menus: AppMenuSection[]
 }
 
+function indentClass(indent?: boolean | 1 | 2): string {
+  if (indent === 2) {
+    return 'app-menu-bar__indent-2'
+  }
+
+  if (indent) {
+    return 'app-menu-bar__indent'
+  }
+
+  return ''
+}
+
 function AppMenuBar({ menus }: AppMenuBarProps): React.JSX.Element {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const barRef = useRef<HTMLElement>(null)
@@ -78,8 +90,19 @@ function AppMenuBar({ menus }: AppMenuBarProps): React.JSX.Element {
                   }
 
                   if (entry.type === 'header') {
+                    const isChild = Boolean(entry.indent)
+
                     return (
-                      <div key={`${section.id}-header-${index}`} className="app-menu-bar__header">
+                      <div
+                        key={`${section.id}-header-${index}`}
+                        className={[
+                          'app-menu-bar__header',
+                          isChild ? 'app-menu-bar__header--child' : 'app-menu-bar__header--parent',
+                          indentClass(entry.indent)
+                        ]
+                          .filter(Boolean)
+                          .join(' ')}
+                      >
                         {entry.label}
                       </div>
                     )
@@ -93,7 +116,7 @@ function AppMenuBar({ menus }: AppMenuBarProps): React.JSX.Element {
                       className={[
                         'app-menu-bar__item',
                         entry.disabled ? 'app-menu-bar__item--disabled' : '',
-                        entry.indent ? 'app-menu-bar__item--indent' : ''
+                        indentClass(entry.indent)
                       ]
                         .filter(Boolean)
                         .join(' ')}

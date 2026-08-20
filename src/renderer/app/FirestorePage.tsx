@@ -7,6 +7,8 @@ import type { BulkFieldMode } from '@features/bulk_operations/shared/types'
 import AuthUsersView from '@features/auth_users/renderer/ui/AuthUsersView'
 import type { ConnectionStatus } from '@features/connection/shared/types'
 import type { WorkspaceEntry } from '@features/workspace/shared/types'
+import type { EmulatorPageMode } from '@features/emulator/shared/types'
+import { DEFAULT_EMULATOR_HOST } from '@features/connection/shared/emulator'
 import { useT } from '@shared/i18n/renderer/I18nProvider'
 import { detectEnvironment } from '@shared/safety/environment'
 import { confirmAction } from '@shared/ui/confirmAction'
@@ -37,10 +39,13 @@ import CommandPalette, { type CommandPaletteItem } from '@shared/shell/CommandPa
 import TabBar from '@shared/shell/TabBar'
 import WorkspacePane from '@shared/shell/WorkspacePane'
 import {
+  createEmulatorImpExpTab,
   createImpExpTab,
   createWorkspaceTab,
   isCollectionTab,
+  isEmulatorImpExpTab,
   isImpExpTab,
+  isWorkspaceToolTab,
   parentCollectionPath,
   remapFirestorePath,
   tabsInPane,
@@ -52,6 +57,7 @@ import {
 export type ShellCommands = {
   openCommandPalette: () => void
   openImpExp: (intent?: ImpExpIntent) => void
+  openEmulatorImpExp: (mode: EmulatorPageMode) => void
   toggleSplit: () => void
   closeActiveTab: () => void
   closeOtherTabs: () => void
@@ -139,6 +145,8 @@ function FirestorePageInner({
   const [mainSection, setMainSection] = useState<'firestore' | 'auth'>('firestore')
   const [impExpJob, setImpExpJob] = useState<ScriptJobSnapshot | null>(null)
   const [impExpDraft, setImpExpDraft] = useState<ImpExpDraft>(() => createImpExpDraft(projectId))
+  const [emulatorImpExpMode, setEmulatorImpExpMode] =
+    useState<EmulatorPageMode>('import-project')
   const lastCollectionPathRef = useRef<string | null>(null)
   const impExpJobRef = useRef<ScriptJobSnapshot | null>(null)
   impExpJobRef.current = impExpJob
@@ -150,6 +158,14 @@ function FirestorePageInner({
   const secondaryTab = tabs.find((tab) => tab.id === secondaryActiveId) ?? null
   const focusedActiveId = focusedPane === 'primary' ? primaryActiveId : secondaryActiveId
   const focusedTab = tabs.find((tab) => tab.id === focusedActiveId) ?? null
+  const focusedEntry = workspaceEntries.find((entry) => entry.id === status.projectId)
+  const loadedEmulator = workspaceEntries.find(
+    (entry) => entry.authType === 'emulator' && loadedProjectIds.includes(entry.id)
+  )
+  const emulatorHost =
+    (status.authType === 'emulator' ? focusedEntry?.emulatorHost : undefined) ??
+    loadedEmulator?.emulatorHost ??
+    DEFAULT_EMULATOR_HOST
   const treeCollectionPath =
     focusedTab && isCollectionTab(focusedTab) && focusedTab.projectId === projectId
       ? focusedTab.collectionPath
@@ -186,7 +202,7 @@ function FirestorePageInner({
 
   useEffect(() => {
     setTabs((current) =>
-      current.map((tab) => (isImpExpTab(tab) ? { ...tab, projectId } : tab))
+      current.map((tab) => (isWorkspaceToolTab(tab) ? { ...tab, projectId } : tab))
     )
     setImpExpDraft((current) =>
       current.destinationProjectId === projectId
@@ -202,7 +218,7 @@ function FirestorePageInner({
 
     const loaded = new Set(loadedProjectIds)
     setTabs((current) => {
-      const next = current.filter((tab) => isImpExpTab(tab) || loaded.has(tab.projectId))
+      const next = current.filter((tab) => isWorkspaceToolTab(tab) || loaded.has(tab.projectId))
       if (next.length === current.length) {
         return current
       }
@@ -414,6 +430,32 @@ function FirestorePageInner({
     [projectId, rootCollections]
   )
 
+  const openEmulatorImpExp = useCallback(
+    (mode: EmulatorPageMode): void => {
+      setMainSection('firestore')
+      setEmulatorImpExpMode(mode)
+
+      setTabs((current) => {
+        const existing = current.find(isEmulatorImpExpTab)
+        if (existing) {
+          if (existing.pane === 'primary') {
+            setPrimaryActiveId(existing.id)
+          } else {
+            setSecondaryActiveId(existing.id)
+          }
+          setFocusedPane(existing.pane)
+          return current
+        }
+
+        const created = createEmulatorImpExpTab({ projectId, pane: 'primary' })
+        setPrimaryActiveId(created.id)
+        setFocusedPane('primary')
+        return [...current, created]
+      })
+    },
+    [projectId]
+  )
+
   const handleImpExpDraftChange = useCallback((patch: Partial<ImpExpDraft>): void => {
     setImpExpDraft((current) => ({ ...current, ...patch }))
   }, [])
@@ -623,7 +665,7 @@ function FirestorePageInner({
         const filtered = current
           .filter(
             (tab) =>
-              isImpExpTab(tab) ||
+              isWorkspaceToolTab(tab) ||
               tab.projectId !== targetProjectId ||
               (tab.collectionPath !== collectionPath && !tab.collectionPath.startsWith(prefix))
           )
@@ -775,7 +817,7 @@ function FirestorePageInner({
 
       setTabs((current) => {
         const remapped = current.map((tab) => {
-          if (isImpExpTab(tab) || tab.projectId !== dialogProjectId) {
+          if (isWorkspaceToolTab(tab) || tab.projectId !== dialogProjectId) {
             return tab
           }
 
@@ -799,8 +841,8 @@ function FirestorePageInner({
 
         const deduped: WorkspaceTab[] = []
         for (const tab of remapped) {
-          if (isImpExpTab(tab)) {
-            if (deduped.some(isImpExpTab)) {
+          if (isWorkspaceToolTab(tab)) {
+            if (deduped.some((existing) => existing.kind === tab.kind)) {
               continue
             }
             deduped.push(tab)
@@ -901,6 +943,13 @@ function FirestorePageInner({
     [confirmStopImpExpJob, tabs]
   )
 
+  const handleCloseEmulatorImpExp = useCallback((): void => {
+    const tab = tabs.find(isEmulatorImpExpTab)
+    if (tab) {
+      void handleCloseTab(tab.id)
+    }
+  }, [handleCloseTab, tabs])
+
   const handleCloseOtherTabs = useCallback(async (): Promise<void> => {
     if (!focusedActiveId || !focusedTab) {
       return
@@ -966,7 +1015,7 @@ function FirestorePageInner({
 
   // メニュー等の view 変更 → フォーカス中のコレクションタブへ
   useEffect(() => {
-    if (!focusedActiveId || !focusedTab || isImpExpTab(focusedTab)) {
+    if (!focusedActiveId || !focusedTab || isWorkspaceToolTab(focusedTab)) {
       return
     }
 
@@ -977,7 +1026,7 @@ function FirestorePageInner({
 
   // フォーカス切替時に App 側 view を同期（Imp/Exp は Simple/Query ではない）
   useEffect(() => {
-    if (!focusedTab || isImpExpTab(focusedTab)) {
+    if (!focusedTab || isWorkspaceToolTab(focusedTab)) {
       return
     }
 
@@ -1013,6 +1062,7 @@ function FirestorePageInner({
     () => ({
       openCommandPalette: () => setPaletteOpen(true),
       openImpExp,
+      openEmulatorImpExp,
       toggleSplit: () => handleToggleSplit(),
       closeActiveTab: () => {
         if (focusedActiveId) {
@@ -1034,6 +1084,7 @@ function FirestorePageInner({
       handleCloseOtherTabs,
       handleToggleSplit,
       openImpExp,
+      openEmulatorImpExp,
       splitEnabled,
       tabs
     ]
@@ -1153,7 +1204,9 @@ function FirestorePageInner({
         label,
         detail: isImpExpTab(tab)
           ? 'Import / Export'
-          : `${tab.collectionPath}（${tab.pane === 'primary' ? '左' : '右'}）`,
+          : isEmulatorImpExpTab(tab)
+            ? 'Emulator'
+            : `${tab.collectionPath}（${tab.pane === 'primary' ? '左' : '右'}）`,
         run: () => activateInPane(tab.id, tab.pane)
       })
 
@@ -1162,7 +1215,11 @@ function FirestorePageInner({
           id: `move-right-${tab.id}`,
           group: 'Split',
           label: `右ペインへ移す: ${label}`,
-          detail: isImpExpTab(tab) ? 'Import / Export' : tab.collectionPath,
+          detail: isImpExpTab(tab)
+            ? 'Import / Export'
+            : isEmulatorImpExpTab(tab)
+              ? 'Emulator'
+              : tab.collectionPath,
           run: () => moveTabToPane(tab.id, 'secondary')
         })
       }
@@ -1172,7 +1229,11 @@ function FirestorePageInner({
           id: `move-left-${tab.id}`,
           group: 'Split',
           label: `左ペインへ移す: ${label}`,
-          detail: isImpExpTab(tab) ? 'Import / Export' : tab.collectionPath,
+          detail: isImpExpTab(tab)
+            ? 'Import / Export'
+            : isEmulatorImpExpTab(tab)
+              ? 'Emulator'
+              : tab.collectionPath,
           run: () => moveTabToPane(tab.id, 'primary')
         })
       }
@@ -1224,7 +1285,7 @@ function FirestorePageInner({
       {active ? (
         <WorkspacePane
           status={
-            isImpExpTab(active)
+            isWorkspaceToolTab(active)
               ? status
               : connectionStatusForTab(status, active, workspaceEntries)
           }
@@ -1238,6 +1299,19 @@ function FirestorePageInner({
           onImpExpDraftChange={handleImpExpDraftChange}
           onCancelImpExp={handleCancelImpExp}
           onOpenImpExp={openImpExp}
+          emulatorPageMode={emulatorImpExpMode}
+          onEmulatorModeChange={setEmulatorImpExpMode}
+          emulatorHost={emulatorHost}
+          emulatorDestinationPoolId={
+            status.authType === 'emulator' ? status.projectId : null
+          }
+          emulatorDestinationLabel={
+            status.authType === 'emulator'
+              ? (focusedEntry?.label ?? focusedEntry?.emulatorProjectId ?? null)
+              : null
+          }
+          onEmulatorWorkspaceChanged={onWorkspaceChanged}
+          onCloseEmulatorImpExp={handleCloseEmulatorImpExp}
           onChangeView={(nextView) => handlePaneViewChange(active.id, nextView)}
           onSelectCollection={(path) => handlePaneCollectionChange(active.id, path)}
           onSelectDocument={(path) => handlePaneDocumentChange(active.id, path)}
