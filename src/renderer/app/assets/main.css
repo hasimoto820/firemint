@@ -701,6 +701,10 @@ code {
 }
 
 .workspace-pane > .emulator-page {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
   flex: 1;
   min-height: 0;
   overflow: auto;
@@ -2927,7 +2931,7 @@ code {
 }
 
 .emulator-page .imp-exp-form__toggles {
-  margin: 12px 0;
+  margin: 0;
 }
 
 .emulator-page .connection-panel__brand {
@@ -3525,6 +3529,10 @@ html.settings-window-root #root {
 }
 
 .emulator-page__destination {
-  margin: 0 0 12px;
+  margin: 0;
   font-size: 13px;
+}
+
+.emulator-page .imp-exp-form {
+  width: 100%;
 }

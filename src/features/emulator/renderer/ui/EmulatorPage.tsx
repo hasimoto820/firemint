@@ -1,4 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useOptionalAutocompleteApi } from '@features/autocomplete/renderer/hooks'
+import { matchesAutocompleteNeedle } from '@features/autocomplete/renderer/catalog'
+import type { AutocompleteItem } from '@features/autocomplete/shared/types'
 import { DEFAULT_EMULATOR_HOST } from '@features/connection/shared/emulator'
 import {
   emulatorPageIntent,
@@ -7,6 +10,8 @@ import {
   type EmulatorPageMode,
   type EmulatorPageTarget
 } from '@features/emulator/shared/types'
+import type { ScriptJobSnapshot } from '@features/script_runner/shared/types'
+import AutocompleteInput from '@shared/ui/AutocompleteInput'
 import Button from '@shared/ui/Button'
 import { useT } from '@shared/i18n/renderer/I18nProvider'
 
@@ -18,6 +23,30 @@ type EmulatorPageProps = {
   defaultHost?: string
   destinationPoolId?: string | null
   destinationLabel?: string | null
+  job?: ScriptJobSnapshot | null
+  onCancelJob?: () => void
+}
+
+function statusLabel(job: ScriptJobSnapshot): string {
+  switch (job.status) {
+    case 'running':
+      return '実行中'
+    case 'succeeded':
+      return '完了'
+    case 'failed':
+      return '失敗'
+    case 'canceled':
+      return '中止'
+  }
+}
+
+function formatLogTime(iso: string): string {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) {
+    return iso
+  }
+
+  return date.toLocaleTimeString()
 }
 
 function ToggleBar<T extends string>({
@@ -57,20 +86,100 @@ function EmulatorPage({
   onWorkspaceChanged,
   defaultHost = DEFAULT_EMULATOR_HOST,
   destinationPoolId = null,
-  destinationLabel = null
+  destinationLabel = null,
+  job = null,
+  onCancelJob
 }: EmulatorPageProps): React.JSX.Element {
   const t = useT()
+  const autocomplete = useOptionalAutocompleteApi()
   const host = defaultHost
   const poolId = destinationPoolId
   const { direction, target } = emulatorPageIntent(mode)
+  const jobRunning = job?.status === 'running'
+  const formDisabled = jobRunning
   const [filePath, setFilePath] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [exportRoots, setExportRoots] = useState<string[]>([])
+  const [selectedRoots, setSelectedRoots] = useState<string[]>([])
+  const [collectionPath, setCollectionPath] = useState('')
+  const [includeSubcollections, setIncludeSubcollections] = useState(true)
 
   useEffect(() => {
     setFilePath(null)
     setError(null)
   }, [mode])
+
+  useEffect(() => {
+    if (direction !== 'export' || !poolId) {
+      setExportRoots([])
+      return
+    }
+
+    let cancelled = false
+    setExportRoots([])
+
+    void (async () => {
+      const loaded = await window.api.workspace.loadProject(poolId)
+      if (!loaded.ok || cancelled) {
+        if (!loaded.ok && !cancelled) {
+          setError(loaded.error)
+        }
+        return
+      }
+
+      const result = await window.api.explorer.listRootCollections(poolId)
+      if (!result.ok || cancelled) {
+        if (!result.ok && !cancelled) {
+          setError(result.error)
+        }
+        return
+      }
+
+      autocomplete.addCollectionPaths(poolId, result.data)
+      setExportRoots(result.data)
+    })()
+
+    return () => {
+      cancelled = true
+    }
+    // addCollectionPaths は安定。revision を依存に入れると選択がリセットされる。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [direction, poolId])
+
+  useEffect(() => {
+    if (mode !== 'export-project') {
+      return
+    }
+
+    setSelectedRoots([...exportRoots])
+  }, [mode, exportRoots])
+
+  const collectionItems = useMemo(() => {
+    void autocomplete.revision
+    if (!poolId) {
+      return []
+    }
+
+    const fromPool = autocomplete.query(poolId, collectionPath, ['collection_path'])
+    const seen = new Set(fromPool.map((item) => item.value))
+    const needle = collectionPath.trim().toLowerCase()
+    const extras: AutocompleteItem[] = []
+
+    for (const rootId of exportRoots) {
+      if (seen.has(rootId)) {
+        continue
+      }
+
+      if (needle && !matchesAutocompleteNeedle(rootId, needle)) {
+        continue
+      }
+
+      extras.push({ kind: 'collection_path', value: rootId })
+    }
+
+    return extras.length === 0 ? fromPool : [...fromPool, ...extras]
+  }, [autocomplete, collectionPath, exportRoots, poolId])
 
   const setDirection = (next: EmulatorPageDirection): void => {
     onModeChange?.(emulatorPageModeFromIntent(next, target))
@@ -172,6 +281,62 @@ function EmulatorPage({
     }
   }
 
+  const handleExport = async (): Promise<void> => {
+    if (!poolId) {
+      setError(t('emulator.no_destination'))
+      return
+    }
+
+    setBusy(true)
+    setError(null)
+
+    try {
+      const loaded = await window.api.workspace.loadProject(poolId)
+      if (!loaded.ok) {
+        setError(loaded.error)
+        return
+      }
+
+      if (target === 'collection') {
+        const path = collectionPath.trim()
+        if (!path) {
+          setError('コレクション path を指定してください')
+          return
+        }
+
+        const result = await window.api.scriptRunner.start({
+          kind: 'export_collection',
+          projectId: poolId,
+          collectionPath: path,
+          includeSubcollections
+        })
+
+        if (!result.ok && !result.canceled) {
+          setError(result.error)
+        }
+        return
+      }
+
+      if (selectedRoots.length === 0) {
+        setError('エクスポートするルートコレクションを選んでください')
+        return
+      }
+
+      const result = await window.api.scriptRunner.start({
+        kind: 'export_project',
+        projectId: poolId,
+        rootCollectionIds: selectedRoots,
+        includeSubcollections
+      })
+
+      if (!result.ok && !result.canceled) {
+        setError(result.error)
+      }
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const lead =
     mode === 'import-project'
       ? t('emulator.import_project_lead')
@@ -181,97 +346,245 @@ function EmulatorPage({
           ? t('emulator.export_project_lead')
           : t('emulator.export_collection_lead')
 
+  const destinationText =
+    destinationLabel ?? destinationPoolId ?? t('emulator.no_destination')
+  const selectedCount = selectedRoots.length
+  const allSelected = exportRoots.length > 0 && selectedCount === exportRoots.length
+  const canStartExportCollection =
+    Boolean(poolId) && Boolean(collectionPath.trim()) && !busy && !formDisabled
+  const canStartExportProject =
+    Boolean(poolId) && selectedRoots.length > 0 && !busy && !formDisabled
+  const togglesDisabled = busy || formDisabled
+
   return (
     <section className="connection-panel emulator-page">
-      <h1 className="imp-exp-form__title">{t('menu.emulator')}</h1>
-      <div className="imp-exp-form__toggles">
-        <ToggleBar
-          ariaLabel="向き"
-          value={direction}
-          disabled={busy}
-          options={[
-            { id: 'import', label: 'Import' },
-            { id: 'export', label: 'Export' }
-          ]}
-          onChange={setDirection}
-        />
-        <ToggleBar
-          ariaLabel="対象"
-          value={target}
-          disabled={busy}
-          options={[
-            { id: 'collection', label: 'Collection' },
-            { id: 'project', label: 'Project' }
-          ]}
-          onChange={setTarget}
-        />
+      <div className="imp-exp-form">
+        <h1 className="imp-exp-form__title">{t('menu.emulator')}</h1>
+        <div className="imp-exp-form__toggles">
+          <ToggleBar
+            ariaLabel="向き"
+            value={direction}
+            disabled={togglesDisabled}
+            options={[
+              { id: 'import', label: 'Import' },
+              { id: 'export', label: 'Export' }
+            ]}
+            onChange={setDirection}
+          />
+          <ToggleBar
+            ariaLabel="対象"
+            value={target}
+            disabled={togglesDisabled}
+            options={[
+              { id: 'collection', label: 'Collection' },
+              { id: 'project', label: 'Project' }
+            ]}
+            onChange={setTarget}
+          />
+        </div>
+        <p className="imp-exp-form__lead">{lead}</p>
+
+        {mode === 'import-project' && (
+          <>
+            <div className="connection-panel__actions">
+              <Button onClick={() => void handleSelectZip()} disabled={busy}>
+                {t('emulator.select_zip')}
+              </Button>
+            </div>
+            {filePath && <p className="connection-panel__file">{filePath}</p>}
+            <div className="connection-panel__actions">
+              <Button
+                onClick={() => void handleImportZip()}
+                disabled={busy || !filePath}
+                variant="primary"
+              >
+                {t('emulator.import')}
+              </Button>
+              <Button onClick={onClose} disabled={busy}>
+                {t('common.cancel')}
+              </Button>
+            </div>
+          </>
+        )}
+
+        {mode === 'import-collection' && (
+          <>
+            <p className="emulator-page__destination">
+              {t('emulator.destination')}: {destinationText}
+            </p>
+            <div className="connection-panel__actions">
+              <Button onClick={() => void handleSelectJson()} disabled={busy || !poolId}>
+                {t('emulator.select_json')}
+              </Button>
+            </div>
+            {filePath && <p className="connection-panel__file">{filePath}</p>}
+            <div className="connection-panel__actions">
+              <Button
+                onClick={() => void handleImportJson()}
+                disabled={busy || !filePath || !poolId}
+                variant="primary"
+              >
+                {t('emulator.import')}
+              </Button>
+              <Button onClick={onClose} disabled={busy}>
+                {t('common.cancel')}
+              </Button>
+            </div>
+          </>
+        )}
+
+        {mode === 'export-collection' && (
+          <>
+            <p className="emulator-page__destination">
+              プロジェクト: {destinationText}
+            </p>
+            <label className="imp-exp-form__field">
+              コレクション
+              <AutocompleteInput
+                value={collectionPath}
+                items={collectionItems}
+                disabled={formDisabled || !poolId}
+                placeholder="equipment / users/uid/posts"
+                aria-label="コレクション path"
+                onChange={setCollectionPath}
+              />
+            </label>
+          </>
+        )}
+
+        {mode === 'export-project' && (
+          <>
+            {!poolId && (
+              <p className="emulator-page__destination">{t('emulator.no_destination')}</p>
+            )}
+            <div className="imp-exp-form__roots">
+              {exportRoots.length === 0 ? (
+                <p className="imp-exp-form__hint">ルートコレクションがありません。</p>
+              ) : (
+                <>
+                  <label className="imp-exp-form__check">
+                    <input
+                      type="checkbox"
+                      checked={allSelected}
+                      disabled={formDisabled}
+                      onChange={() =>
+                        setSelectedRoots(allSelected ? [] : [...exportRoots])
+                      }
+                    />
+                    すべて選択（{selectedCount}/{exportRoots.length}）
+                  </label>
+                  <ul className="imp-exp-form__root-list">
+                    {exportRoots.map((rootId) => (
+                      <li key={rootId}>
+                        <label className="imp-exp-form__check">
+                          <input
+                            type="checkbox"
+                            checked={selectedRoots.includes(rootId)}
+                            disabled={formDisabled}
+                            onChange={() => {
+                              const selected = new Set(selectedRoots)
+                              if (selected.has(rootId)) {
+                                selected.delete(rootId)
+                              } else {
+                                selected.add(rootId)
+                              }
+                              setSelectedRoots(Array.from(selected))
+                            }}
+                          />
+                          {rootId}
+                        </label>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </div>
+          </>
+        )}
+
+        {direction === 'export' && (
+          <>
+            <label className="imp-exp-form__check">
+              <input
+                type="checkbox"
+                checked={includeSubcollections}
+                disabled={formDisabled}
+                onChange={(event) => setIncludeSubcollections(event.target.checked)}
+              />
+              サブコレクションを含む
+            </label>
+            <div className="imp-exp-form__actions">
+              <Button
+                variant="primary"
+                onClick={() => void handleExport()}
+                disabled={
+                  target === 'collection' ? !canStartExportCollection : !canStartExportProject
+                }
+              >
+                エクスポート
+              </Button>
+            </div>
+          </>
+        )}
       </div>
-      <p className="connection-panel__lead">{lead}</p>
-
-      {mode === 'import-project' && (
-        <>
-          <div className="connection-panel__actions">
-            <Button onClick={() => void handleSelectZip()} disabled={busy}>
-              {t('emulator.select_zip')}
-            </Button>
-          </div>
-          {filePath && <p className="connection-panel__file">{filePath}</p>}
-          <div className="connection-panel__actions">
-            <Button
-              onClick={() => void handleImportZip()}
-              disabled={busy || !filePath}
-              variant="primary"
-            >
-              {t('emulator.import')}
-            </Button>
-            <Button onClick={onClose} disabled={busy}>
-              {t('common.cancel')}
-            </Button>
-          </div>
-        </>
-      )}
-
-      {mode === 'import-collection' && (
-        <>
-          <p className="emulator-page__destination">
-            {t('emulator.destination')}: {destinationLabel ?? destinationPoolId ?? t('emulator.no_destination')}
-          </p>
-          <div className="connection-panel__actions">
-            <Button onClick={() => void handleSelectJson()} disabled={busy || !poolId}>
-              {t('emulator.select_json')}
-            </Button>
-          </div>
-          {filePath && <p className="connection-panel__file">{filePath}</p>}
-          <div className="connection-panel__actions">
-            <Button
-              onClick={() => void handleImportJson()}
-              disabled={busy || !filePath || !poolId}
-              variant="primary"
-            >
-              {t('emulator.import')}
-            </Button>
-            <Button onClick={onClose} disabled={busy}>
-              {t('common.cancel')}
-            </Button>
-          </div>
-        </>
-      )}
-
-      {(mode === 'export-project' || mode === 'export-collection') && (
-        <>
-          <p className="emulator-page__destination">
-            {t('emulator.destination')}: {destinationLabel ?? destinationPoolId ?? t('emulator.no_destination')}
-          </p>
-          <div className="connection-panel__actions">
-            <Button onClick={onClose} disabled={busy}>
-              {t('common.cancel')}
-            </Button>
-          </div>
-        </>
-      )}
 
       {busy && <p className="connection-panel__loading">{t('common.busy')}</p>}
       {error && <p className="connection-panel__error">{error}</p>}
+
+      {direction === 'export' &&
+        (job ? (
+          <div className="imp-exp-job">
+            <header className="imp-exp-view__header">
+              <p className="simple-main__empty-title">{job.title}</p>
+              <p className={`imp-exp-view__status imp-exp-view__status--${job.status}`}>
+                {statusLabel(job)}
+                {job.detail ? ` · ${job.detail}` : ''}
+              </p>
+            </header>
+
+            <div className="imp-exp-view__progress" aria-label="進捗">
+              <div className="imp-exp-view__progress-bar" style={{ width: `${job.percent}%` }} />
+              <p className="imp-exp-view__progress-label">{job.percent}%</p>
+            </div>
+
+            {job.resultSummary && job.status === 'succeeded' && (
+              <p className="simple-main__success">{job.resultSummary}</p>
+            )}
+            {job.error && job.status === 'failed' && (
+              <p className="simple-main__error">{job.error}</p>
+            )}
+
+            {job.status === 'running' && (
+              <div className="imp-exp-view__actions">
+                <Button onClick={() => onCancelJob?.()}>中止</Button>
+              </div>
+            )}
+
+            <section className="imp-exp-view__log" aria-label="ログ">
+              {job.logs.length === 0 ? (
+                <p className="simple-main__empty-hint">ログはまだありません</p>
+              ) : (
+                job.logs.map((line, index) => (
+                  <p
+                    key={`${line.at}-${index}`}
+                    className={
+                      line.level === 'error'
+                        ? 'imp-exp-view__log-line imp-exp-view__log-line--error'
+                        : 'imp-exp-view__log-line'
+                    }
+                  >
+                    <span className="imp-exp-view__log-time">{formatLogTime(line.at)}</span>
+                    {line.message}
+                  </p>
+                ))
+              )}
+            </section>
+          </div>
+        ) : (
+          <p className="simple-main__empty-hint">
+            実行中は別のコレクションタブへ戻れます。進捗とログはここに出ます。
+          </p>
+        ))}
     </section>
   )
 }

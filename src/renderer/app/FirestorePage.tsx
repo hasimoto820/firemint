@@ -65,6 +65,7 @@ export type ShellCommands = {
   canCloseOtherTabs: boolean
   splitEnabled: boolean
   impExpActive: boolean
+  hasRootCollections: boolean
 }
 
 type FirestorePageProps = {
@@ -1075,7 +1076,8 @@ function FirestorePageInner({
         Boolean(focusedTab) &&
         tabsInPane(tabs, focusedTab?.pane ?? 'primary').length > 1,
       splitEnabled,
-      impExpActive: Boolean(focusedTab && isImpExpTab(focusedTab))
+      impExpActive: Boolean(focusedTab && isImpExpTab(focusedTab)),
+      hasRootCollections: rootCollections.length > 0
     }),
     [
       focusedActiveId,
@@ -1085,6 +1087,7 @@ function FirestorePageInner({
       handleToggleSplit,
       openImpExp,
       openEmulatorImpExp,
+      rootCollections.length,
       splitEnabled,
       tabs
     ]

@@ -135,9 +135,8 @@ export const en: Record<string, string> = {
   'emulator.import_collection_title': 'Add a collection to the emulator',
   'emulator.import_collection_lead':
     'Select a JSON. The destination is the emulator project selected in the left tree.',
-  'emulator.export_project_lead': 'Export the focused emulator project as a zip.',
-  'emulator.export_collection_lead':
-    'Export a collection from the focused emulator project as JSON.',
+  'emulator.export_project_lead': 'Select the range, then run. The file is a ZIP.',
+  'emulator.export_collection_lead': 'Select the range, then run. The file is JSON.',
   'emulator.destination': 'Destination',
   'emulator.no_destination': 'Select an emulator project in the left tree.',
   'emulator.delete_project_confirm':

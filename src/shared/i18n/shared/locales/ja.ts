@@ -136,9 +136,8 @@ export const ja: MessageCatalog = {
   'emulator.import_collection_title': 'エミュレーターにコレクションを追加',
   'emulator.import_collection_lead':
     'json を選びます。インポート先は左ツリーで選択中のエミュレータープロジェクトです。',
-  'emulator.export_project_lead': 'フォーカス中のエミュレータープロジェクトを zip で出します。',
-  'emulator.export_collection_lead':
-    'フォーカス中のエミュレータープロジェクトから、コレクションを JSON で出します。',
+  'emulator.export_project_lead': '範囲を選んでから実行。ファイルは ZIP です。',
+  'emulator.export_collection_lead': '範囲を選んでから実行。ファイルは JSON です。',
   'emulator.destination': 'インポート先',
   'emulator.no_destination': '左ツリーでエミュレーターのプロジェクトを選んでください。',
   'emulator.delete_project_confirm':

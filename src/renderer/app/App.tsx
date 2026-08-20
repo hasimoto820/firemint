@@ -95,8 +95,10 @@ function App(): React.JSX.Element {
     loadedEmulator?.emulatorHost ??
     DEFAULT_EMULATOR_HOST
   const canEmulatorImportProject = Boolean(loadedEmulator)
-  const canEmulatorImportCollection = focusedIsEmulator
-  const canEmulatorExport = focusedIsEmulator && Boolean(shellCommands?.openEmulatorImpExp)
+  const emulatorHasCollections = focusedIsEmulator && shellCommands?.hasRootCollections === true
+  const canEmulatorImportCollection = emulatorHasCollections
+  const canEmulatorExport =
+    emulatorHasCollections && Boolean(shellCommands?.openEmulatorImpExp)
   const platform = window.electron.process.platform
   const useWindowMenuActions = platform === 'linux'
 

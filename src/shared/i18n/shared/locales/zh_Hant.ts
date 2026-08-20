@@ -133,8 +133,8 @@ export const zhHant: MessageCatalog = {
   'emulator.import_project_lead': '選擇 zip。會以新列顯示在左側樹，並寫入 workspace。',
   'emulator.import_collection_title': '將集合加入模擬器',
   'emulator.import_collection_lead': '選擇 json。目標是左側樹中選取的模擬器專案。',
-  'emulator.export_project_lead': '將目前模擬器專案匯出為 zip。',
-  'emulator.export_collection_lead': '從目前模擬器專案將集合匯出為 JSON。',
+  'emulator.export_project_lead': '選擇範圍後執行。檔案為 ZIP。',
+  'emulator.export_collection_lead': '選擇範圍後執行。檔案為 JSON。',
   'emulator.destination': '目標',
   'emulator.no_destination': '請在左側樹中選取模擬器專案。',
   'emulator.delete_project_confirm':

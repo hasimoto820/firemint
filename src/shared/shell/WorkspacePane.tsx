@@ -115,6 +115,8 @@ function WorkspacePane({
           defaultHost={emulatorHost}
           destinationPoolId={emulatorDestinationPoolId}
           destinationLabel={emulatorDestinationLabel}
+          job={impExpJob}
+          onCancelJob={onCancelImpExp}
         />
       </div>
     )
