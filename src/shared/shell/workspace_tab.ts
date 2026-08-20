@@ -6,8 +6,8 @@ export type WorkspacePaneId = 'primary' | 'secondary'
 /** 上段タブの種別。Imp/Exp と Emulator はコレクションに紐づかない。 */
 export type WorkspaceTabKind = 'collection' | 'imp_exp' | 'emulator_imp_exp'
 
-export const IMP_EXP_TAB_LABEL = 'Imp/Exp'
-export const EMULATOR_IMP_EXP_TAB_LABEL = 'Emulator'
+export const IMP_EXP_TAB_LABEL = 'Cloud Imp/Exp'
+export const EMULATOR_IMP_EXP_TAB_LABEL = 'Emu Imp/Exp'
 
 /**
  * 作業面 1 枚分。Phase 9 のタブ / Split の単位。

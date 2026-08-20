@@ -42,6 +42,8 @@ import {
   createEmulatorImpExpTab,
   createImpExpTab,
   createWorkspaceTab,
+  EMULATOR_IMP_EXP_TAB_LABEL,
+  IMP_EXP_TAB_LABEL,
   isCollectionTab,
   isEmulatorImpExpTab,
   isImpExpTab,
@@ -1158,7 +1160,7 @@ function FirestorePageInner({
       {
         id: 'open-imp-exp',
         group: 'タブ',
-        label: 'Imp/Exp',
+        label: IMP_EXP_TAB_LABEL,
         detail: 'Import / Export',
         run: () => openImpExp()
       },
@@ -1206,9 +1208,9 @@ function FirestorePageInner({
         group: '開いているタブ',
         label,
         detail: isImpExpTab(tab)
-          ? 'Import / Export'
+          ? IMP_EXP_TAB_LABEL
           : isEmulatorImpExpTab(tab)
-            ? 'Emulator'
+            ? EMULATOR_IMP_EXP_TAB_LABEL
             : `${tab.collectionPath}（${tab.pane === 'primary' ? '左' : '右'}）`,
         run: () => activateInPane(tab.id, tab.pane)
       })
@@ -1219,9 +1221,9 @@ function FirestorePageInner({
           group: 'Split',
           label: `右ペインへ移す: ${label}`,
           detail: isImpExpTab(tab)
-            ? 'Import / Export'
+            ? IMP_EXP_TAB_LABEL
             : isEmulatorImpExpTab(tab)
-              ? 'Emulator'
+              ? EMULATOR_IMP_EXP_TAB_LABEL
               : tab.collectionPath,
           run: () => moveTabToPane(tab.id, 'secondary')
         })
@@ -1233,9 +1235,9 @@ function FirestorePageInner({
           group: 'Split',
           label: `左ペインへ移す: ${label}`,
           detail: isImpExpTab(tab)
-            ? 'Import / Export'
+            ? IMP_EXP_TAB_LABEL
             : isEmulatorImpExpTab(tab)
-              ? 'Emulator'
+              ? EMULATOR_IMP_EXP_TAB_LABEL
               : tab.collectionPath,
           run: () => moveTabToPane(tab.id, 'primary')
         })
