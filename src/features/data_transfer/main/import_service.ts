@@ -294,6 +294,59 @@ async function findCollisions(
   }
 }
 
+const COLLISION_SAMPLE_LIMIT = 20
+
+async function skipExistingIdWrites(
+  projectId: string,
+  planned: PlannedWrite[],
+  onProgress?: ProgressReporter,
+  signal?: AbortSignal
+): Promise<{
+  planned: PlannedWrite[]
+  skippedCount: number
+  collisionSamples: string[]
+}> {
+  const kept: PlannedWrite[] = []
+  const collisionSamples: string[] = []
+  let skippedCount = 0
+  const existingIdWrites = planned.filter((write) => write.kind === 'existingId')
+  const totalCount = existingIdWrites.length
+  let checkedCount = 0
+
+  for (const write of planned) {
+    throwIfCanceled(signal)
+
+    if (write.kind !== 'existingId') {
+      kept.push(write)
+      continue
+    }
+
+    checkedCount += 1
+    if (checkedCount === 1 || checkedCount % 50 === 0 || checkedCount === totalCount) {
+      onProgress?.({
+        phase: 'writing',
+        processedCount: checkedCount,
+        totalCount,
+        percent: totalCount === 0 ? 0 : Math.min(40, Math.round((checkedCount / totalCount) * 40)),
+        detail: write.documentPath
+      })
+    }
+
+    const snapshot = await getDocumentRef(write.documentPath, projectId).get()
+    if (snapshot.exists) {
+      skippedCount += 1
+      if (collisionSamples.length < COLLISION_SAMPLE_LIMIT) {
+        collisionSamples.push(write.documentPath)
+      }
+      continue
+    }
+
+    kept.push(write)
+  }
+
+  return { planned: kept, skippedCount, collisionSamples }
+}
+
 function pathSegments(path: string): string[] {
   return path.split('/').filter(Boolean)
 }
@@ -657,17 +710,10 @@ export async function importCollectionJson(
 
     const loaded = await loadAndPlan(input, onProgress)
     throwIfCanceled(signal)
-    const collisions = await findCollisions(input.projectId, loaded.planned, onProgress, signal)
-
-    if (collisions.hasCollisions) {
-      throw new Error(
-        `既存ドキュメントと衝突したため中止しました: ${collisions.collisionSamples.join(', ')}`
-      )
-    }
-
+    const skipped = await skipExistingIdWrites(input.projectId, loaded.planned, onProgress, signal)
     const writtenCount = await writePlannedDocuments(
       input.projectId,
-      loaded.planned,
+      skipped.planned,
       onProgress,
       signal
     )
@@ -677,7 +723,7 @@ export async function importCollectionJson(
       processedCount: writtenCount,
       totalCount: loaded.planned.length,
       percent: 100,
-      detail: '完了'
+      detail: skipped.skippedCount > 0 ? `スキップ ${skipped.skippedCount}` : '完了'
     })
 
     return {
@@ -685,6 +731,8 @@ export async function importCollectionJson(
       data: {
         writtenCount,
         skippedOutsideCount: loaded.skippedOutsideCount,
+        skippedCollisionCount: skipped.skippedCount,
+        collisionSamples: skipped.collisionSamples,
         includeSubcollections: loaded.includeSubcollections,
         filePath: loaded.filePath
       }
@@ -711,17 +759,10 @@ export async function importDocumentsJson(
 
     const planned = await loadAndPlanFromPaths(input.filePath, onProgress)
     throwIfCanceled(signal)
-    const collisions = await findCollisions(input.projectId, planned, onProgress, signal)
-
-    if (collisions.hasCollisions) {
-      throw new Error(
-        `既存ドキュメントと衝突したため中止しました: ${collisions.collisionSamples.join(', ')}`
-      )
-    }
-
+    const skipped = await skipExistingIdWrites(input.projectId, planned, onProgress, signal)
     const writtenCount = await writePlannedDocuments(
       input.projectId,
-      planned,
+      skipped.planned,
       onProgress,
       signal
     )
@@ -731,7 +772,7 @@ export async function importDocumentsJson(
       processedCount: writtenCount,
       totalCount: planned.length,
       percent: 100,
-      detail: '完了'
+      detail: skipped.skippedCount > 0 ? `スキップ ${skipped.skippedCount}` : '完了'
     })
 
     return {
@@ -739,6 +780,8 @@ export async function importDocumentsJson(
       data: {
         writtenCount,
         skippedOutsideCount: 0,
+        skippedCollisionCount: skipped.skippedCount,
+        collisionSamples: skipped.collisionSamples,
         includeSubcollections: true,
         filePath: input.filePath
       }

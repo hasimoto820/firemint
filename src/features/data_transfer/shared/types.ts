@@ -121,6 +121,8 @@ export type PeekProjectImportResult =
 export type ImportSummary = {
   writtenCount: number
   skippedOutsideCount: number
+  skippedCollisionCount: number
+  collisionSamples: string[]
   includeSubcollections: boolean
   filePath: string
 }
@@ -230,6 +232,8 @@ export type ImportProjectValidationResult =
 export type ImportProjectSummary = {
   filePath: string
   writtenCount: number
+  skippedCount: number
+  collisionSamples: string[]
   rootCollectionIds: string[]
   includeSubcollections: boolean
   sourceProjectId: string

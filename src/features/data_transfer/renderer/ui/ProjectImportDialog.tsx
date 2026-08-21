@@ -101,16 +101,16 @@ function ProjectImportDialog({
   }, [open, watchingJob, onImported])
 
   const canImport = useMemo(() => {
-    if (readOnly || !validation || validation.hasCollisions || Boolean(success) || busy || watchingJob) {
+    if (readOnly || !filePath || Boolean(success) || busy || watchingJob) {
       return false
     }
 
-    if (validation.projectIdMismatch && !acceptMismatch) {
+    if (validation?.projectIdMismatch && !acceptMismatch) {
       return false
     }
 
     return true
-  }, [readOnly, validation, acceptMismatch, success, busy, watchingJob])
+  }, [readOnly, filePath, validation, acceptMismatch, success, busy, watchingJob])
 
   const progressLabel = useMemo(() => {
     if (!progress) {
@@ -209,7 +209,7 @@ function ProjectImportDialog({
       setValidation(result.data)
       if (result.data.hasCollisions) {
         setError(
-          `衝突があります（例: ${result.data.collisionSamples.join(', ')}）。書込は行いません。`
+          `衝突があります（例: ${result.data.collisionSamples.join(', ')}）。実行するとその件はスキップします。`
         )
       }
     } finally {
@@ -274,7 +274,7 @@ function ProjectImportDialog({
         <header className="project-export-dialog__header">
           <h2 className="project-export-dialog__title">プロジェクトにインポート</h2>
           <p className="project-export-dialog__lead">
-            ZIP を検証してから、選んだプロジェクトへ書き込みます。接続中でなくても実行できます。
+            ZIP を選んで実行。検証は任意です。衝突したドキュメントはスキップして先に進みます。接続中でなくても実行できます。
           </p>
         </header>
 
@@ -349,7 +349,7 @@ function ProjectImportDialog({
             )}
             {validation.hasCollisions && (
               <p className="project-export-dialog__error">
-                衝突サンプル: {validation.collisionSamples.join(', ')}
+                衝突サンプル: {validation.collisionSamples.join(', ')}（実行時はスキップ）
               </p>
             )}
             {!validation.hasCollisions && (

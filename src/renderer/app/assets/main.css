@@ -845,7 +845,7 @@ code {
 }
 
 .imp-exp-view__status--succeeded {
-  color: #9fef9f;
+  color: var(--ev-c-text-success);
 }
 
 .imp-exp-view__status--failed,
@@ -2068,7 +2068,7 @@ code {
 
 .simple-main__success,
 .query-main__success {
-  color: #9fef9f;
+  color: var(--ev-c-text-success);
 }
 
 .simple-main__loading {
@@ -2620,7 +2620,7 @@ code {
 
 .query-main__status {
   margin: 0;
-  color: #9fef9f;
+  color: var(--ev-c-text-success);
   font-size: 13px;
   flex-shrink: 0;
 }
@@ -2877,7 +2877,7 @@ code {
 }
 
 .diff-preview__after {
-  color: #9fef9f;
+  color: var(--ev-c-text-success);
 }
 
 .document-table__checkbox-col {
@@ -3336,7 +3336,7 @@ code {
 
 .project-export-dialog__success {
   margin: 0;
-  color: #047857;
+  color: var(--ev-c-text-success);
   font-size: 12px;
   word-break: break-all;
 }

@@ -224,37 +224,61 @@ async function writeDocuments(
   documents: ExportDocument[],
   onProgress?: ProgressReporter,
   signal?: AbortSignal
-): Promise<number> {
+): Promise<{ writtenCount: number; skippedCount: number; collisionSamples: string[] }> {
   const db = getFirestore(projectId)
+  const collisionSamples: string[] = []
+  const pending: ExportDocument[] = []
   let writtenCount = 0
+  let skippedCount = 0
   const totalCount = documents.length
 
-  for (let offset = 0; offset < documents.length; offset += FIRESTORE_BATCH_LIMIT) {
-    throwIfCanceled(signal)
-    const chunk = documents.slice(offset, offset + FIRESTORE_BATCH_LIMIT)
-    const batch = db.batch()
+  const flush = async (): Promise<void> => {
+    if (pending.length === 0) {
+      return
+    }
 
-    for (const document of chunk) {
+    throwIfCanceled(signal)
+    const batch = db.batch()
+    for (const document of pending) {
       batch.create(
         getDocumentRef(document.path, projectId),
         deserializeDocumentData(document.data)
       )
-      writtenCount += 1
     }
-
     await batch.commit()
-
-    onProgress?.({
-      phase: 'writing',
-      processedCount: writtenCount,
-      totalCount,
-      percent:
-        totalCount === 0 ? 100 : Math.min(99, Math.round((writtenCount / totalCount) * 100)),
-      detail: chunk[chunk.length - 1]?.path ?? null
-    })
+    writtenCount += pending.length
+    pending.length = 0
   }
 
-  return writtenCount
+  for (let index = 0; index < documents.length; index += 1) {
+    throwIfCanceled(signal)
+    const document = documents[index]
+    const snapshot = await getDocumentRef(document.path, projectId).get()
+    if (snapshot.exists) {
+      skippedCount += 1
+      if (collisionSamples.length < 20) {
+        collisionSamples.push(document.path)
+      }
+    } else {
+      pending.push(document)
+      if (pending.length >= FIRESTORE_BATCH_LIMIT) {
+        await flush()
+      }
+    }
+
+    if (index === 0 || (index + 1) % 50 === 0 || index + 1 === totalCount) {
+      onProgress?.({
+        phase: 'writing',
+        processedCount: index + 1,
+        totalCount,
+        percent: totalCount === 0 ? 100 : Math.min(99, Math.round(((index + 1) / totalCount) * 100)),
+        detail: document.path
+      })
+    }
+  }
+
+  await flush()
+  return { writtenCount, skippedCount, collisionSamples }
 }
 
 function buildValidation(
@@ -414,28 +438,23 @@ export async function importProject(
       )
     }
 
-    const collisions = await findCollisions(input.projectId, documents, onProgress, signal)
-    if (collisions.hasCollisions) {
-      throw new Error(
-        `既存ドキュメントと衝突したため中止しました: ${collisions.collisionSamples.join(', ')}`
-      )
-    }
-
-    const writtenCount = await writeDocuments(input.projectId, documents, onProgress, signal)
+    const write = await writeDocuments(input.projectId, documents, onProgress, signal)
 
     onProgress?.({
       phase: 'done',
-      processedCount: writtenCount,
+      processedCount: write.writtenCount,
       totalCount: documents.length,
       percent: 100,
-      detail: '完了'
+      detail: write.skippedCount > 0 ? `スキップ ${write.skippedCount}` : '完了'
     })
 
     return {
       ok: true,
       data: {
         filePath,
-        writtenCount,
+        writtenCount: write.writtenCount,
+        skippedCount: write.skippedCount,
+        collisionSamples: write.collisionSamples,
         rootCollectionIds: manifest.rootCollectionIds,
         includeSubcollections: manifest.includeSubcollections,
         sourceProjectId: manifest.projectId

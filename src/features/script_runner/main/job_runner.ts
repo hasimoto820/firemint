@@ -183,8 +183,15 @@ async function runJob(
       }
       patchSnapshot({
         writtenCount: result.data.writtenCount,
-        resultSummary: `${result.data.writtenCount} 件をインポートしました`
+        resultSummary: `${result.data.writtenCount} 件をインポートしました${
+          result.data.skippedCollisionCount > 0
+            ? ` / スキップ ${result.data.skippedCollisionCount} 件`
+            : ''
+        }`
       })
+      if (result.data.collisionSamples.length > 0) {
+        appendLog('info', `スキップ例: ${result.data.collisionSamples.join(', ')}`)
+      }
       return
     }
     case 'export_project': {
@@ -209,8 +216,13 @@ async function runJob(
       }
       patchSnapshot({
         writtenCount: result.data.writtenCount,
-        resultSummary: `${result.data.writtenCount} 件をインポートしました`
+        resultSummary: `${result.data.writtenCount} 件をインポートしました${
+          result.data.skippedCount > 0 ? ` / スキップ ${result.data.skippedCount} 件` : ''
+        }`
       })
+      if (result.data.collisionSamples.length > 0) {
+        appendLog('info', `スキップ例: ${result.data.collisionSamples.join(', ')}`)
+      }
       return
     }
     case 'transport': {

@@ -364,7 +364,7 @@ function ImpExpView({
     onDraftChange({ collectionValidation: result.data })
     if (result.data.hasCollisions) {
       setFormError(
-        `衝突があります（例: ${result.data.collisionSamples.join(', ')}）。書込は行いません。`
+        `衝突があります（例: ${result.data.collisionSamples.join(', ')}）。実行するとその件はスキップします。`
       )
     }
 
@@ -397,7 +397,7 @@ function ImpExpView({
     onDraftChange({ projectValidation: result.data })
     if (result.data.hasCollisions) {
       setFormError(
-        `衝突があります（例: ${result.data.collisionSamples.join(', ')}）。書込は行いません。`
+        `衝突があります（例: ${result.data.collisionSamples.join(', ')}）。実行するとその件はスキップします。`
       )
     }
 
@@ -477,21 +477,36 @@ function ImpExpView({
       }
 
       if (draft.target === 'collection') {
-        const validation = collectionValidation ?? (await validateCollection())
-        if (!validation || validation.hasCollisions) {
+        const collectionPath = collectionPathRef.current.trim() || draft.collectionPath.trim()
+        if (!collectionPath) {
+          const inferred = await applyInferredCollection(draft.filePath, false)
+          if (!inferred) {
+            setFormError('JSON からコレクションを特定できません。コレクション path を指定してください')
+            return
+          }
+        }
+
+        const resolvedPath =
+          collectionPathRef.current.trim() || draft.collectionPath.trim()
+        if (!resolvedPath) {
+          setFormError('JSON からコレクションを特定できません。コレクション path を指定してください')
           return
         }
 
-        const collectionPath = collectionPathRef.current.trim() || draft.collectionPath.trim()
-        if (!collectionPath) {
-          setFormError('JSON からコレクションを特定できません。コレクション path を指定してください')
+        const loadedProjectId = await ensureDestinationLoaded()
+        if (!loadedProjectId) {
+          return
+        }
+
+        if (destinationReadOnly) {
+          setFormError('このプロジェクトは read-only です')
           return
         }
 
         const result = await window.api.scriptRunner.start({
           kind: 'import_collection',
-          projectId: destinationId,
-          collectionPath,
+          projectId: loadedProjectId,
+          collectionPath: resolvedPath,
           filePath: draft.filePath,
           includeSubcollections: draft.includeSubcollections
         })
@@ -502,12 +517,7 @@ function ImpExpView({
         return
       }
 
-      const validation = projectValidation ?? (await validateProject())
-      if (!validation || validation.hasCollisions) {
-        return
-      }
-
-      if (validation.projectIdMismatch && !draft.acceptMismatch) {
+      if (projectValidation?.projectIdMismatch && !draft.acceptMismatch) {
         setFormError('projectId の不一致を確認してください')
         return
       }
@@ -555,7 +565,6 @@ function ImpExpView({
     draft.direction === 'import' &&
     draft.target === 'collection' &&
     Boolean(draft.filePath) &&
-    !collectionValidation?.hasCollisions &&
     !destinationReadOnly &&
     !busy &&
     !formDisabled
@@ -563,7 +572,6 @@ function ImpExpView({
     draft.direction === 'import' &&
     draft.target === 'project' &&
     Boolean(draft.filePath) &&
-    !projectValidation?.hasCollisions &&
     !(projectValidation?.projectIdMismatch && !draft.acceptMismatch) &&
     !destinationReadOnly &&
     !busy &&
@@ -606,7 +614,7 @@ function ImpExpView({
 
         <p className="imp-exp-form__lead">
           {draft.direction === 'import'
-            ? 'ファイルを選んで実行。検証は任意です。'
+            ? 'ファイルを選んで実行。検証は任意です。衝突したドキュメントはスキップして先に進みます。'
             : '範囲を選んでから実行。'}
           ファイルは {fileKindLabel(draft)} です。
         </p>
@@ -734,7 +742,7 @@ function ImpExpView({
             {collectionValidation.skippedOutsideCount > 0
               ? ` / 宛先外除外 ${collectionValidation.skippedOutsideCount}`
               : ''}
-            {collectionValidation.hasCollisions ? '' : ' / 検証 OK'}
+            {collectionValidation.hasCollisions ? ' / 衝突あり（実行時スキップ）' : ' / 検証 OK'}
           </p>
         )}
 
@@ -743,7 +751,7 @@ function ImpExpView({
             <p className="imp-exp-form__hint">
               件数: {projectValidation.documentCount} ／ ソース: {projectValidation.sourceProjectId}
               {projectValidation.includeSubcollections ? ' ／ サブコレ含む' : ''}
-              {projectValidation.hasCollisions ? '' : ' ／ 検証 OK'}
+              {projectValidation.hasCollisions ? ' ／ 衝突あり（実行時スキップ）' : ' ／ 検証 OK'}
             </p>
             {projectValidation.projectIdMismatch && (
               <label className="imp-exp-form__check">
