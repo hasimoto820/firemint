@@ -158,20 +158,21 @@ const api: IpcApi = {
       return () => {
         ipcRenderer.removeListener(IPC_CHANNELS.DATA_TRANSFER_IMPORT_PROJECT_PROGRESS, handler)
       }
-    },
-    validateTransport: (input) =>
-      ipcRenderer.invoke(IPC_CHANNELS.DATA_TRANSFER_VALIDATE_TRANSPORT, input),
-    transport: (input) => ipcRenderer.invoke(IPC_CHANNELS.DATA_TRANSFER_TRANSPORT, input),
-    onTransportProgress: (listener) => {
+    }
+  },
+  transport: {
+    validate: (input) => ipcRenderer.invoke(IPC_CHANNELS.TRANSPORT_VALIDATE, input),
+    run: (input) => ipcRenderer.invoke(IPC_CHANNELS.TRANSPORT_RUN, input),
+    onProgress: (listener) => {
       const handler = (
         _event: Electron.IpcRendererEvent,
         progress: Parameters<typeof listener>[0]
       ): void => {
         listener(progress)
       }
-      ipcRenderer.on(IPC_CHANNELS.DATA_TRANSFER_TRANSPORT_PROGRESS, handler)
+      ipcRenderer.on(IPC_CHANNELS.TRANSPORT_PROGRESS, handler)
       return () => {
-        ipcRenderer.removeListener(IPC_CHANNELS.DATA_TRANSFER_TRANSPORT_PROGRESS, handler)
+        ipcRenderer.removeListener(IPC_CHANNELS.TRANSPORT_PROGRESS, handler)
       }
     }
   },

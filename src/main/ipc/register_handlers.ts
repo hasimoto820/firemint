@@ -6,6 +6,7 @@ import { registerExplorerHandlers } from '@features/explorer/main/ipc'
 import { registerQueryHandlers } from '@features/query/main/ipc'
 import { registerBulkOperationsHandlers } from '@features/bulk_operations/main/ipc'
 import { registerDataTransferHandlers } from '@features/data_transfer/main/ipc'
+import { registerTransportHandlers } from '@features/transport/main/ipc'
 import { registerDiffHandlers } from '@features/diff/main/ipc'
 import { registerEmulatorHandlers } from '@features/emulator/main/ipc'
 import { registerScriptRunnerHandlers } from '@features/script_runner/main/ipc'
@@ -28,6 +29,7 @@ export function registerIpcHandlers(): void {
   registerQueryHandlers()
   registerBulkOperationsHandlers()
   registerDataTransferHandlers()
+  registerTransportHandlers()
   registerDiffHandlers()
   registerEmulatorHandlers()
   registerScriptRunnerHandlers()

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import type { TransportDraft } from '@features/data_transfer/shared/transport'
-import type { TransportProgress, TransportValidation } from '@features/data_transfer/shared/types'
+import type { TransportDraft } from '@features/transport/shared/transport'
+import type { TransportProgress, TransportValidation } from '@features/transport/shared/types'
 import type { ScriptJobSnapshot } from '@features/script_runner/shared/types'
 import type { WorkspaceAuthType, WorkspaceEntry } from '@features/workspace/shared/types'
 import { workspaceAuthLabel } from '@features/workspace/shared/types'
@@ -142,7 +142,7 @@ function TransportView({
       return
     }
 
-    return window.api.dataTransfer.onTransportProgress(setValidateProgress)
+    return window.api.transport.onProgress(setValidateProgress)
   }, [busy])
 
   const resetValidation = (patch: Partial<TransportDraft> = {}): void => {
@@ -154,7 +154,7 @@ function TransportView({
     setFormError(null)
   }
 
-  const buildInput = (): Parameters<typeof window.api.dataTransfer.validateTransport>[0] | null => {
+  const buildInput = (): Parameters<typeof window.api.transport.validate>[0] | null => {
     if (!destinationId) {
       setFormError('コピー先のプロジェクトを選んでください')
       return null
@@ -234,7 +234,7 @@ function TransportView({
     onDraftChange({ validation: null })
 
     try {
-      const result = await window.api.dataTransfer.validateTransport(input)
+      const result = await window.api.transport.validate(input)
       if (!result.ok) {
         if (!result.canceled) {
           setFormError(result.error)

@@ -43,7 +43,7 @@ import {
   createTransportDraft,
   type TransportDraft,
   type TransportIntent
-} from '@features/data_transfer/shared/transport'
+} from '@features/transport/shared/transport'
 import AppHeader from '@shared/shell/AppHeader'
 import type { AppView } from '@shared/shell/AppNav'
 import AppShell from '@shared/shell/AppShell'

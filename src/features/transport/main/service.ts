@@ -1,4 +1,3 @@
-import { ensureWritable } from '@features/workspace/main/guard'
 import { iterateExportDocuments } from '@features/data_transfer/main/project_export_service'
 import type { ExportDocument } from '@features/data_transfer/shared/types'
 import type {
@@ -6,7 +5,8 @@ import type {
   TransportProgress,
   TransportResult,
   TransportValidationResult
-} from '@features/data_transfer/shared/types'
+} from '@features/transport/shared/types'
+import { ensureWritable } from '@features/workspace/main/guard'
 import { assertCollectionPath, getDocumentRef } from '@shared/firestore/paths'
 import { deserializeDocumentData } from '@shared/firestore/serialize'
 import { getFirestore, isFirestoreConnected } from '@shared/firestore/client'
@@ -33,7 +33,7 @@ function toValidationError(
   error: unknown,
   canceled = false
 ): TransportValidationResult {
-  logError('data_transfer', 'validateTransport failed', error)
+  logError('transport', 'validateTransport failed', error)
 
   if (canceled || isCanceledError(error)) {
     return { ok: false, error: '検証をキャンセルしました', canceled: true }
@@ -47,7 +47,7 @@ function toValidationError(
 
 function toTransportError(error: unknown, canceled = false): TransportResult {
   const wasCanceled = canceled || isCanceledError(error)
-  logError('data_transfer', 'transport failed', error)
+  logError('transport', 'transport failed', error)
 
   if (wasCanceled) {
     return { ok: false, error: 'トランスポートをキャンセルしました', canceled: true }
@@ -207,7 +207,7 @@ export async function validateTransport(
     assertProjects(input, false)
 
     logInfo(
-      'data_transfer',
+      'transport',
       `validateTransport ${input.sourceProjectId} → ${input.destinationProjectId} target=${input.target}`
     )
 
@@ -272,7 +272,7 @@ export async function transportDocuments(
     assertProjects(input, true)
 
     logInfo(
-      'data_transfer',
+      'transport',
       `transport ${input.sourceProjectId} → ${input.destinationProjectId} target=${input.target}`
     )
 

@@ -6,9 +6,9 @@ import type {
   ExportCollectionProgress,
   ExportProjectProgress,
   ImportCollectionProgress,
-  ImportProjectProgress,
-  TransportProgress
+  ImportProjectProgress
 } from '@features/data_transfer/shared/types'
+import type { TransportProgress } from '@features/transport/shared/types'
 import {
   collectionExportDefaultFileName,
   promptIncludeSubcollections,
@@ -21,7 +21,7 @@ import {
   exportProject
 } from '@features/data_transfer/main/project_export_service'
 import { importProject } from '@features/data_transfer/main/project_import_service'
-import { transportDocuments } from '@features/data_transfer/main/transport_service'
+import { transportDocuments } from '@features/transport/main/service'
 import type {
   ScriptJobLogLine,
   ScriptJobSnapshot,

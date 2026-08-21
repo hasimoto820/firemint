@@ -1,6 +1,6 @@
 import type { ImpExpIntent } from '@features/data_transfer/shared/imp_exp'
 import type { DiffIntent } from '@features/diff/shared/diff'
-import type { TransportIntent } from '@features/data_transfer/shared/transport'
+import type { TransportIntent } from '@features/transport/shared/transport'
 import type { AppView } from '@shared/shell/AppNav'
 import type { TranslateFn } from '@shared/i18n/shared/types'
 import type { AppMenuSection } from './app_menu'

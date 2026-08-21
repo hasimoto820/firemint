@@ -2,9 +2,9 @@ import type {
   ExportCollectionJsonInput,
   ExportProjectInput,
   ImportCollectionJsonInput,
-  ImportProjectInput,
-  TransportInput
+  ImportProjectInput
 } from '@features/data_transfer/shared/types'
+import type { TransportInput } from '@features/transport/shared/types'
 
 export type ScriptJobKind =
   | 'export_collection'

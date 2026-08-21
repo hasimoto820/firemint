@@ -10,9 +10,7 @@ import type {
   ImportCollectionProgress,
   ImportDocumentsJsonInput,
   ImportProjectInput,
-  ImportProjectProgress,
-  TransportInput,
-  TransportProgress
+  ImportProjectProgress
 } from '@features/data_transfer/shared/types'
 import {
   importCollectionJson,
@@ -32,7 +30,6 @@ import {
   exportDocumentsCsv,
   exportDocumentsJson
 } from './service'
-import { transportDocuments, validateTransport } from './transport_service'
 
 export function registerDataTransferHandlers(): void {
   ipcMain.handle(
@@ -161,34 +158,6 @@ export function registerDataTransferHandlers(): void {
         event.sender.send(IPC_CHANNELS.DATA_TRANSFER_IMPORT_PROJECT_PROGRESS, progress)
       }
       return importProject(input, reportProgress)
-    }
-  )
-
-  ipcMain.handle(
-    IPC_CHANNELS.DATA_TRANSFER_VALIDATE_TRANSPORT,
-    async (event, input: TransportInput) => {
-      logInfo(
-        'ipc:data_transfer',
-        `validateTransport ${input.sourceProjectId} → ${input.destinationProjectId} target=${input.target}`
-      )
-      const reportProgress = (progress: TransportProgress): void => {
-        event.sender.send(IPC_CHANNELS.DATA_TRANSFER_TRANSPORT_PROGRESS, progress)
-      }
-      return validateTransport(input, reportProgress)
-    }
-  )
-
-  ipcMain.handle(
-    IPC_CHANNELS.DATA_TRANSFER_TRANSPORT,
-    async (event, input: TransportInput) => {
-      logInfo(
-        'ipc:data_transfer',
-        `transport ${input.sourceProjectId} → ${input.destinationProjectId} target=${input.target}`
-      )
-      const reportProgress = (progress: TransportProgress): void => {
-        event.sender.send(IPC_CHANNELS.DATA_TRANSFER_TRANSPORT_PROGRESS, progress)
-      }
-      return transportDocuments(input, reportProgress)
     }
   )
 }

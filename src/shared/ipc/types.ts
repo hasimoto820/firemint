@@ -59,6 +59,13 @@ import type {
 } from '@features/diff/shared/types'
 
 import type {
+  TransportInput,
+  TransportProgress,
+  TransportResult,
+  TransportValidationResult
+} from '@features/transport/shared/types'
+
+import type {
   ExportCollectionJsonInput,
   ExportDocumentsInput,
   ExportProjectInput,
@@ -74,11 +81,7 @@ import type {
   ImportProjectResult,
   ImportProjectValidationResult,
   ImportResult,
-  PeekCollectionImportResult,
-  TransportInput,
-  TransportProgress,
-  TransportResult,
-  TransportValidationResult
+  PeekCollectionImportResult
 } from '@features/data_transfer/shared/types'
 
 import type {
@@ -257,9 +260,12 @@ export type DataTransferIpcApi = {
   onImportProjectProgress: (
     listener: (progress: ImportProjectProgress) => void
   ) => () => void
-  validateTransport: (input: TransportInput) => Promise<TransportValidationResult>
-  transport: (input: TransportInput) => Promise<TransportResult>
-  onTransportProgress: (listener: (progress: TransportProgress) => void) => () => void
+}
+
+export type TransportIpcApi = {
+  validate: (input: TransportInput) => Promise<TransportValidationResult>
+  run: (input: TransportInput) => Promise<TransportResult>
+  onProgress: (listener: (progress: TransportProgress) => void) => () => void
 }
 
 export type DiffIpcApi = {
@@ -339,6 +345,7 @@ export interface IpcApi {
   query: QueryIpcApi
   bulk: BulkOperationsIpcApi
   dataTransfer: DataTransferIpcApi
+  transport: TransportIpcApi
   diff: DiffIpcApi
   emulator: EmulatorIpcApi
   scriptRunner: ScriptRunnerIpcApi
