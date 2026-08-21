@@ -4,7 +4,8 @@ import { logInfo } from '@shared/logging/logger'
 import type {
   CollectionDiffInput,
   CollectionDiffProgress,
-  CollectionDiffSummary
+  CollectionDiffSummary,
+  DiffExportFormat
 } from '@features/diff/shared/types'
 import {
   compareCollectionJson,
@@ -38,13 +39,13 @@ export function registerDiffHandlers(): void {
 
   ipcMain.handle(
     IPC_CHANNELS.DIFF_EXPORT_REPORT,
-    async (event, summary: CollectionDiffSummary) => {
+    async (event, summary: CollectionDiffSummary, format: DiffExportFormat) => {
       logInfo(
         'ipc:diff',
-        `exportCollectionDiffReport path=${summary.collectionPath} rows=${summary.rows.length}`
+        `exportCollectionDiffReport format=${format} path=${summary.collectionPath} rows=${summary.rows.length}`
       )
       const window = BrowserWindow.fromWebContents(event.sender)
-      return exportCollectionDiffReport(summary, window)
+      return exportCollectionDiffReport(summary, format, window)
     }
   )
 }

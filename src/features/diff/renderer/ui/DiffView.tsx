@@ -7,7 +7,8 @@ import { DIFF_PREVIEW_LIMIT, diffRowPreview } from '@features/diff/shared/diff'
 import type {
   CollectionDiffProgress,
   CollectionDiffRow,
-  CollectionDiffStatus
+  CollectionDiffStatus,
+  DiffExportFormat
 } from '@features/diff/shared/types'
 import type { WorkspaceAuthType } from '@features/workspace/shared/types'
 import AutocompleteInput from '@shared/ui/AutocompleteInput'
@@ -167,7 +168,7 @@ function DiffView({
     }
   }
 
-  const handleExport = async (): Promise<void> => {
+  const handleExport = async (format: DiffExportFormat): Promise<void> => {
     if (!draft.result) {
       return
     }
@@ -177,7 +178,7 @@ function DiffView({
     setExportMessage(null)
 
     try {
-      const result = await window.api.diff.exportReport(draft.result)
+      const result = await window.api.diff.exportReport(draft.result, format)
       if (!result.ok) {
         if (!result.canceled) {
           setFormError(result.error)
@@ -272,8 +273,17 @@ function DiffView({
 
       <div className="document-table-panel diff-table-panel">
         <div className="document-table-panel__toolbar">
-          <Button onClick={() => void handleExport()} disabled={!result || exportBusy || busy}>
-            {exportBusy ? '保存中…' : '結果を排出'}
+          <Button
+            onClick={() => void handleExport('json')}
+            disabled={!result || exportBusy || busy}
+          >
+            {exportBusy ? '保存中…' : 'JSON を排出'}
+          </Button>
+          <Button
+            onClick={() => void handleExport('csv')}
+            disabled={!result || exportBusy || busy}
+          >
+            {exportBusy ? '保存中…' : 'CSV を排出'}
           </Button>
           {result ? (
             <span className="document-table-panel__count">

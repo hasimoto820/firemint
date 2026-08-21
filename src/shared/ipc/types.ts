@@ -53,6 +53,7 @@ import type {
   CollectionDiffProgress,
   CollectionDiffResult,
   CollectionDiffSummary,
+  DiffExportFormat,
   DiffExportResult,
   PeekDiffJsonResult
 } from '@features/diff/shared/types'
@@ -266,7 +267,10 @@ export type DiffIpcApi = {
   peekJson: (filePath: string) => Promise<PeekDiffJsonResult>
   compareCollection: (input: CollectionDiffInput) => Promise<CollectionDiffResult>
   onCompareProgress: (listener: (progress: CollectionDiffProgress) => void) => () => void
-  exportReport: (summary: CollectionDiffSummary) => Promise<DiffExportResult>
+  exportReport: (
+    summary: CollectionDiffSummary,
+    format: DiffExportFormat
+  ) => Promise<DiffExportResult>
 }
 
 export type ScriptRunnerIpcApi = {

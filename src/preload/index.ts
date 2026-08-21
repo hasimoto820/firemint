@@ -192,7 +192,8 @@ const api: IpcApi = {
         ipcRenderer.removeListener(IPC_CHANNELS.DIFF_COMPARE_PROGRESS, handler)
       }
     },
-    exportReport: (summary) => ipcRenderer.invoke(IPC_CHANNELS.DIFF_EXPORT_REPORT, summary)
+    exportReport: (summary, format) =>
+      ipcRenderer.invoke(IPC_CHANNELS.DIFF_EXPORT_REPORT, summary, format)
   },
   emulator: {
     importProjectZip: (input) =>

@@ -12,6 +12,7 @@ import type {
   CollectionDiffResult,
   CollectionDiffRow,
   CollectionDiffSummary,
+  DiffExportFormat,
   DiffExportResult,
   PeekDiffJsonResult
 } from '@features/diff/shared/types'
@@ -32,6 +33,51 @@ function ensureConnected(projectId: string): void {
 
 function sanitizeFileName(name: string): string {
   return name.replace(/[\\/:*?"<>|]/g, '_').replace(/\s+/g, '_')
+}
+
+function escapeCsvCell(value: unknown): string {
+  if (value === null || value === undefined) {
+    return ''
+  }
+
+  const text = typeof value === 'object' ? JSON.stringify(value) : String(value)
+
+  if (/[",\n\r]/.test(text)) {
+    return `"${text.replace(/"/g, '""')}"`
+  }
+
+  return text
+}
+
+function statusLabel(status: CollectionDiffRow['status']): string {
+  switch (status) {
+    case 'json_only':
+      return 'JSON'
+    case 'collection_only':
+      return 'コレクション'
+    case 'changed':
+      return '中身が違う'
+  }
+}
+
+function summaryToCsv(summary: CollectionDiffSummary): string {
+  const header = ['id', 'path', 'collectionPath', '固有', 'JSON', 'コレクション']
+    .map(escapeCsvCell)
+    .join(',')
+  const rows = summary.rows.map((row) =>
+    [
+      row.id,
+      row.path,
+      row.collectionPath,
+      statusLabel(row.status),
+      row.json,
+      row.collection
+    ]
+      .map(escapeCsvCell)
+      .join(',')
+  )
+
+  return [header, ...rows].join('\n')
 }
 
 function toDiffError(error: unknown, canceled = false): CollectionDiffResult {
@@ -403,50 +449,66 @@ export async function compareCollectionJson(
 
 export async function exportCollectionDiffReport(
   summary: CollectionDiffSummary,
+  format: DiffExportFormat,
   window: BrowserWindow | null
 ): Promise<DiffExportResult> {
   try {
-    const report = {
-      version: 1,
-      kind: 'firemint-collection-diff',
-      createdAt: new Date().toISOString(),
-      projectId: summary.projectId,
-      collectionPath: summary.collectionPath,
-      filePath: summary.filePath,
-      includeSubcollections: summary.includeSubcollections,
-      counts: {
-        jsonCount: summary.jsonCount,
-        collectionCount: summary.collectionCount,
-        sameCount: summary.sameCount,
-        jsonOnlyCount: summary.jsonOnlyCount,
-        collectionOnlyCount: summary.collectionOnlyCount,
-        changedCount: summary.changedCount,
-        missingIdCount: summary.missingIdCount,
-        skippedOutsideCount: summary.skippedOutsideCount
-      },
-      rows: summary.rows
-    }
-
     const baseName = sanitizeFileName(`diff_${summary.collectionPath}`)
-    const defaultPath = `${baseName}.json`
+    const extension = format === 'csv' ? 'csv' : 'json'
+    const defaultPath = `${baseName}.${extension}`
+    const filters =
+      format === 'csv'
+        ? [{ name: 'CSV', extensions: ['csv'] }]
+        : [{ name: 'JSON', extensions: ['json'] }]
     const result = window
       ? await dialog.showSaveDialog(window, {
           title: '差分レポートの保存先',
           defaultPath,
-          filters: [{ name: 'JSON', extensions: ['json'] }]
+          filters
         })
       : await dialog.showSaveDialog({
           title: '差分レポートの保存先',
           defaultPath,
-          filters: [{ name: 'JSON', extensions: ['json'] }]
+          filters
         })
 
     if (result.canceled || !result.filePath) {
       return { ok: false, error: '保存をキャンセルしました', canceled: true }
     }
 
-    await writeFile(result.filePath, JSON.stringify(report, null, 2), 'utf8')
-    logInfo('diff', `exportCollectionDiffReport file=${result.filePath} rows=${summary.rows.length}`)
+    const content =
+      format === 'csv'
+        ? summaryToCsv(summary)
+        : JSON.stringify(
+            {
+              version: 1,
+              kind: 'firemint-collection-diff',
+              createdAt: new Date().toISOString(),
+              projectId: summary.projectId,
+              collectionPath: summary.collectionPath,
+              filePath: summary.filePath,
+              includeSubcollections: summary.includeSubcollections,
+              counts: {
+                jsonCount: summary.jsonCount,
+                collectionCount: summary.collectionCount,
+                sameCount: summary.sameCount,
+                jsonOnlyCount: summary.jsonOnlyCount,
+                collectionOnlyCount: summary.collectionOnlyCount,
+                changedCount: summary.changedCount,
+                missingIdCount: summary.missingIdCount,
+                skippedOutsideCount: summary.skippedOutsideCount
+              },
+              rows: summary.rows
+            },
+            null,
+            2
+          )
+
+    await writeFile(result.filePath, content, 'utf8')
+    logInfo(
+      'diff',
+      `exportCollectionDiffReport format=${format} file=${result.filePath} rows=${summary.rows.length}`
+    )
 
     return { ok: true, data: { filePath: result.filePath } }
   } catch (error) {

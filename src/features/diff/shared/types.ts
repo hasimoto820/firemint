@@ -61,6 +61,8 @@ export type PeekDiffJsonResult =
       error: string
     }
 
+export type DiffExportFormat = 'json' | 'csv'
+
 export type DiffExportResult =
   | {
       ok: true
