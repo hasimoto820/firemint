@@ -2,7 +2,9 @@ import type { BulkFieldMode } from '@features/bulk_operations/shared/types'
 import type { ConnectionStatus } from '@features/connection/shared/types'
 import ImpExpView from '@features/data_transfer/renderer/ui/ImpExpView'
 import TransportView from '@features/data_transfer/renderer/ui/TransportView'
+import DiffView from '@features/diff/renderer/ui/DiffView'
 import type { ImpExpDraft, ImpExpIntent } from '@features/data_transfer/shared/imp_exp'
+import type { DiffDraft } from '@features/diff/shared/diff'
 import type { TransportDraft } from '@features/data_transfer/shared/transport'
 import type { EmulatorPageMode } from '@features/emulator/shared/types'
 import EmulatorPage from '@features/emulator/renderer/ui/EmulatorPage'
@@ -11,6 +13,7 @@ import QueryView from '@features/query/renderer/ui/QueryView'
 import type { ScriptJobSnapshot } from '@features/script_runner/shared/types'
 import type { AppView } from '@shared/shell/AppNav'
 import {
+  isDiffTab,
   isEmulatorImpExpTab,
   isImpExpTab,
   isTransportTab,
@@ -30,6 +33,8 @@ type WorkspacePaneProps = {
   onOpenImpExp: (intent?: ImpExpIntent) => void
   transportDraft: TransportDraft
   onTransportDraftChange: (patch: Partial<TransportDraft>) => void
+  diffDraft: DiffDraft
+  onDiffDraftChange: (patch: Partial<DiffDraft>) => void
   sourceLabel?: string
   sourceCollectionPath?: string
   emulatorPageMode?: EmulatorPageMode
@@ -73,6 +78,8 @@ function WorkspacePane({
   onOpenImpExp,
   transportDraft,
   onTransportDraftChange,
+  diffDraft,
+  onDiffDraftChange,
   sourceLabel = '',
   sourceCollectionPath = '',
   emulatorPageMode = 'import-project',
@@ -112,6 +119,21 @@ function WorkspacePane({
           onDraftChange={onTransportDraftChange}
           job={impExpJob}
           onCancel={onCancelImpExp}
+        />
+      </div>
+    )
+  }
+
+  if (isDiffTab(tab)) {
+    return (
+      <div className="workspace-pane">
+        <DiffView
+          projectId={status.projectId}
+          sourceLabel={sourceLabel || status.projectId}
+          sourceAuthType={status.authType ?? 'serviceAccount'}
+          rootCollections={rootCollections}
+          draft={diffDraft}
+          onDraftChange={onDiffDraftChange}
         />
       </div>
     )

@@ -18,6 +18,7 @@ export const ja: MessageCatalog = {
   'menu.import': 'インポート',
   'menu.export': 'エクスポート',
   'menu.transport': 'トランスポート',
+  'menu.diff': 'Diff',
   'menu.cloud': 'クラウド',
   'menu.emulator': 'エミュレーター',
   'menu.connection': '接続',

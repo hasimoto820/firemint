@@ -33,6 +33,12 @@ import {
   type ImpExpIntent
 } from '@features/data_transfer/shared/imp_exp'
 import {
+  applyDiffIntent,
+  createDiffDraft,
+  type DiffDraft,
+  type DiffIntent
+} from '@features/diff/shared/diff'
+import {
   applyTransportIntent,
   createTransportDraft,
   type TransportDraft,
@@ -45,14 +51,17 @@ import CommandPalette, { type CommandPaletteItem } from '@shared/shell/CommandPa
 import TabBar from '@shared/shell/TabBar'
 import WorkspacePane from '@shared/shell/WorkspacePane'
 import {
+  createDiffTab,
   createEmulatorImpExpTab,
   createImpExpTab,
   createTransportTab,
   createWorkspaceTab,
+  DIFF_TAB_LABEL,
   EMULATOR_IMP_EXP_TAB_LABEL,
   IMP_EXP_TAB_LABEL,
   TRANSPORT_TAB_LABEL,
   isCollectionTab,
+  isDiffTab,
   isEmulatorImpExpTab,
   isImpExpTab,
   isTransportTab,
@@ -70,6 +79,7 @@ export type ShellCommands = {
   openImpExp: (intent?: ImpExpIntent) => void
   openEmulatorImpExp: (mode: EmulatorPageMode) => void
   openTransport: (intent?: TransportIntent) => void
+  openDiff: (intent?: DiffIntent) => void
   toggleSplit: () => void
   closeActiveTab: () => void
   closeOtherTabs: () => void
@@ -162,6 +172,7 @@ function FirestorePageInner({
   const [impExpJob, setImpExpJob] = useState<ScriptJobSnapshot | null>(null)
   const [impExpDraft, setImpExpDraft] = useState<ImpExpDraft>(() => createImpExpDraft(projectId))
   const [transportDraft, setTransportDraft] = useState<TransportDraft>(() => createTransportDraft())
+  const [diffDraft, setDiffDraft] = useState<DiffDraft>(() => createDiffDraft())
   const [lastCollectionPath, setLastCollectionPath] = useState('')
   const [emulatorImpExpMode, setEmulatorImpExpMode] =
     useState<EmulatorPageMode>('import-project')
@@ -520,12 +531,52 @@ function FirestorePageInner({
     [lastCollectionPath, projectId, rootCollections]
   )
 
+  const openDiff = useCallback(
+    (intent?: DiffIntent): void => {
+      setMainSection('firestore')
+
+      if (intent) {
+        setDiffDraft((current) =>
+          applyDiffIntent(current, intent, lastCollectionPathRef.current || lastCollectionPath)
+        )
+      } else {
+        setDiffDraft((current) => ({
+          ...current,
+          collectionPath: current.collectionPath || lastCollectionPathRef.current || lastCollectionPath
+        }))
+      }
+
+      setTabs((current) => {
+        const existing = current.find(isDiffTab)
+        if (existing) {
+          if (existing.pane === 'primary') {
+            setPrimaryActiveId(existing.id)
+          } else {
+            setSecondaryActiveId(existing.id)
+          }
+          setFocusedPane(existing.pane)
+          return current
+        }
+
+        const created = createDiffTab({ projectId, pane: 'primary' })
+        setPrimaryActiveId(created.id)
+        setFocusedPane('primary')
+        return [...current, created]
+      })
+    },
+    [lastCollectionPath, projectId]
+  )
+
   const handleImpExpDraftChange = useCallback((patch: Partial<ImpExpDraft>): void => {
     setImpExpDraft((current) => ({ ...current, ...patch }))
   }, [])
 
   const handleTransportDraftChange = useCallback((patch: Partial<TransportDraft>): void => {
     setTransportDraft((current) => ({ ...current, ...patch }))
+  }, [])
+
+  const handleDiffDraftChange = useCallback((patch: Partial<DiffDraft>): void => {
+    setDiffDraft((current) => ({ ...current, ...patch }))
   }, [])
 
   const handleSelectCollection = useCallback(
@@ -1132,6 +1183,7 @@ function FirestorePageInner({
       openImpExp,
       openEmulatorImpExp,
       openTransport,
+      openDiff,
       toggleSplit: () => handleToggleSplit(),
       closeActiveTab: () => {
         if (focusedActiveId) {
@@ -1160,6 +1212,7 @@ function FirestorePageInner({
       openImpExp,
       openEmulatorImpExp,
       openTransport,
+      openDiff,
       rootCollections.length,
       splitEnabled,
       status.authType,
@@ -1244,6 +1297,13 @@ function FirestorePageInner({
         run: () => openTransport()
       },
       {
+        id: 'open-diff',
+        group: 'タブ',
+        label: DIFF_TAB_LABEL,
+        detail: 'コレクション ↔ JSON',
+        run: () => openDiff()
+      },
+      {
         id: 'toggle-split',
         group: 'レイアウト',
         label: splitEnabled ? 'Split View を解除' : 'Split View を開く',
@@ -1292,7 +1352,9 @@ function FirestorePageInner({
             ? EMULATOR_IMP_EXP_TAB_LABEL
             : isTransportTab(tab)
               ? TRANSPORT_TAB_LABEL
-              : `${tab.collectionPath}（${tab.pane === 'primary' ? '左' : '右'}）`,
+              : isDiffTab(tab)
+                ? DIFF_TAB_LABEL
+                : `${tab.collectionPath}（${tab.pane === 'primary' ? '左' : '右'}）`,
         run: () => activateInPane(tab.id, tab.pane)
       })
 
@@ -1307,7 +1369,9 @@ function FirestorePageInner({
               ? EMULATOR_IMP_EXP_TAB_LABEL
               : isTransportTab(tab)
                 ? TRANSPORT_TAB_LABEL
-                : tab.collectionPath,
+                : isDiffTab(tab)
+                  ? DIFF_TAB_LABEL
+                  : tab.collectionPath,
           run: () => moveTabToPane(tab.id, 'secondary')
         })
       }
@@ -1323,7 +1387,9 @@ function FirestorePageInner({
               ? EMULATOR_IMP_EXP_TAB_LABEL
               : isTransportTab(tab)
                 ? TRANSPORT_TAB_LABEL
-                : tab.collectionPath,
+                : isDiffTab(tab)
+                  ? DIFF_TAB_LABEL
+                  : tab.collectionPath,
           run: () => moveTabToPane(tab.id, 'primary')
         })
       }
@@ -1341,6 +1407,7 @@ function FirestorePageInner({
     openCollection,
     openImpExp,
     openTransport,
+    openDiff,
     projectLabelFor,
     rootCollections,
     showProjectLabel,
@@ -1392,6 +1459,8 @@ function FirestorePageInner({
           onOpenImpExp={openImpExp}
           transportDraft={transportDraft}
           onTransportDraftChange={handleTransportDraftChange}
+          diffDraft={diffDraft}
+          onDiffDraftChange={handleDiffDraftChange}
           sourceLabel={focusedEntry?.label ?? status.projectId}
           sourceCollectionPath={lastCollectionPath}
           emulatorPageMode={emulatorImpExpMode}

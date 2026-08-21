@@ -4,11 +4,12 @@ import type { AppView } from '@shared/shell/AppNav'
 export type WorkspacePaneId = 'primary' | 'secondary'
 
 /** 上段タブの種別。Imp/Exp と Emulator はコレクションに紐づかない。 */
-export type WorkspaceTabKind = 'collection' | 'imp_exp' | 'emulator_imp_exp' | 'transport'
+export type WorkspaceTabKind = 'collection' | 'imp_exp' | 'emulator_imp_exp' | 'transport' | 'diff'
 
 export const IMP_EXP_TAB_LABEL = 'Cloud Imp/Exp'
 export const EMULATOR_IMP_EXP_TAB_LABEL = 'Emu Imp/Exp'
 export const TRANSPORT_TAB_LABEL = 'Transport'
+export const DIFF_TAB_LABEL = 'Diff'
 
 /**
  * 作業面 1 枚分。Phase 9 のタブ / Split の単位。
@@ -118,9 +119,18 @@ export function isTransportTab(tab: WorkspaceTab): boolean {
   return tab.kind === 'transport'
 }
 
-/** Imp/Exp / Emulator / Transport。コレクションタブではない。 */
+export function isDiffTab(tab: WorkspaceTab): boolean {
+  return tab.kind === 'diff'
+}
+
+/** Imp/Exp / Emulator / Transport / Diff。コレクションタブではない。 */
 export function isWorkspaceToolTab(tab: WorkspaceTab): boolean {
-  return tab.kind === 'imp_exp' || tab.kind === 'emulator_imp_exp' || tab.kind === 'transport'
+  return (
+    tab.kind === 'imp_exp' ||
+    tab.kind === 'emulator_imp_exp' ||
+    tab.kind === 'transport' ||
+    tab.kind === 'diff'
+  )
 }
 
 /** ウィンドウに 1 つだけの Emulator Imp/Exp タブ。 */
@@ -153,6 +163,21 @@ export function createTransportTab(input: {
   }
 }
 
+/** ウィンドウに 1 つだけの Diff タブ。 */
+export function createDiffTab(input: {
+  projectId: string
+  pane?: WorkspacePaneId
+}): WorkspaceTab {
+  return {
+    ...createWorkspaceTab({
+      projectId: input.projectId,
+      collectionPath: '',
+      pane: input.pane ?? 'primary'
+    }),
+    kind: 'diff'
+  }
+}
+
 /** タブ見出し。コレクションはパス末尾、Imp/Exp・Emulator は固定名。混在時は projectLabel を付ける。 */
 export function workspaceTabLabel(tab: WorkspaceTab, projectLabel?: string): string {
   if (tab.kind === 'imp_exp') {
@@ -165,6 +190,10 @@ export function workspaceTabLabel(tab: WorkspaceTab, projectLabel?: string): str
 
   if (tab.kind === 'transport') {
     return TRANSPORT_TAB_LABEL
+  }
+
+  if (tab.kind === 'diff') {
+    return DIFF_TAB_LABEL
   }
 
   const segments = tab.collectionPath.split('/').filter(Boolean)

@@ -175,6 +175,25 @@ const api: IpcApi = {
       }
     }
   },
+  diff: {
+    selectJson: () => ipcRenderer.invoke(IPC_CHANNELS.DIFF_SELECT_JSON),
+    peekJson: (filePath) => ipcRenderer.invoke(IPC_CHANNELS.DIFF_PEEK_JSON, filePath),
+    compareCollection: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.DIFF_COMPARE_COLLECTION, input),
+    onCompareProgress: (listener) => {
+      const handler = (
+        _event: Electron.IpcRendererEvent,
+        progress: Parameters<typeof listener>[0]
+      ): void => {
+        listener(progress)
+      }
+      ipcRenderer.on(IPC_CHANNELS.DIFF_COMPARE_PROGRESS, handler)
+      return () => {
+        ipcRenderer.removeListener(IPC_CHANNELS.DIFF_COMPARE_PROGRESS, handler)
+      }
+    },
+    exportReport: (summary) => ipcRenderer.invoke(IPC_CHANNELS.DIFF_EXPORT_REPORT, summary)
+  },
   emulator: {
     importProjectZip: (input) =>
       ipcRenderer.invoke(IPC_CHANNELS.EMULATOR_IMPORT_PROJECT_ZIP, input),

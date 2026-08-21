@@ -49,6 +49,15 @@ import type {
 } from '@features/bulk_operations/shared/types'
 
 import type {
+  CollectionDiffInput,
+  CollectionDiffProgress,
+  CollectionDiffResult,
+  CollectionDiffSummary,
+  DiffExportResult,
+  PeekDiffJsonResult
+} from '@features/diff/shared/types'
+
+import type {
   ExportCollectionJsonInput,
   ExportDocumentsInput,
   ExportProjectInput,
@@ -252,6 +261,14 @@ export type DataTransferIpcApi = {
   onTransportProgress: (listener: (progress: TransportProgress) => void) => () => void
 }
 
+export type DiffIpcApi = {
+  selectJson: () => Promise<{ canceled: boolean; filePath: string | null }>
+  peekJson: (filePath: string) => Promise<PeekDiffJsonResult>
+  compareCollection: (input: CollectionDiffInput) => Promise<CollectionDiffResult>
+  onCompareProgress: (listener: (progress: CollectionDiffProgress) => void) => () => void
+  exportReport: (summary: CollectionDiffSummary) => Promise<DiffExportResult>
+}
+
 export type ScriptRunnerIpcApi = {
   start: (input: StartScriptJobInput) => Promise<StartScriptJobResult>
   cancel: () => Promise<CancelScriptJobResult>
@@ -318,6 +335,7 @@ export interface IpcApi {
   query: QueryIpcApi
   bulk: BulkOperationsIpcApi
   dataTransfer: DataTransferIpcApi
+  diff: DiffIpcApi
   emulator: EmulatorIpcApi
   scriptRunner: ScriptRunnerIpcApi
   authUsers: AuthUsersIpcApi

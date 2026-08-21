@@ -700,6 +700,10 @@ code {
   overflow: auto;
 }
 
+.workspace-pane > .imp-exp-view.imp-exp-view--diff {
+  overflow: hidden;
+}
+
 .workspace-pane > .emulator-page {
   display: flex;
   flex-direction: column;
@@ -724,6 +728,32 @@ code {
 
 .imp-exp-view--job {
   gap: 20px;
+}
+
+.imp-exp-view--diff {
+  gap: 12px;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.imp-exp-view--diff .imp-exp-form {
+  flex-shrink: 0;
+  max-width: none;
+}
+
+.imp-exp-view--diff .diff-table-panel {
+  flex: 1;
+  min-height: 120px;
+}
+
+.diff-table__path,
+.diff-table__json {
+  max-width: 280px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-all;
 }
 
 .imp-exp-form {

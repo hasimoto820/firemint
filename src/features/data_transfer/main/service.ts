@@ -110,7 +110,7 @@ async function fetchAllDocuments(
  * コレクション一段、またはサブコレクション込みでドキュメントを収集する。
  * 含む場合は flat な ExportDocument[]（path がフルパス）。
  */
-async function fetchExportDocuments(
+export async function fetchExportDocuments(
   projectId: string,
   collectionPath: string,
   includeSubcollections: boolean,

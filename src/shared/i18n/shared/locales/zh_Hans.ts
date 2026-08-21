@@ -18,6 +18,7 @@ export const zhHans: MessageCatalog = {
   'menu.import': '导入',
   'menu.export': '导出',
   'menu.transport': '传输',
+  'menu.diff': 'Diff',
   'menu.cloud': '云',
   'menu.emulator': '模拟器',
   'menu.connection': '连接',

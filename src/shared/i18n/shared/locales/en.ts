@@ -16,6 +16,7 @@ export const en: Record<string, string> = {
   'menu.import': 'Import',
   'menu.export': 'Export',
   'menu.transport': 'Transport',
+  'menu.diff': 'Diff',
   'menu.cloud': 'Cloud',
   'menu.emulator': 'Emulator',
   'menu.connection': 'Connection',

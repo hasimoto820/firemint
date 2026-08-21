@@ -18,6 +18,7 @@ export const zhHant: MessageCatalog = {
   'menu.import': '匯入',
   'menu.export': '匯出',
   'menu.transport': '傳輸',
+  'menu.diff': 'Diff',
   'menu.cloud': '雲端',
   'menu.emulator': '模擬器',
   'menu.connection': '連線',

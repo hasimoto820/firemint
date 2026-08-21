@@ -1,4 +1,5 @@
 import type { ImpExpIntent } from '@features/data_transfer/shared/imp_exp'
+import type { DiffIntent } from '@features/diff/shared/diff'
 import type { TransportIntent } from '@features/data_transfer/shared/transport'
 import type { AppView } from '@shared/shell/AppNav'
 import type { TranslateFn } from '@shared/i18n/shared/types'
@@ -53,6 +54,7 @@ export type AppShellMenuActions = {
   openCommandPalette?: () => void
   openImpExp?: (intent?: ImpExpIntent) => void
   openTransport?: (intent?: TransportIntent) => void
+  openDiff?: (intent?: DiffIntent) => void
   toggleSplit?: () => void
   closeActiveTab?: () => void
   closeOtherTabs?: () => void
@@ -171,6 +173,18 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
             !shell?.hasCollectionPath,
           onClick: () => shell?.openTransport?.({ sourceKind: 'cloud', target: 'collection' })
         },
+        { type: 'header', label: t('menu.diff'), indent: true },
+        {
+          type: 'item',
+          id: 'file-diff-collection',
+          label: t('menu.collection'),
+          indent: 2,
+          disabled:
+            !handlers.connected ||
+            Boolean(shell?.sourceIsEmulator) ||
+            !shell?.hasCollectionPath,
+          onClick: () => shell?.openDiff?.({ sourceKind: 'cloud' })
+        },
         { type: 'separator' },
         { type: 'header', label: t('menu.emulator') },
         { type: 'header', label: t('menu.import'), indent: true },
@@ -223,6 +237,15 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
           indent: 2,
           disabled: !shell?.sourceIsEmulator || !shell?.hasCollectionPath,
           onClick: () => shell?.openTransport?.({ sourceKind: 'emulator', target: 'collection' })
+        },
+        { type: 'header', label: t('menu.diff'), indent: true },
+        {
+          type: 'item',
+          id: 'file-emulator-diff-collection',
+          label: t('menu.collection'),
+          indent: 2,
+          disabled: !shell?.sourceIsEmulator || !shell?.hasCollectionPath,
+          onClick: () => shell?.openDiff?.({ sourceKind: 'emulator' })
         },
         { type: 'separator' },
         { type: 'header', label: t('menu.connection') },

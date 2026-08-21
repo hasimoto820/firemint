@@ -227,6 +227,7 @@ function App(): React.JSX.Element {
               openCommandPalette: shellCommands.openCommandPalette,
               openImpExp: shellCommands.openImpExp,
               openTransport: shellCommands.openTransport,
+              openDiff: shellCommands.openDiff,
               toggleSplit: shellCommands.toggleSplit,
               closeActiveTab: shellCommands.closeActiveTab,
               closeOtherTabs: shellCommands.closeOtherTabs,
