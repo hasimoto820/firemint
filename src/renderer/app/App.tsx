@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ConnectionStatus } from '@features/connection/shared/types'
 import type { WorkspaceEntry } from '@features/workspace/shared/types'
 import ConnectionPanel from '@features/connection/renderer/ui/ConnectionPanel'
@@ -53,6 +53,48 @@ function App(): React.JSX.Element {
     await refreshStatus()
     setRefreshKey((current) => current + 1)
   }, [refreshStatus])
+
+  const startupDiscoverDone = useRef(false)
+
+  useEffect(() => {
+    if (!ready || connectionStatus === undefined || startupDiscoverDone.current) {
+      return
+    }
+
+    startupDiscoverDone.current = true
+    let cancelled = false
+
+    void (async () => {
+      const settings = await window.api.settings.get()
+      if (!settings.autoDiscoverEmulator || cancelled) {
+        return
+      }
+
+      const result = await window.api.emulator.discover()
+      if (!result.ok || cancelled || result.data.length === 0) {
+        return
+      }
+
+      if (result.data.length === 1) {
+        const connected = await window.api.connection.connectEmulator({
+          host: result.data[0].firestoreHost,
+          projectId: result.data[0].projectId
+        })
+        if (!connected.ok || cancelled) {
+          return
+        }
+
+        await handleWorkspaceChanged()
+        return
+      }
+
+      setEmulatorConnectOpen(true)
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [connectionStatus, handleWorkspaceChanged, ready])
 
   const handleDisconnect = useCallback(async (): Promise<void> => {
     if (!(await confirmAction(t('workspace.disconnect_confirm')))) {

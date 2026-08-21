@@ -59,6 +59,7 @@ export const ja: MessageCatalog = {
   'settings.theme': 'テーマ',
   'settings.theme.dark': 'ダーク',
   'settings.theme.light': 'ライト',
+  'settings.auto_discover': '起動時に自動検出する',
 
   'connection.lead': 'Firestore に接続',
   'connection.mode_list': 'リスト',

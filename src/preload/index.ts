@@ -199,6 +199,8 @@ const api: IpcApi = {
     get: () => ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_GET),
     setLocale: (locale) => ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_SET_LOCALE, locale),
     setTheme: (theme) => ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_SET_THEME, theme),
+    setAutoDiscoverEmulator: (enabled) =>
+      ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_SET_AUTO_DISCOVER_EMULATOR, enabled),
     openWindow: () => ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_OPEN_WINDOW),
     onChanged: (listener) => {
       const handler = (_event: IpcRendererEvent, settings: AppSettings): void => {

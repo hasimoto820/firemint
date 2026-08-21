@@ -1,16 +1,43 @@
+import { useEffect, useState } from 'react'
 import { useI18n } from '@shared/i18n/renderer/I18nProvider'
 import {
   LOCALES,
   LOCALE_LABEL_KEYS,
   type Locale
 } from '@shared/i18n/shared/types'
-import { THEMES, type Theme } from '@shared/settings/shared/types'
+import {
+  DEFAULT_SETTINGS,
+  THEMES,
+  type Theme
+} from '@shared/settings/shared/types'
 
 /**
- * 別ウィンドウ用の Settings。言語とテーマ。
+ * 別ウィンドウ用の Settings。言語とテーマと起動時 Discover。
  */
 function SettingsApp(): React.JSX.Element {
   const { t, locale, setLocale, theme, setTheme, ready } = useI18n()
+  const [autoDiscoverEmulator, setAutoDiscoverEmulatorState] = useState(
+    DEFAULT_SETTINGS.autoDiscoverEmulator
+  )
+
+  useEffect(() => {
+    let cancelled = false
+
+    void window.api.settings.get().then((settings) => {
+      if (!cancelled) {
+        setAutoDiscoverEmulatorState(settings.autoDiscoverEmulator)
+      }
+    })
+
+    const unsubscribe = window.api.settings.onChanged((settings) => {
+      setAutoDiscoverEmulatorState(settings.autoDiscoverEmulator)
+    })
+
+    return () => {
+      cancelled = true
+      unsubscribe()
+    }
+  }, [])
 
   if (!ready) {
     return (
@@ -60,6 +87,24 @@ function SettingsApp(): React.JSX.Element {
               <span>{t(`settings.theme.${item}`)}</span>
             </label>
           ))}
+        </div>
+      </section>
+
+      <section className="settings-window__section">
+        <h2 className="settings-window__section-title">{t('menu.emulator')}</h2>
+        <div className="settings-window__options">
+          <label className="settings-window__option">
+            <input
+              type="checkbox"
+              checked={autoDiscoverEmulator}
+              onChange={(event) => {
+                const next = event.target.checked
+                setAutoDiscoverEmulatorState(next)
+                void window.api.settings.setAutoDiscoverEmulator(next)
+              }}
+            />
+            <span>{t('settings.auto_discover')}</span>
+          </label>
         </div>
       </section>
     </div>

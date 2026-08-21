@@ -4,7 +4,7 @@ import { logInfo } from '@shared/logging/logger'
 import type { Locale } from '@shared/i18n/shared/types'
 import { isLocale } from '@shared/i18n/shared/types'
 import { isTheme, type Theme } from '@shared/settings/shared/types'
-import { getSettings, setLocale, setTheme } from './service'
+import { getSettings, setAutoDiscoverEmulator, setLocale, setTheme } from './service'
 import { applyThemeToWindows } from './window_chrome'
 import { broadcastSettingsChanged, openSettingsWindow } from './window'
 
@@ -34,6 +34,22 @@ export function registerSettingsHandlers(): void {
     broadcastSettingsChanged(next)
     return next
   })
+
+  ipcMain.handle(
+    IPC_CHANNELS.SETTINGS_SET_AUTO_DISCOVER_EMULATOR,
+    async (_event, autoDiscoverEmulator: boolean) => {
+      if (typeof autoDiscoverEmulator !== 'boolean') {
+        throw new Error('autoDiscoverEmulator must be boolean')
+      }
+      logInfo(
+        'ipc:settings',
+        `setAutoDiscoverEmulator invoked autoDiscoverEmulator=${autoDiscoverEmulator}`
+      )
+      const next = await setAutoDiscoverEmulator(autoDiscoverEmulator)
+      broadcastSettingsChanged(next)
+      return next
+    }
+  )
 
   ipcMain.handle(IPC_CHANNELS.SETTINGS_OPEN_WINDOW, async () => {
     logInfo('ipc:settings', 'openWindow invoked')

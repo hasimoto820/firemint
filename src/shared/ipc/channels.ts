@@ -85,6 +85,7 @@ export const IPC_CHANNELS = {
   SETTINGS_GET: 'settings:get',
   SETTINGS_SET_LOCALE: 'settings:set_locale',
   SETTINGS_SET_THEME: 'settings:set_theme',
+  SETTINGS_SET_AUTO_DISCOVER_EMULATOR: 'settings:set_auto_discover_emulator',
   SETTINGS_OPEN_WINDOW: 'settings:open_window',
   SETTINGS_CHANGED: 'settings:changed'
 } as const

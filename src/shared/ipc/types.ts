@@ -296,6 +296,7 @@ export type SettingsIpcApi = {
   get: () => Promise<AppSettings>
   setLocale: (locale: Locale) => Promise<AppSettings>
   setTheme: (theme: Theme) => Promise<AppSettings>
+  setAutoDiscoverEmulator: (enabled: boolean) => Promise<AppSettings>
   openWindow: () => Promise<null>
   onChanged: (listener: (settings: AppSettings) => void) => () => void
 }

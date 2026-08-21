@@ -59,6 +59,7 @@ export const zhHant: MessageCatalog = {
   'settings.theme': '主題',
   'settings.theme.dark': '深色',
   'settings.theme.light': '淺色',
+  'settings.auto_discover': '啟動時自動偵測',
 
   'connection.lead': '連線到 Firestore',
   'connection.mode_list': '清單',

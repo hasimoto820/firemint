@@ -57,6 +57,7 @@ export const en: Record<string, string> = {
   'settings.theme': 'Theme',
   'settings.theme.dark': 'Dark',
   'settings.theme.light': 'Light',
+  'settings.auto_discover': 'Discover on startup',
 
   'connection.lead': 'Connect to Firestore',
   'connection.mode_list': 'List',

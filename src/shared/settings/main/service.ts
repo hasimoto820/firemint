@@ -48,3 +48,10 @@ export async function setTheme(theme: Theme): Promise<AppSettings> {
   await saveSettings(next)
   return next
 }
+
+export async function setAutoDiscoverEmulator(autoDiscoverEmulator: boolean): Promise<AppSettings> {
+  const current = await loadSettings()
+  const next: AppSettings = { ...current, autoDiscoverEmulator }
+  await saveSettings(next)
+  return next
+}

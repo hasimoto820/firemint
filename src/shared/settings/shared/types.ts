@@ -9,6 +9,7 @@ export type AppSettings = {
   version: 1
   locale: Locale
   theme: Theme
+  autoDiscoverEmulator: boolean
 }
 
 export const DEFAULT_THEME: Theme = 'dark'
@@ -16,7 +17,8 @@ export const DEFAULT_THEME: Theme = 'dark'
 export const DEFAULT_SETTINGS: AppSettings = {
   version: 1,
   locale: DEFAULT_LOCALE,
-  theme: DEFAULT_THEME
+  theme: DEFAULT_THEME,
+  autoDiscoverEmulator: true
 }
 
 export function isTheme(value: unknown): value is Theme {
@@ -32,7 +34,11 @@ export function normalizeSettings(raw: unknown): AppSettings {
   return {
     version: 1,
     locale: isLocale(record.locale) ? record.locale : DEFAULT_LOCALE,
-    theme: isTheme(record.theme) ? record.theme : DEFAULT_THEME
+    theme: isTheme(record.theme) ? record.theme : DEFAULT_THEME,
+    autoDiscoverEmulator:
+      typeof record.autoDiscoverEmulator === 'boolean'
+        ? record.autoDiscoverEmulator
+        : DEFAULT_SETTINGS.autoDiscoverEmulator
   }
 }
 
