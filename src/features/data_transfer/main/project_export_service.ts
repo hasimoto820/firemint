@@ -115,7 +115,7 @@ async function* iterateCollectionPage(
   }
 }
 
-async function* iterateExportDocuments(
+export async function* iterateExportDocuments(
   projectId: string,
   collectionPath: string,
   includeSubcollections: boolean,

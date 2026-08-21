@@ -1,4 +1,5 @@
 import type { ImpExpIntent } from '@features/data_transfer/shared/imp_exp'
+import type { TransportIntent } from '@features/data_transfer/shared/transport'
 import type { AppView } from '@shared/shell/AppNav'
 import type { TranslateFn } from '@shared/i18n/shared/types'
 import type { AppMenuSection } from './app_menu'
@@ -51,6 +52,7 @@ export type AppMenuContextActions = {
 export type AppShellMenuActions = {
   openCommandPalette?: () => void
   openImpExp?: (intent?: ImpExpIntent) => void
+  openTransport?: (intent?: TransportIntent) => void
   toggleSplit?: () => void
   closeActiveTab?: () => void
   closeOtherTabs?: () => void
@@ -58,6 +60,9 @@ export type AppShellMenuActions = {
   canCloseOtherTabs?: boolean
   splitEnabled?: boolean
   impExpActive?: boolean
+  toolTabActive?: boolean
+  hasCollectionPath?: boolean
+  sourceIsEmulator?: boolean
 }
 
 export type AppMenuHandlers = {
@@ -146,6 +151,26 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
           disabled: !handlers.connected,
           onClick: () => shell?.openImpExp?.({ direction: 'export', target: 'collection' })
         },
+        { type: 'header', label: t('menu.transport'), indent: true },
+        {
+          type: 'item',
+          id: 'file-transport-project',
+          label: t('menu.project'),
+          indent: 2,
+          disabled: !handlers.connected || Boolean(shell?.sourceIsEmulator),
+          onClick: () => shell?.openTransport?.({ sourceKind: 'cloud', target: 'project' })
+        },
+        {
+          type: 'item',
+          id: 'file-transport-collection',
+          label: t('menu.collection'),
+          indent: 2,
+          disabled:
+            !handlers.connected ||
+            Boolean(shell?.sourceIsEmulator) ||
+            !shell?.hasCollectionPath,
+          onClick: () => shell?.openTransport?.({ sourceKind: 'cloud', target: 'collection' })
+        },
         { type: 'separator' },
         { type: 'header', label: t('menu.emulator') },
         { type: 'header', label: t('menu.import'), indent: true },
@@ -181,6 +206,23 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
           indent: 2,
           disabled: !(handlers.canEmulatorExport ?? false),
           onClick: handlers.onEmulatorExportCollection
+        },
+        { type: 'header', label: t('menu.transport'), indent: true },
+        {
+          type: 'item',
+          id: 'file-emulator-transport-project',
+          label: t('menu.project'),
+          indent: 2,
+          disabled: !shell?.sourceIsEmulator,
+          onClick: () => shell?.openTransport?.({ sourceKind: 'emulator', target: 'project' })
+        },
+        {
+          type: 'item',
+          id: 'file-emulator-transport-collection',
+          label: t('menu.collection'),
+          indent: 2,
+          disabled: !shell?.sourceIsEmulator || !shell?.hasCollectionPath,
+          onClick: () => shell?.openTransport?.({ sourceKind: 'emulator', target: 'collection' })
         },
         { type: 'separator' },
         { type: 'header', label: t('menu.connection') },
@@ -383,14 +425,14 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
           type: 'item',
           id: 'view-simple',
           label: !shell?.impExpActive && handlers.activeView === 'simple' ? 'Simple ✓' : 'Simple',
-          disabled: !handlers.connected || Boolean(shell?.impExpActive),
+          disabled: !handlers.connected || Boolean(shell?.toolTabActive),
           onClick: () => handlers.onNavigate('simple')
         },
         {
           type: 'item',
           id: 'view-query',
           label: !shell?.impExpActive && handlers.activeView === 'query' ? 'Query ✓' : 'Query',
-          disabled: !handlers.connected || Boolean(shell?.impExpActive),
+          disabled: !handlers.connected || Boolean(shell?.toolTabActive),
           onClick: () => handlers.onNavigate('query')
         },
         { type: 'separator' },

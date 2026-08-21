@@ -64,7 +64,11 @@ import type {
   ImportProjectResult,
   ImportProjectValidationResult,
   ImportResult,
-  PeekCollectionImportResult
+  PeekCollectionImportResult,
+  TransportInput,
+  TransportProgress,
+  TransportResult,
+  TransportValidationResult
 } from '@features/data_transfer/shared/types'
 
 import type {
@@ -243,6 +247,9 @@ export type DataTransferIpcApi = {
   onImportProjectProgress: (
     listener: (progress: ImportProjectProgress) => void
   ) => () => void
+  validateTransport: (input: TransportInput) => Promise<TransportValidationResult>
+  transport: (input: TransportInput) => Promise<TransportResult>
+  onTransportProgress: (listener: (progress: TransportProgress) => void) => () => void
 }
 
 export type ScriptRunnerIpcApi = {

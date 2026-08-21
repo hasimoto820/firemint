@@ -226,13 +226,17 @@ function App(): React.JSX.Element {
           ? {
               openCommandPalette: shellCommands.openCommandPalette,
               openImpExp: shellCommands.openImpExp,
+              openTransport: shellCommands.openTransport,
               toggleSplit: shellCommands.toggleSplit,
               closeActiveTab: shellCommands.closeActiveTab,
               closeOtherTabs: shellCommands.closeOtherTabs,
               canCloseTab: shellCommands.canCloseTab,
               canCloseOtherTabs: shellCommands.canCloseOtherTabs,
               splitEnabled: shellCommands.splitEnabled,
-              impExpActive: shellCommands.impExpActive
+              impExpActive: shellCommands.impExpActive,
+              toolTabActive: shellCommands.toolTabActive,
+              hasCollectionPath: shellCommands.hasCollectionPath,
+              sourceIsEmulator: shellCommands.sourceIsEmulator
             }
           : null,
         t,

@@ -46,13 +46,13 @@ export function serializeFirestoreValue(value: unknown): unknown {
   return value
 }
 
-export function deserializeFirestoreValue(value: unknown): unknown {
+export function deserializeFirestoreValue(value: unknown, projectId?: string): unknown {
   if (value === null || value === undefined) {
     return value
   }
 
   if (Array.isArray(value)) {
-    return value.map(deserializeFirestoreValue)
+    return value.map((item) => deserializeFirestoreValue(item, projectId))
   }
 
   if (typeof value === 'object') {
@@ -72,13 +72,13 @@ export function deserializeFirestoreValue(value: unknown): unknown {
     }
 
     if (typeMarker === 'reference' && typeof record.path === 'string') {
-      return getFirestore().doc(record.path)
+      return getFirestore(projectId).doc(record.path)
     }
 
     const result: Record<string, unknown> = {}
 
     for (const [key, nestedValue] of Object.entries(record)) {
-      result[key] = deserializeFirestoreValue(nestedValue)
+      result[key] = deserializeFirestoreValue(nestedValue, projectId)
     }
 
     return result
@@ -87,11 +87,14 @@ export function deserializeFirestoreValue(value: unknown): unknown {
   return value
 }
 
-export function deserializeDocumentData(data: Record<string, unknown>): Record<string, unknown> {
+export function deserializeDocumentData(
+  data: Record<string, unknown>,
+  projectId?: string
+): Record<string, unknown> {
   const result: Record<string, unknown> = {}
 
   for (const [key, value] of Object.entries(data)) {
-    result[key] = deserializeFirestoreValue(value)
+    result[key] = deserializeFirestoreValue(value, projectId)
   }
 
   return result

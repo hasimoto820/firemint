@@ -4,10 +4,11 @@ import type { AppView } from '@shared/shell/AppNav'
 export type WorkspacePaneId = 'primary' | 'secondary'
 
 /** 上段タブの種別。Imp/Exp と Emulator はコレクションに紐づかない。 */
-export type WorkspaceTabKind = 'collection' | 'imp_exp' | 'emulator_imp_exp'
+export type WorkspaceTabKind = 'collection' | 'imp_exp' | 'emulator_imp_exp' | 'transport'
 
 export const IMP_EXP_TAB_LABEL = 'Cloud Imp/Exp'
 export const EMULATOR_IMP_EXP_TAB_LABEL = 'Emu Imp/Exp'
+export const TRANSPORT_TAB_LABEL = 'Transport'
 
 /**
  * 作業面 1 枚分。Phase 9 のタブ / Split の単位。
@@ -113,9 +114,13 @@ export function isEmulatorImpExpTab(tab: WorkspaceTab): boolean {
   return tab.kind === 'emulator_imp_exp'
 }
 
-/** Imp/Exp / Emulator。コレクションタブではない。 */
+export function isTransportTab(tab: WorkspaceTab): boolean {
+  return tab.kind === 'transport'
+}
+
+/** Imp/Exp / Emulator / Transport。コレクションタブではない。 */
 export function isWorkspaceToolTab(tab: WorkspaceTab): boolean {
-  return tab.kind === 'imp_exp' || tab.kind === 'emulator_imp_exp'
+  return tab.kind === 'imp_exp' || tab.kind === 'emulator_imp_exp' || tab.kind === 'transport'
 }
 
 /** ウィンドウに 1 つだけの Emulator Imp/Exp タブ。 */
@@ -133,6 +138,21 @@ export function createEmulatorImpExpTab(input: {
   }
 }
 
+/** ウィンドウに 1 つだけの Transport タブ。 */
+export function createTransportTab(input: {
+  projectId: string
+  pane?: WorkspacePaneId
+}): WorkspaceTab {
+  return {
+    ...createWorkspaceTab({
+      projectId: input.projectId,
+      collectionPath: '',
+      pane: input.pane ?? 'primary'
+    }),
+    kind: 'transport'
+  }
+}
+
 /** タブ見出し。コレクションはパス末尾、Imp/Exp・Emulator は固定名。混在時は projectLabel を付ける。 */
 export function workspaceTabLabel(tab: WorkspaceTab, projectLabel?: string): string {
   if (tab.kind === 'imp_exp') {
@@ -141,6 +161,10 @@ export function workspaceTabLabel(tab: WorkspaceTab, projectLabel?: string): str
 
   if (tab.kind === 'emulator_imp_exp') {
     return EMULATOR_IMP_EXP_TAB_LABEL
+  }
+
+  if (tab.kind === 'transport') {
+    return TRANSPORT_TAB_LABEL
   }
 
   const segments = tab.collectionPath.split('/').filter(Boolean)

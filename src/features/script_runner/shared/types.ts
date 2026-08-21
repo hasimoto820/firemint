@@ -2,7 +2,8 @@ import type {
   ExportCollectionJsonInput,
   ExportProjectInput,
   ImportCollectionJsonInput,
-  ImportProjectInput
+  ImportProjectInput,
+  TransportInput
 } from '@features/data_transfer/shared/types'
 
 export type ScriptJobKind =
@@ -10,6 +11,7 @@ export type ScriptJobKind =
   | 'import_collection'
   | 'export_project'
   | 'import_project'
+  | 'transport'
 
 export type ScriptJobStatus = 'running' | 'succeeded' | 'failed' | 'canceled'
 
@@ -38,6 +40,7 @@ export type StartScriptJobInput =
   | ({ kind: 'import_collection' } & ImportCollectionJsonInput)
   | ({ kind: 'export_project' } & ExportProjectInput)
   | ({ kind: 'import_project' } & ImportProjectInput)
+  | ({ kind: 'transport' } & TransportInput)
 
 export type StartScriptJobResult =
   | {

@@ -36,7 +36,7 @@ function TabBar({
           'tab-bar__tab',
           active ? 'tab-bar__tab--active' : '',
           isWorkspaceToolTab(tab) ? 'tab-bar__tab--imp-exp' : '',
-          tab.kind === 'imp_exp' && impExpBusy ? 'tab-bar__tab--busy' : ''
+          isWorkspaceToolTab(tab) && impExpBusy ? 'tab-bar__tab--busy' : ''
         ]
           .filter(Boolean)
           .join(' ')

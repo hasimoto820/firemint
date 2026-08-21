@@ -6,7 +6,8 @@ import type {
   ExportCollectionProgress,
   ExportProjectProgress,
   ImportCollectionProgress,
-  ImportProjectProgress
+  ImportProjectProgress,
+  TransportProgress
 } from '@features/data_transfer/shared/types'
 import {
   collectionExportDefaultFileName,
@@ -20,6 +21,7 @@ import {
   exportProject
 } from '@features/data_transfer/main/project_export_service'
 import { importProject } from '@features/data_transfer/main/project_import_service'
+import { transportDocuments } from '@features/data_transfer/main/transport_service'
 import type {
   ScriptJobLogLine,
   ScriptJobSnapshot,
@@ -50,6 +52,8 @@ function jobTitle(input: StartScriptJobInput): string {
       return `Export · Project · ${input.projectId}`
     case 'import_project':
       return `Import · Project · ${input.projectId}`
+    case 'transport':
+      return `Transport · ${input.target} · ${input.sourceProjectId} → ${input.destinationProjectId}`
   }
 }
 
@@ -128,6 +132,13 @@ function onProjectExportProgress(progress: ExportProjectProgress): void {
   applyProgress(progress.percent, detail)
 }
 
+function onTransportProgress(progress: TransportProgress): void {
+  const detail = progress.detail
+    ? `${progress.phase} ${progress.processedCount} 件 / 書込 ${progress.writtenCount} / スキップ ${progress.skippedCount} / ${progress.detail}`
+    : `${progress.phase} ${progress.processedCount} 件 / 書込 ${progress.writtenCount} / スキップ ${progress.skippedCount}`
+  applyProgress(progress.percent, detail, progress.writtenCount)
+}
+
 function onImportProgress(
   progress: ImportCollectionProgress | ImportProjectProgress
 ): void {
@@ -200,6 +211,26 @@ async function runJob(
         writtenCount: result.data.writtenCount,
         resultSummary: `${result.data.writtenCount} 件をインポートしました`
       })
+      return
+    }
+    case 'transport': {
+      const result = await transportDocuments(input, onTransportProgress, signal)
+      if (!result.ok) {
+        throw Object.assign(new Error(result.error), { canceled: result.canceled })
+      }
+      const skipNote =
+        result.data.skippedCount > 0 ? ` / スキップ ${result.data.skippedCount} 件` : ''
+      patchSnapshot({
+        writtenCount: result.data.writtenCount,
+        resultSummary: `${result.data.writtenCount} 件をコピーしました${skipNote}`
+      })
+      if (result.data.collisionSamples.length > 0) {
+        appendLog(
+          'info',
+          `スキップ例: ${result.data.collisionSamples.join(', ')}`
+        )
+      }
+      return
     }
   }
 }
