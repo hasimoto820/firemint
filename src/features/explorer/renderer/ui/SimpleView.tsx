@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useOptionalAutocompleteApi } from '@features/autocomplete/renderer/hooks'
-import type { ConnectionStatus } from '@features/connection/shared/types'
+import {
+  isFirestoreWriteDisabled,
+  type ConnectionStatus
+} from '@features/connection/shared/types'
 import type { ImpExpIntent } from '@features/data_transfer/shared/imp_exp'
 import type { BulkFieldMode } from '@features/bulk_operations/shared/types'
 import type { DocumentSummary } from '@features/explorer/shared/types'
@@ -69,7 +72,7 @@ function SimpleView({
 }: SimpleViewProps): React.JSX.Element {
   const { t } = useI18n()
   const projectId = status.projectId
-  const readOnly = status.readOnly
+  const readOnly = isFirestoreWriteDisabled(status)
   const autocomplete = useOptionalAutocompleteApi()
   const [documents, setDocuments] = useState<DocumentSummary[]>([])
   const [selectedCreateTime, setSelectedCreateTime] = useState<string | null>(null)

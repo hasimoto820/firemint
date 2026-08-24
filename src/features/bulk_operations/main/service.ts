@@ -6,7 +6,7 @@ import { deserializeFirestoreValue } from '@shared/firestore/serialize'
 import { parseQueryLiteral } from '@shared/firestore/value_parse'
 import { calculateBatchCount, FIRESTORE_BATCH_LIMIT } from '@shared/safety/operations'
 import { logError, logInfo } from '@shared/logging/logger'
-import { ensureWritable } from '@features/workspace/main/guard'
+import { ensureFirestoreWritable } from '@features/workspace/main/guard'
 import type {
   BulkCreateFieldInput,
   BulkDeleteFieldInput,
@@ -280,7 +280,7 @@ export async function bulkUpdateFieldValue(
 ): Promise<BulkResult<BulkFieldWriteResult>> {
   try {
     ensureConnected(input.projectId)
-    ensureWritable(input.projectId)
+    ensureFirestoreWritable(input.projectId)
 
     const collectionPath = validateCollectionPath(input.collectionPath)
     const field = validateField(input.field)
@@ -383,7 +383,7 @@ export async function bulkUpdateField(
 ): Promise<BulkResult<BulkOperationSummary>> {
   try {
     ensureConnected(input.projectId)
-    ensureWritable(input.projectId)
+    ensureFirestoreWritable(input.projectId)
 
     const documentPaths = validateDocumentPaths(input.documentPaths)
     const field = validateField(input.field)
@@ -413,7 +413,7 @@ export async function bulkDelete(
 ): Promise<BulkResult<BulkOperationSummary>> {
   try {
     ensureConnected(input.projectId)
-    ensureWritable(input.projectId)
+    ensureFirestoreWritable(input.projectId)
 
     const documentPaths = validateDocumentPaths(input.documentPaths)
 
@@ -487,7 +487,7 @@ export async function bulkCreateField(
 ): Promise<BulkResult<BulkFieldWriteResult>> {
   try {
     ensureConnected(input.projectId)
-    ensureWritable(input.projectId)
+    ensureFirestoreWritable(input.projectId)
 
     const collectionPath = validateCollectionPath(input.collectionPath)
     const field = validateField(input.field)
@@ -607,7 +607,7 @@ export async function bulkRenameField(
 ): Promise<BulkResult<BulkFieldWriteResult>> {
   try {
     ensureConnected(input.projectId)
-    ensureWritable(input.projectId)
+    ensureFirestoreWritable(input.projectId)
 
     const collectionPath = validateCollectionPath(input.collectionPath)
     const fromField = validateField(input.fromField)
@@ -727,7 +727,7 @@ export async function bulkDeleteField(
 ): Promise<BulkResult<BulkFieldWriteResult>> {
   try {
     ensureConnected(input.projectId)
-    ensureWritable(input.projectId)
+    ensureFirestoreWritable(input.projectId)
 
     const collectionPath = validateCollectionPath(input.collectionPath)
     const field = validateField(input.field)

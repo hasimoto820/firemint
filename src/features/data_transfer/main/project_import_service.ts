@@ -4,7 +4,7 @@ import { join } from 'path'
 import type { BrowserWindow } from 'electron'
 import { dialog } from 'electron'
 import extractZip from 'extract-zip'
-import { ensureWritable } from '@features/workspace/main/guard'
+import { ensureFirestoreWritable } from '@features/workspace/main/guard'
 import { getDocumentRef } from '@shared/firestore/paths'
 import { getFirestore, isFirestoreConnected } from '@shared/firestore/client'
 import { deserializeDocumentData } from '@shared/firestore/serialize'
@@ -413,7 +413,7 @@ export async function importProject(
 
   try {
     ensureConnected(input.projectId)
-    ensureWritable(input.projectId)
+    ensureFirestoreWritable(input.projectId)
     throwIfCanceled(signal)
 
     const filePath = input.filePath.trim()

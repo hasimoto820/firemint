@@ -20,6 +20,12 @@ export type ConnectionStatus = {
   environment: EnvironmentKind
   readOnly: boolean
   authType?: 'serviceAccount' | 'google' | 'emulator'
+  /** Native Firestore でないとき。read-only とは別 */
+  writeBlockedReason: string | null
+}
+
+export function isFirestoreWriteDisabled(status: ConnectionStatus): boolean {
+  return status.readOnly || Boolean(status.writeBlockedReason)
 }
 
 export type EmulatorConnectInput = {

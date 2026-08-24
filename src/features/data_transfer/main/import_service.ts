@@ -1,7 +1,7 @@
 import { readFile } from 'fs/promises'
 import type { BrowserWindow } from 'electron'
 import { dialog } from 'electron'
-import { ensureWritable } from '@features/workspace/main/guard'
+import { ensureFirestoreWritable } from '@features/workspace/main/guard'
 import { getCollectionRef, getDocumentRef, joinDocumentPath } from '@shared/firestore/paths'
 import { getFirestore, isFirestoreConnected } from '@shared/firestore/client'
 import { deserializeDocumentData } from '@shared/firestore/serialize'
@@ -700,7 +700,7 @@ export async function importCollectionJson(
 ): Promise<ImportResult> {
   try {
     ensureConnected(input.projectId)
-    ensureWritable(input.projectId)
+    ensureFirestoreWritable(input.projectId)
     throwIfCanceled(signal)
 
     logInfo(
@@ -749,7 +749,7 @@ export async function importDocumentsJson(
 ): Promise<ImportResult> {
   try {
     ensureConnected(input.projectId)
-    ensureWritable(input.projectId)
+    ensureFirestoreWritable(input.projectId)
     throwIfCanceled(signal)
 
     logInfo(

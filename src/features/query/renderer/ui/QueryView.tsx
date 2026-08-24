@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useOptionalAutocompleteApi } from '@features/autocomplete/renderer/hooks'
-import type { ConnectionStatus } from '@features/connection/shared/types'
+import {
+  isFirestoreWriteDisabled,
+  type ConnectionStatus
+} from '@features/connection/shared/types'
 import type { DocumentSummary } from '@features/explorer/shared/types'
 import {
   buildCollectionGroupJsQuerySource,
@@ -63,7 +66,7 @@ function QueryView({
 }: QueryViewProps): React.JSX.Element {
   const { t } = useI18n()
   const projectId = status.projectId
-  const readOnly = status.readOnly
+  const readOnly = isFirestoreWriteDisabled(status)
   const autocomplete = useOptionalAutocompleteApi()
   const source = querySource ?? buildDefaultJsQuerySource(activeCollectionPath)
   const groupTab = matchQueryGroupTab(source, activeCollectionPath)

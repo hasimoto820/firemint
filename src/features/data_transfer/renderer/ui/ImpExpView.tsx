@@ -85,9 +85,18 @@ function fileKindLabel(intent: ImpExpIntent): string {
   return intent.target === 'collection' ? 'JSON' : 'ZIP'
 }
 
-function projectOptionLabel(entry: WorkspaceEntry): string {
+function projectOptionLabel(
+  entry: WorkspaceEntry,
+  writeBlockedReasons: Record<string, string>
+): string {
   const name = entry.label !== entry.id ? `${entry.label} — ${entry.id}` : entry.id
-  return entry.readOnly ? `${name}（read-only）` : name
+  if (entry.readOnly) {
+    return `${name}（read-only）`
+  }
+  if (writeBlockedReasons[entry.id]) {
+    return `${name}（Firestore 書込不可）`
+  }
+  return name
 }
 
 /**
@@ -109,6 +118,7 @@ function ImpExpView({
   const collectionValidation = draft.collectionValidation
   const projectValidation = draft.projectValidation
   const [entries, setEntries] = useState<WorkspaceEntry[]>([])
+  const [writeBlockedReasons, setWriteBlockedReasons] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
   const [destRootCollections, setDestRootCollections] = useState<string[]>([])
   const [formError, setFormError] = useState<string | null>(null)
@@ -123,6 +133,8 @@ function ImpExpView({
     null
   const destinationId = destination?.id ?? projectId
   const destinationReadOnly = destination?.readOnly ?? readOnly
+  const destinationWriteBlockedReason = writeBlockedReasons[destinationId] ?? null
+  const destinationLocked = destinationReadOnly || Boolean(destinationWriteBlockedReason)
   const showProjectSelect =
     draft.target === 'collection' || (draft.direction === 'import' && draft.target === 'project')
 
@@ -223,6 +235,7 @@ function ImpExpView({
     void window.api.workspace.getState().then((state) => {
       if (!cancelled) {
         setEntries(state.entries)
+        setWriteBlockedReasons(state.writeBlockedReasons)
       }
     })
 
@@ -322,6 +335,10 @@ function ImpExpView({
       setFormError(result.error)
       return null
     }
+
+    const state = await window.api.workspace.getState()
+    setEntries(state.entries)
+    setWriteBlockedReasons(state.writeBlockedReasons)
 
     return destinationId
   }
@@ -498,6 +515,14 @@ function ImpExpView({
           return
         }
 
+        const latest = await window.api.workspace.getState()
+        const blocked = latest.writeBlockedReasons[loadedProjectId]
+        if (blocked) {
+          setWriteBlockedReasons(latest.writeBlockedReasons)
+          setFormError(blocked)
+          return
+        }
+
         if (destinationReadOnly) {
           setFormError('このプロジェクトは read-only です')
           return
@@ -522,13 +547,21 @@ function ImpExpView({
         return
       }
 
-      if (destinationReadOnly) {
-        setFormError('このプロジェクトは read-only です')
+      const loadedProjectId = await ensureDestinationLoaded()
+      if (!loadedProjectId) {
         return
       }
 
-      const loadedProjectId = await ensureDestinationLoaded()
-      if (!loadedProjectId) {
+      const latest = await window.api.workspace.getState()
+      const blocked = latest.writeBlockedReasons[loadedProjectId]
+      if (blocked) {
+        setWriteBlockedReasons(latest.writeBlockedReasons)
+        setFormError(blocked)
+        return
+      }
+
+      if (destinationReadOnly) {
+        setFormError('このプロジェクトは read-only です')
         return
       }
 
@@ -565,7 +598,7 @@ function ImpExpView({
     draft.direction === 'import' &&
     draft.target === 'collection' &&
     Boolean(draft.filePath) &&
-    !destinationReadOnly &&
+    !destinationLocked &&
     !busy &&
     !formDisabled
   const canStartImportProject =
@@ -573,7 +606,7 @@ function ImpExpView({
     draft.target === 'project' &&
     Boolean(draft.filePath) &&
     !(projectValidation?.projectIdMismatch && !draft.acceptMismatch) &&
-    !destinationReadOnly &&
+    !destinationLocked &&
     !busy &&
     !formDisabled
 
@@ -635,7 +668,7 @@ function ImpExpView({
             >
               {entries.map((entry) => (
                 <option key={entry.id} value={entry.id}>
-                  {projectOptionLabel(entry)}
+                  {projectOptionLabel(entry, writeBlockedReasons)}
                 </option>
               ))}
             </select>
@@ -731,6 +764,8 @@ function ImpExpView({
               <p className="simple-main__error">
                 このプロジェクトは read-only です。検証はできますが、実行はできません。
               </p>
+            ) : destinationWriteBlockedReason ? (
+              <p className="simple-main__error">{destinationWriteBlockedReason}</p>
             ) : null}
           </>
         )}

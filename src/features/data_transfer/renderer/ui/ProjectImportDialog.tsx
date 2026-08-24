@@ -24,6 +24,7 @@ function ProjectImportDialog({
   onImported,
   onJobStarted
 }: ProjectImportDialogProps): React.JSX.Element | null {
+  const [writeBlockedReasons, setWriteBlockedReasons] = useState<Record<string, string>>({})
   const [destinationId, setDestinationId] = useState(projectId ?? '')
   const [filePath, setFilePath] = useState<string | null>(null)
   const [validation, setValidation] = useState<ImportProjectValidation | null>(null)
@@ -37,6 +38,8 @@ function ProjectImportDialog({
   const destination = destinations.find((entry) => entry.id === destinationId) ?? destinations[0] ?? null
   const resolvedProjectId = destination?.id ?? ''
   const readOnly = destination?.readOnly ?? false
+  const writeBlockedReason = writeBlockedReasons[resolvedProjectId] ?? null
+  const writeLocked = readOnly || Boolean(writeBlockedReason)
 
   useEffect(() => {
     if (!open) {
@@ -57,6 +60,10 @@ function ProjectImportDialog({
     setSuccess(null)
     setProgress(null)
     setWatchingJob(false)
+
+    void window.api.workspace.getState().then((state) => {
+      setWriteBlockedReasons(state.writeBlockedReasons)
+    })
   }, [open, projectId, destinations])
 
   useEffect(() => {
@@ -101,7 +108,7 @@ function ProjectImportDialog({
   }, [open, watchingJob, onImported])
 
   const canImport = useMemo(() => {
-    if (readOnly || !filePath || Boolean(success) || busy || watchingJob) {
+    if (writeLocked || !filePath || Boolean(success) || busy || watchingJob) {
       return false
     }
 
@@ -110,7 +117,7 @@ function ProjectImportDialog({
     }
 
     return true
-  }, [readOnly, filePath, validation, acceptMismatch, success, busy, watchingJob])
+  }, [writeLocked, filePath, validation, acceptMismatch, success, busy, watchingJob])
 
   const progressLabel = useMemo(() => {
     if (!progress) {
@@ -165,6 +172,9 @@ function ProjectImportDialog({
       setError(result.error)
       return null
     }
+
+    const state = await window.api.workspace.getState()
+    setWriteBlockedReasons(state.writeBlockedReasons)
 
     return resolvedProjectId
   }
@@ -240,6 +250,14 @@ function ProjectImportDialog({
         return
       }
 
+      const latest = await window.api.workspace.getState()
+      const blocked = latest.writeBlockedReasons[loadedProjectId]
+      if (blocked) {
+        setWriteBlockedReasons(latest.writeBlockedReasons)
+        setError(blocked)
+        return
+      }
+
       const result = await window.api.scriptRunner.start({
         kind: 'import_project',
         projectId: loadedProjectId,
@@ -300,7 +318,11 @@ function ProjectImportDialog({
               {destinations.map((entry) => (
                 <option key={entry.id} value={entry.id}>
                   {entry.label !== entry.id ? `${entry.label} — ${entry.id}` : entry.id}
-                  {entry.readOnly ? '（read-only）' : ''}
+                  {entry.readOnly
+                    ? '（read-only）'
+                    : writeBlockedReasons[entry.id]
+                      ? '（Firestore 書込不可）'
+                      : ''}
                 </option>
               ))}
             </select>
@@ -311,6 +333,9 @@ function ProjectImportDialog({
           <p className="project-export-dialog__error">
             このプロジェクトは read-only です。検証はできますが、実行はできません。
           </p>
+        )}
+        {!readOnly && writeBlockedReason && (
+          <p className="project-export-dialog__error">{writeBlockedReason}</p>
         )}
 
         <div className="project-export-dialog__actions" style={{ justifyContent: 'flex-start' }}>

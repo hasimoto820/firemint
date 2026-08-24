@@ -29,6 +29,7 @@ type ExplorerSidebarProps = {
   treeContentReloadToken?: number
   workspaceRefreshToken?: number
   disabled?: boolean
+  unavailableReason?: string | null
 }
 
 /**
@@ -59,7 +60,8 @@ function ExplorerSidebar({
   treeReloadToken = 0,
   treeContentReloadToken = 0,
   workspaceRefreshToken = 0,
-  disabled = false
+  disabled = false,
+  unavailableReason = null
 }: ExplorerSidebarProps): React.JSX.Element {
   const t = useT()
 
@@ -102,6 +104,7 @@ function ExplorerSidebar({
               reloadToken={treeReloadToken}
               contentReloadToken={treeContentReloadToken}
               disabled={disabled}
+              unavailableReason={unavailableReason}
             />
             <AuthNavSection
               active={mainSection === 'auth'}

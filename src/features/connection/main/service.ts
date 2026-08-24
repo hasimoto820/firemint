@@ -1,4 +1,10 @@
-import { getConnectionInfo, getFirestore, logFirestoreState } from '@shared/firestore/client'
+import {
+  getConnectionInfo,
+  getFirestore,
+  getWriteBlockedReason,
+  logFirestoreState
+} from '@shared/firestore/client'
+import { formatUnavailableFirestoreMessage } from '@shared/firestore/native_check'
 import { logError, logInfo, logWarn } from '@shared/logging/logger'
 import { detectEnvironment } from '@shared/safety/environment'
 import {
@@ -32,6 +38,11 @@ const CONNECT_TIMEOUT_MS = 30_000
 
 function formatConnectionError(error: unknown): string {
   const message = error instanceof Error ? error.message : 'Connection failed'
+  const unavailable = formatUnavailableFirestoreMessage(message)
+
+  if (unavailable) {
+    return unavailable
+  }
 
   if (message.includes('unable to verify') || message.includes('UNABLE_TO_VERIFY')) {
     return 'SSL 証明書の検証に失敗しました。社内プロキシ環境の場合は config/extra_ca.pem に CA 証明書を置いてください。'
@@ -47,7 +58,7 @@ function formatConnectionError(error: unknown): string {
     message.includes('Firestore API has not been used') ||
     (message.includes('firestore.googleapis.com') && message.includes('disabled'))
   ) {
-    return 'このプロジェクトで Cloud Firestore API が有効になっていません。Firebase Console で Firestore データベースを作成（または API を有効化）してから再試行してください。'
+    return 'このプロジェクトで Cloud Firestore API が有効になっていません。'
   }
 
   // プロジェクト ID に含まれる "403"（例: colorpanda-19403）に誤反応しない
@@ -64,7 +75,7 @@ function formatConnectionError(error: unknown): string {
   }
 
   if (message.includes('NOT_FOUND')) {
-    return 'Firestore が有効化されていない可能性があります。Firebase Console で Firestore を作成してください。'
+    return 'このプロジェクトに Firestore データベースがありません。'
   }
 
   if (message.includes('タイムアウト')) {
@@ -101,6 +112,12 @@ function formatEmulatorError(error: unknown): string {
 }
 
 async function listRootCollectionsWithTimeout(projectId: string): Promise<string[]> {
+  const unavailable = getWriteBlockedReason(projectId)
+
+  if (unavailable) {
+    logInfo('connection', `listCollections skipped: ${unavailable} projectId=${projectId}`)
+    return []
+  }
   logInfo('connection', `listCollections start projectId=${projectId} timeout=${CONNECT_TIMEOUT_MS}ms`)
   const startedAt = Date.now()
 
@@ -394,6 +411,7 @@ export function getConnectionStatus(): ConnectionStatus | null {
         ? 'development'
         : detectEnvironment(focused.projectId),
     readOnly: focused.entry?.readOnly ?? false,
-    authType: focused.info.authType ?? focused.entry?.authType
+    authType: focused.info.authType ?? focused.entry?.authType,
+    writeBlockedReason: getWriteBlockedReason(focused.projectId)
   }
 }

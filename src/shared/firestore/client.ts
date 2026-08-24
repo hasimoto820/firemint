@@ -5,6 +5,7 @@ import { Firestore as GoogleCloudFirestore } from '@google-cloud/firestore'
 import { PassThroughClient } from 'google-auth-library'
 import { getFocusedProjectId, requireFocusedProjectId, setFocusedProjectId } from './focused'
 import { logInfo } from '@shared/logging/logger'
+import { probeWriteBlockedReason } from './native_check'
 import type { FirestoreConnectionInfo, GoogleAuthorizedUserJson, ServiceAccountJson } from './types'
 
 /** ADC を使わない。process-wide の FIRESTORE_EMULATOR_HOST も置かない。 */
@@ -18,6 +19,7 @@ type ConnectionEntry = {
   app: admin.app.App
   firestore: Firestore
   info: FirestoreConnectionInfo
+  writeBlockedReason: string | null
 }
 
 const connections = new Map<string, ConnectionEntry>()
@@ -78,7 +80,8 @@ export async function connectFirestore(json: string): Promise<FirestoreConnectio
     authType: 'serviceAccount'
   }
 
-  connections.set(projectId, { app, firestore, info })
+  connections.set(projectId, { app, firestore, info, writeBlockedReason: null })
+  await attachNativeFirestoreGuard(projectId)
   logInfo('firestore', `firestore client initialized project_id=${projectId}`)
 
   return info
@@ -133,7 +136,8 @@ export async function connectFirestoreWithGoogle(input: {
     authType: 'google'
   }
 
-  connections.set(projectId, { app, firestore, info })
+  connections.set(projectId, { app, firestore, info, writeBlockedReason: null })
+  await attachNativeFirestoreGuard(projectId)
   logInfo('firestore', `firestore client initialized via google project_id=${projectId}`)
 
   return info
@@ -177,7 +181,7 @@ export async function connectFirestoreWithEmulator(input: {
     authType: 'emulator'
   }
 
-  connections.set(poolId, { app, firestore, info })
+  connections.set(poolId, { app, firestore, info, writeBlockedReason: null })
   logInfo('firestore', `firestore client initialized via emulator pool_id=${poolId} host=${host}`)
 
   return info
@@ -226,6 +230,60 @@ export function getAuth(projectId?: string): admin.auth.Auth {
   }
 
   return admin.auth(entry.app)
+}
+
+async function attachNativeFirestoreGuard(poolId: string): Promise<void> {
+  const entry = connections.get(poolId)
+
+  if (!entry || entry.info.authType === 'emulator') {
+    return
+  }
+
+  entry.writeBlockedReason = await probeWriteBlockedReason({
+    projectId: entry.info.projectId,
+    getAccessToken: async () => {
+      const credential = entry.app.options.credential
+
+      if (!credential) {
+        return null
+      }
+
+      const token = await credential.getAccessToken()
+      return token.access_token ?? null
+    }
+  })
+}
+
+export function getWriteBlockedReason(projectId?: string): string | null {
+  const resolvedProjectId = projectId ?? getFocusedProjectId()
+
+  if (!resolvedProjectId) {
+    return null
+  }
+
+  return connections.get(resolvedProjectId)?.writeBlockedReason ?? null
+}
+
+export function setWriteBlockedReason(projectId: string, reason: string): void {
+  const entry = connections.get(projectId)
+
+  if (!entry) {
+    return
+  }
+
+  entry.writeBlockedReason = reason
+}
+
+export function listWriteBlockedReasons(): Record<string, string> {
+  const reasons: Record<string, string> = {}
+
+  for (const [projectId, entry] of connections) {
+    if (entry.writeBlockedReason) {
+      reasons[projectId] = entry.writeBlockedReason
+    }
+  }
+
+  return reasons
 }
 
 export function getConnectionInfo(projectId?: string): FirestoreConnectionInfo | null {

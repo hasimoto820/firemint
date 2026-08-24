@@ -1,5 +1,8 @@
 import type { BulkFieldMode } from '@features/bulk_operations/shared/types'
-import type { ConnectionStatus } from '@features/connection/shared/types'
+import {
+  isFirestoreWriteDisabled,
+  type ConnectionStatus
+} from '@features/connection/shared/types'
 import ImpExpView from '@features/data_transfer/renderer/ui/ImpExpView'
 import TransportView from '@features/transport/renderer/ui/TransportView'
 import DiffView from '@features/diff/renderer/ui/DiffView'
@@ -144,7 +147,7 @@ function WorkspacePane({
       <div className="workspace-pane">
         <ImpExpView
           projectId={status.projectId}
-          readOnly={status.readOnly}
+          readOnly={isFirestoreWriteDisabled(status)}
           rootCollections={rootCollections}
           draft={impExpDraft}
           onDraftChange={onImpExpDraftChange}

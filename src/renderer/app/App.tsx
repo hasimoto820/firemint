@@ -25,6 +25,7 @@ function App(): React.JSX.Element {
   )
   const [workspaceEntries, setWorkspaceEntries] = useState<WorkspaceEntry[]>([])
   const [loadedProjectIds, setLoadedProjectIds] = useState<string[]>([])
+  const [writeBlockedReasons, setWriteBlockedReasons] = useState<Record<string, string>>({})
   const [view, setView] = useState<AppView>('simple')
   const [refreshKey, setRefreshKey] = useState(0)
   const [menuContext, setMenuContext] = useState<AppMenuContextActions | null>(null)
@@ -43,6 +44,7 @@ function App(): React.JSX.Element {
     setConnectionStatus(status)
     setWorkspaceEntries(workspace.entries)
     setLoadedProjectIds(workspace.loadedProjectIds)
+    setWriteBlockedReasons(workspace.writeBlockedReasons)
   }, [])
 
   useEffect(() => {
@@ -308,6 +310,7 @@ function App(): React.JSX.Element {
         workspaceRefreshToken={refreshKey}
         workspaceEntries={workspaceEntries}
         loadedProjectIds={loadedProjectIds}
+        writeBlockedReasons={writeBlockedReasons}
       />
     )
   }

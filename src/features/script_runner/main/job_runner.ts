@@ -1,6 +1,7 @@
 import { BrowserWindow } from 'electron'
 import { IPC_CHANNELS } from '@shared/ipc/channels'
 import { logError, logInfo } from '@shared/logging/logger'
+import { formatUnavailableFirestoreMessage } from '@shared/firestore/native_check'
 import { isCanceledError } from '@shared/safety/canceled'
 import type {
   ExportCollectionProgress,
@@ -379,7 +380,8 @@ export async function startScriptJob(
         return
       }
 
-      const message = error instanceof Error ? error.message : 'Import / Export に失敗しました'
+      const raw = error instanceof Error ? error.message : 'Import / Export に失敗しました'
+      const message = formatUnavailableFirestoreMessage(raw) ?? raw
       logError('script_runner', `job failed id=${snapshot.id}`, error)
       finishJob('failed', message)
     })

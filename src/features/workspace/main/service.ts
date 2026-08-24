@@ -2,7 +2,8 @@ import {
   disconnectFirestore,
   getConnectionInfo,
   isFirestoreConnected,
-  listConnectedProjectIds
+  listConnectedProjectIds,
+  listWriteBlockedReasons
 } from '@shared/firestore/client'
 import { getFocusedProjectId, setFocusedProjectId } from '@shared/firestore/focused'
 import { logError } from '@shared/logging/logger'
@@ -65,7 +66,8 @@ export function getWorkspaceState(): WorkspaceState {
   return {
     entries: store.entries.map((entry) => ({ ...entry })),
     focusedProjectId: store.focusedProjectId,
-    loadedProjectIds: listConnectedProjectIds()
+    loadedProjectIds: listConnectedProjectIds(),
+    writeBlockedReasons: listWriteBlockedReasons()
   }
 }
 

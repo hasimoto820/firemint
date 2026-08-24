@@ -1,5 +1,6 @@
 import type { DocumentSnapshot, QueryDocumentSnapshot } from 'firebase-admin/firestore'
-import { getFirestore, isFirestoreConnected } from '@shared/firestore/client'
+import { getFirestore, getWriteBlockedReason, isFirestoreConnected } from '@shared/firestore/client'
+import { formatUnavailableFirestoreMessage } from '@shared/firestore/native_check'
 import {
   assertCollectionPath,
   assertDocumentPath,
@@ -13,7 +14,7 @@ import {
   serializeFirestoreValue
 } from '@shared/firestore/serialize'
 import { logError, logInfo } from '@shared/logging/logger'
-import { ensureWritable } from '@features/workspace/main/guard'
+import { ensureFirestoreWritable } from '@features/workspace/main/guard'
 import { LIST_DOCUMENTS_PAGE_SIZE } from '@features/explorer/shared/types'
 import type {
   CreateCollectionInput,
@@ -65,10 +66,21 @@ const PAGE_SIZE = 500
 
 function toExplorerError<T>(error: unknown): ExplorerResult<T> {
   logError('explorer', 'operation failed', error)
+  const message = error instanceof Error ? error.message : 'Explorer operation failed'
   return {
     ok: false,
-    error: error instanceof Error ? error.message : 'Explorer operation failed'
+    error: formatUnavailableFirestoreMessage(message) ?? message
   }
+}
+
+function rejectIfFirestoreUnavailable(projectId: string): ExplorerResult<never> | null {
+  const reason = getWriteBlockedReason(projectId)
+
+  if (!reason) {
+    return null
+  }
+
+  return { ok: false, error: reason }
 }
 
 class DocumentConflictError extends Error {
@@ -120,6 +132,13 @@ function toDocumentSummaryFromSnapshot(
 export async function listRootCollections(projectId: string): Promise<ExplorerResult<string[]>> {
   try {
     ensureConnected(projectId)
+    const unavailable = rejectIfFirestoreUnavailable(projectId)
+
+    if (unavailable) {
+      logInfo('explorer', `listRootCollections skipped projectId=${projectId}`)
+      return { ok: true, data: [] }
+    }
+
     logInfo('explorer', `listRootCollections projectId=${projectId}`)
     const collections = await getFirestore(projectId).listCollections()
     const names = collections.map((collection) => collection.id)
@@ -136,6 +155,11 @@ export async function listDocuments(
 ): Promise<ExplorerResult<ListDocumentsPage>> {
   try {
     ensureConnected(projectId)
+    const unavailable = rejectIfFirestoreUnavailable(projectId)
+
+    if (unavailable) {
+      return unavailable
+    }
     const pageSize = Math.min(
       Math.max(options.pageSize ?? LIST_DOCUMENTS_PAGE_SIZE, 1),
       500
@@ -217,7 +241,7 @@ export async function getDocument(
 export async function createDocument(input: CreateDocumentInput): Promise<ExplorerResult<string>> {
   try {
     ensureConnected(input.projectId)
-    ensureWritable(input.projectId)
+    ensureFirestoreWritable(input.projectId)
     logInfo('explorer', `createDocument projectId=${input.projectId} path=${input.collectionPath}`)
     const collectionRef = getCollectionRef(input.collectionPath, input.projectId)
     const documentRef = input.documentId ? collectionRef.doc(input.documentId) : collectionRef.doc()
@@ -233,7 +257,7 @@ export async function createDocument(input: CreateDocumentInput): Promise<Explor
 export async function updateDocument(input: UpdateDocumentInput): Promise<ExplorerResult<null>> {
   try {
     ensureConnected(input.projectId)
-    ensureWritable(input.projectId)
+    ensureFirestoreWritable(input.projectId)
     logInfo('explorer', `updateDocument projectId=${input.projectId} path=${input.documentPath}`)
 
     const ref = getDocumentRef(input.documentPath, input.projectId)
@@ -285,7 +309,7 @@ export async function deleteDocument(
 ): Promise<ExplorerResult<null>> {
   try {
     ensureConnected(projectId)
-    ensureWritable(projectId)
+    ensureFirestoreWritable(projectId)
     logInfo('explorer', `deleteDocument projectId=${projectId} path=${documentPath}`)
     await getDocumentRef(documentPath, projectId).delete()
 
@@ -301,6 +325,11 @@ export async function listSubcollections(
 ): Promise<ExplorerResult<string[]>> {
   try {
     ensureConnected(projectId)
+    const unavailable = rejectIfFirestoreUnavailable(projectId)
+
+    if (unavailable) {
+      return unavailable
+    }
     logInfo('explorer', `listSubcollections projectId=${projectId} path=${documentPath}`)
     const collections = await getDocumentRef(documentPath, projectId).listCollections()
     const names = collections.map((collection) => collection.id)
@@ -320,7 +349,7 @@ export async function duplicateDocument(
 ): Promise<ExplorerResult<string>> {
   try {
     ensureConnected(input.projectId)
-    ensureWritable(input.projectId)
+    ensureFirestoreWritable(input.projectId)
 
     const includeSubcollections = input.includeSubcollections === true
 
@@ -369,7 +398,7 @@ export async function duplicateCollection(
 ): Promise<ExplorerResult<DuplicateCollectionResult>> {
   try {
     ensureConnected(input.projectId)
-    ensureWritable(input.projectId)
+    ensureFirestoreWritable(input.projectId)
 
     const sourceCollectionPath = input.sourceCollectionPath.trim()
     const targetCollectionPath = input.targetCollectionPath.trim()
@@ -543,7 +572,7 @@ export async function renameCollection(
 ): Promise<ExplorerResult<RenameCollectionResult>> {
   try {
     ensureConnected(input.projectId)
-    ensureWritable(input.projectId)
+    ensureFirestoreWritable(input.projectId)
 
     const sourceCollectionPath = input.sourceCollectionPath.trim()
     const targetCollectionPath = input.targetCollectionPath.trim()
@@ -616,7 +645,7 @@ export async function createCollection(
 ): Promise<ExplorerResult<CreateCollectionResult>> {
   try {
     ensureConnected(input.projectId)
-    ensureWritable(input.projectId)
+    ensureFirestoreWritable(input.projectId)
 
     const collectionId = assertCollectionId(input.collectionId, 'コレクション名')
     assertCollectionPath(collectionId)
@@ -656,7 +685,7 @@ export async function createSubcollection(
 ): Promise<ExplorerResult<CreateSubcollectionResult>> {
   try {
     ensureConnected(input.projectId)
-    ensureWritable(input.projectId)
+    ensureFirestoreWritable(input.projectId)
 
     const documentPath = input.documentPath.trim()
     assertDocumentPath(documentPath)
@@ -710,7 +739,7 @@ export async function deleteCollection(
 ): Promise<ExplorerResult<DeleteCollectionResult>> {
   try {
     ensureConnected(input.projectId)
-    ensureWritable(input.projectId)
+    ensureFirestoreWritable(input.projectId)
 
     const collectionPath = input.collectionPath.trim()
 

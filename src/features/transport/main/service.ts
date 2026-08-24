@@ -6,10 +6,11 @@ import type {
   TransportResult,
   TransportValidationResult
 } from '@features/transport/shared/types'
-import { ensureWritable } from '@features/workspace/main/guard'
+import { ensureFirestoreWritable } from '@features/workspace/main/guard'
 import { assertCollectionPath, getDocumentRef } from '@shared/firestore/paths'
 import { deserializeDocumentData } from '@shared/firestore/serialize'
-import { getFirestore, isFirestoreConnected } from '@shared/firestore/client'
+import { getFirestore, isFirestoreConnected, setWriteBlockedReason } from '@shared/firestore/client'
+import { formatUnavailableFirestoreMessage } from '@shared/firestore/native_check'
 import { FIRESTORE_BATCH_LIMIT } from '@shared/safety/operations'
 import { isCanceledError, throwIfCanceled } from '@shared/safety/canceled'
 import { logError, logInfo } from '@shared/logging/logger'
@@ -29,8 +30,21 @@ function ensureConnected(projectId: string): void {
   }
 }
 
+function mapTransportError(error: unknown, destinationProjectId?: string): string {
+  const raw = error instanceof Error ? error.message : String(error)
+  const mapped = formatUnavailableFirestoreMessage(raw)
+
+  if (mapped && destinationProjectId) {
+    setWriteBlockedReason(destinationProjectId, mapped)
+    return mapped
+  }
+
+  return mapped ?? (error instanceof Error ? error.message : raw)
+}
+
 function toValidationError(
   error: unknown,
+  destinationProjectId?: string,
   canceled = false
 ): TransportValidationResult {
   logError('transport', 'validateTransport failed', error)
@@ -41,11 +55,15 @@ function toValidationError(
 
   return {
     ok: false,
-    error: error instanceof Error ? error.message : 'Validate transport failed'
+    error: mapTransportError(error, destinationProjectId)
   }
 }
 
-function toTransportError(error: unknown, canceled = false): TransportResult {
+function toTransportError(
+  error: unknown,
+  destinationProjectId?: string,
+  canceled = false
+): TransportResult {
   const wasCanceled = canceled || isCanceledError(error)
   logError('transport', 'transport failed', error)
 
@@ -55,7 +73,7 @@ function toTransportError(error: unknown, canceled = false): TransportResult {
 
   return {
     ok: false,
-    error: error instanceof Error ? error.message : 'Transport failed'
+    error: mapTransportError(error, destinationProjectId)
   }
 }
 
@@ -133,7 +151,7 @@ function assertProjects(input: TransportInput, requireWritable: boolean): void {
   ensureConnected(destinationProjectId)
 
   if (requireWritable) {
-    ensureWritable(destinationProjectId)
+    ensureFirestoreWritable(destinationProjectId)
   }
 }
 
@@ -259,7 +277,7 @@ export async function validateTransport(
       }
     }
   } catch (error) {
-    return toValidationError(error)
+    return toValidationError(error, input.destinationProjectId)
   }
 }
 
@@ -336,6 +354,6 @@ export async function transportDocuments(
       }
     }
   } catch (error) {
-    return toTransportError(error)
+    return toTransportError(error, input.destinationProjectId)
   }
 }

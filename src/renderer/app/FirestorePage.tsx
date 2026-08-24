@@ -5,7 +5,10 @@ import {
 } from '@features/autocomplete/renderer/hooks'
 import type { BulkFieldMode } from '@features/bulk_operations/shared/types'
 import AuthUsersView from '@features/auth_users/renderer/ui/AuthUsersView'
-import type { ConnectionStatus } from '@features/connection/shared/types'
+import {
+  isFirestoreWriteDisabled,
+  type ConnectionStatus
+} from '@features/connection/shared/types'
 import type { WorkspaceEntry } from '@features/workspace/shared/types'
 import type { EmulatorPageMode } from '@features/emulator/shared/types'
 import { DEFAULT_EMULATOR_HOST } from '@features/connection/shared/emulator'
@@ -105,12 +108,14 @@ type FirestorePageProps = {
   workspaceRefreshToken?: number
   workspaceEntries?: WorkspaceEntry[]
   loadedProjectIds?: string[]
+  writeBlockedReasons?: Record<string, string>
 }
 
 function connectionStatusForTab(
   focused: ConnectionStatus,
   tab: WorkspaceTab,
-  entries: WorkspaceEntry[]
+  entries: WorkspaceEntry[],
+  writeBlockedReasons: Record<string, string>
 ): ConnectionStatus {
   if (tab.projectId === focused.projectId) {
     return focused
@@ -122,7 +127,8 @@ function connectionStatusForTab(
     clientEmail: focused.clientEmail,
     environment: detectEnvironment(tab.projectId),
     readOnly: entry?.readOnly ?? false,
-    authType: entry?.authType
+    authType: entry?.authType,
+    writeBlockedReason: writeBlockedReasons[tab.projectId] ?? null
   }
 }
 
@@ -140,7 +146,8 @@ function FirestorePageInner({
   rootsReloadToken = 0,
   workspaceRefreshToken = 0,
   workspaceEntries = [],
-  loadedProjectIds = []
+  loadedProjectIds = [],
+  writeBlockedReasons = {}
 }: FirestorePageProps): React.JSX.Element {
   const projectId = status.projectId
   const t = useT()
@@ -226,13 +233,17 @@ function FirestorePageInner({
   }, [tabs])
   const isReadOnlyProject = useCallback(
     (id: string): boolean => {
+      if (writeBlockedReasons[id]) {
+        return true
+      }
+
       if (id === status.projectId) {
-        return status.readOnly
+        return isFirestoreWriteDisabled(status)
       }
 
       return workspaceEntries.find((entry) => entry.id === id)?.readOnly ?? false
     },
-    [status.projectId, status.readOnly, workspaceEntries]
+    [status, workspaceEntries, writeBlockedReasons]
   )
 
   useEffect(() => {
@@ -279,6 +290,8 @@ function FirestorePageInner({
       const result = await window.api.explorer.listRootCollections(projectId)
       if (result.ok) {
         setRootCollections(result.data)
+      } else {
+        setRootCollections([])
       }
     } finally {
       setTreeLoading(false)
@@ -1445,7 +1458,7 @@ function FirestorePageInner({
           status={
             isWorkspaceToolTab(active)
               ? status
-              : connectionStatusForTab(status, active, workspaceEntries)
+              : connectionStatusForTab(status, active, workspaceEntries, writeBlockedReasons)
           }
           tab={active}
           menuEnabled={
@@ -1532,7 +1545,8 @@ function FirestorePageInner({
         sidebar={
           <ExplorerSidebar
             projectId={projectId}
-            rootCollections={rootCollections}
+            rootCollections={status.writeBlockedReason ? [] : rootCollections}
+            unavailableReason={status.writeBlockedReason}
             activeCollectionPath={treeCollectionPath}
             selectedDocumentPath={treeDocumentPath}
             mainSection={mainSection}
@@ -1548,8 +1562,8 @@ function FirestorePageInner({
             onDuplicateDocument={handleRequestDuplicateDocument}
             onDeleteDocument={(path) => void handleRequestDeleteDocument(path)}
             onCreateSubcollection={handleRequestCreateSubcollection}
-            canRename={!status.readOnly}
-            canManageSubcollections={!status.readOnly}
+            canRename={!isFirestoreWriteDisabled(status)}
+            canManageSubcollections={!isFirestoreWriteDisabled(status)}
             onWorkspaceChanged={onWorkspaceChanged}
             treeReloadToken={treeReloadToken}
             treeContentReloadToken={treeContentReloadToken}

@@ -71,11 +71,15 @@ function ToggleBar<T extends string>({
   )
 }
 
-function projectOptionLabel(entry: WorkspaceEntry): string {
+function projectOptionLabel(
+  entry: WorkspaceEntry,
+  writeBlockedReasons: Record<string, string>
+): string {
   const kind = workspaceAuthLabel(entry.authType)
   const name = entry.label !== entry.id ? `${entry.label} — ${entry.id}` : entry.id
   const readOnly = entry.readOnly ? '（read-only）' : ''
-  return `${kind} · ${name}${readOnly}`
+  const blocked = writeBlockedReasons[entry.id] ? '（Firestore 書込不可）' : ''
+  return `${kind} · ${name}${readOnly}${blocked}`
 }
 
 function TransportView({
@@ -93,6 +97,7 @@ function TransportView({
   const jobRunning = job?.status === 'running'
   const formDisabled = jobRunning
   const [entries, setEntries] = useState<WorkspaceEntry[]>([])
+  const [writeBlockedReasons, setWriteBlockedReasons] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [validateProgress, setValidateProgress] = useState<TransportProgress | null>(null)
@@ -102,6 +107,8 @@ function TransportView({
     destinations.find((entry) => entry.id === draft.destinationProjectId) ?? destinations[0] ?? null
   const destinationId = destination?.id ?? ''
   const destinationReadOnly = destination?.readOnly ?? false
+  const destinationWriteBlockedReason = writeBlockedReasons[destinationId] ?? null
+  const destinationLocked = destinationReadOnly || Boolean(destinationWriteBlockedReason)
 
   useEffect(() => {
     let cancelled = false
@@ -109,6 +116,7 @@ function TransportView({
     void window.api.workspace.getState().then((state) => {
       if (!cancelled) {
         setEntries(state.entries)
+        setWriteBlockedReasons(state.writeBlockedReasons)
       }
     })
 
@@ -214,6 +222,10 @@ function TransportView({
       return null
     }
 
+    const state = await window.api.workspace.getState()
+    setEntries(state.entries)
+    setWriteBlockedReasons(state.writeBlockedReasons)
+
     return destinationId
   }
 
@@ -255,13 +267,21 @@ function TransportView({
       return
     }
 
-    if (destinationReadOnly) {
-      setFormError('このプロジェクトは read-only です')
+    if (destinationLocked) {
+      setFormError(destinationWriteBlockedReason ?? 'このプロジェクトは read-only です')
       return
     }
 
     const loaded = await ensureDestinationLoaded()
     if (!loaded) {
+      return
+    }
+
+    const latest = await window.api.workspace.getState()
+    const blocked = latest.writeBlockedReasons[loaded]
+    if (blocked) {
+      setWriteBlockedReasons(latest.writeBlockedReasons)
+      setFormError(blocked)
       return
     }
 
@@ -290,12 +310,12 @@ function TransportView({
     Boolean(sourceCollectionPath.trim()) &&
     Boolean(draft.destinationCollectionPath.trim()) &&
     Boolean(destinationId) &&
-    !destinationReadOnly
+    !destinationLocked
   const canStartProject =
     draft.target === 'project' &&
     draft.selectedRoots.length > 0 &&
     Boolean(destinationId) &&
-    !destinationReadOnly
+    !destinationLocked
   const canStart = !busy && !formDisabled && (draft.target === 'collection' ? canStartCollection : canStartProject)
   const canValidate = !busy && !formDisabled && Boolean(destinationId) &&
     (draft.target === 'collection'
@@ -367,7 +387,7 @@ function TransportView({
             ) : (
               destinations.map((entry) => (
                 <option key={entry.id} value={entry.id}>
-                  {projectOptionLabel(entry)}
+                  {projectOptionLabel(entry, writeBlockedReasons)}
                 </option>
               ))
             )}
@@ -453,6 +473,8 @@ function TransportView({
           <p className="simple-main__error">
             このプロジェクトは read-only です。検証はできますが、実行はできません。
           </p>
+        ) : destinationWriteBlockedReason ? (
+          <p className="simple-main__error">{destinationWriteBlockedReason}</p>
         ) : null}
 
         {draft.validation && (

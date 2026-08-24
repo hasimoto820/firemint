@@ -64,6 +64,8 @@ export type WorkspaceState = {
   entries: WorkspaceEntry[]
   focusedProjectId: string | null
   loadedProjectIds: string[]
+  /** 接続済みのうち、Native Firestore でないもの */
+  writeBlockedReasons: Record<string, string>
 }
 
 export type UpdateWorkspaceEntryInput = {

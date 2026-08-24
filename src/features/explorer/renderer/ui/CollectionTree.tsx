@@ -32,6 +32,7 @@ type CollectionTreeProps = {
   contentReloadToken?: number
   disabled?: boolean
   title?: string
+  unavailableReason?: string | null
 }
 
 type ContextMenuState =
@@ -68,7 +69,8 @@ function CollectionTree({
   reloadToken = 0,
   contentReloadToken = 0,
   disabled = false,
-  title = 'コレクション'
+  title = 'コレクション',
+  unavailableReason = null
 }: CollectionTreeProps): React.JSX.Element {
   const autocomplete = useOptionalAutocompleteApi()
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set())
@@ -532,8 +534,12 @@ function CollectionTree({
   return (
     <div className="collection-tree">
       <h2 className="collection-tree__title">{title}</h2>
-      {error && <p className="collection-tree__error">{error}</p>}
-      {rootNodes.length === 0 ? (
+      {unavailableReason ? (
+        <p className="collection-tree__error">{unavailableReason}</p>
+      ) : error ? (
+        <p className="collection-tree__error">{error}</p>
+      ) : null}
+      {unavailableReason ? null : rootNodes.length === 0 ? (
         <p className="collection-tree__empty">（コレクションなし）</p>
       ) : (
         <ul className="collection-tree__roots">{rootNodes.map((node) => renderNode(node))}</ul>

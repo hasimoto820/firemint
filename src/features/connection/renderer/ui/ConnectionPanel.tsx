@@ -268,6 +268,9 @@ function ConnectionPanel({
               本番プロジェクトに接続しています。操作に注意してください。
             </p>
           )}
+          {status.writeBlockedReason && (
+            <p className="connection-panel__warning">{status.writeBlockedReason}</p>
+          )}
           <div>
             <p>ルートコレクション ({rootCollections.length})</p>
             {rootCollections.length > 0 ? (
