@@ -1,0 +1,34 @@
+[
+  {
+    "id": "75Wz6UUdZlKb2c0P2LAd",
+    "path": "equipmentZ/75Wz6UUdZlKb2c0P2LAd",
+    "data": {
+      "names": "Googleあいうeg"
+    }
+  },
+  {
+    "id": "7zPgDVN1Suz",
+    "path": "equipmentZ/7zPgDVN1Suz",
+    "data": {
+      "user_id": "0002",
+      "helmet": "shogun",
+      "armor": "shogun",
+      "sword": "fan"
+    }
+  },
+  {
+    "id": "7zPgDYcQAiRxbN9VN1Su",
+    "path": "equipmentZ/7zPgDYcQAiRxbN9VN1Su",
+    "data": {
+      "user_id": "0002",
+      "helmet": "shogun",
+      "armor": "shogun",
+      "sword": "fan"
+    }
+  },
+  {
+    "id": "kF5G2nmFWLPSfE4n7CpG",
+    "path": "equipmentZ/kF5G2nmFWLPSfE4n7CpG",
+    "data": {}
+  }
+]

@@ -1,5 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
-import type { DiscoveredEmulator } from '@features/emulator/shared/types'
+import { useCallback, useEffect, useState } from 'react'
+import { DEFAULT_EMULATOR_HOST } from '@features/connection/shared/emulator'
+import type { EmulatorWizardStep } from '@features/emulator/shared/types'
+import { workspaceAuthLabel, type WorkspaceEntry } from '@features/workspace/shared/types'
 import Button from '@shared/ui/Button'
 import { useT } from '@shared/i18n/renderer/I18nProvider'
 
@@ -7,129 +9,134 @@ type EmulatorConnectDialogProps = {
   open: boolean
   onClose: () => void
   onConnected: () => void | Promise<void>
-}
-
-function candidateKey(candidate: DiscoveredEmulator): string {
-  return `${candidate.firestoreHost}::${candidate.projectId}`
+  defaultHost?: string
 }
 
 function EmulatorConnectDialog({
   open,
   onClose,
-  onConnected
+  onConnected,
+  defaultHost = DEFAULT_EMULATOR_HOST
 }: EmulatorConnectDialogProps): React.JSX.Element | null {
   const t = useT()
-  const onCloseRef = useRef(onClose)
-  const onConnectedRef = useRef(onConnected)
-  onCloseRef.current = onClose
-  onConnectedRef.current = onConnected
-
-  const [phase, setPhase] = useState<'discovering' | 'none' | 'pick' | 'connecting'>('discovering')
-  const [candidates, setCandidates] = useState<DiscoveredEmulator[]>([])
-  const [selectedKey, setSelectedKey] = useState<string | null>(null)
+  const [step, setStep] = useState<EmulatorWizardStep>('connect')
+  const [host, setHost] = useState(defaultHost)
+  const [knownEntries, setKnownEntries] = useState<WorkspaceEntry[]>([])
+  const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null)
+  const [filePath, setFilePath] = useState<string | null>(null)
+  const [projectId, setProjectId] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [discoverToken, setDiscoverToken] = useState(0)
+
+  const refreshKnown = useCallback(async (): Promise<void> => {
+    const state = await window.api.workspace.getState()
+    const known = state.entries.filter((entry) => entry.authType === 'emulator')
+    setKnownEntries(known)
+
+    const first = known[0]
+    if (!first) {
+      setSelectedEntryId(null)
+      return
+    }
+
+    setSelectedEntryId(first.id)
+    if (first.emulatorHost) {
+      setHost(first.emulatorHost)
+    }
+  }, [])
 
   useEffect(() => {
     if (!open) {
       return
     }
 
-    let cancelled = false
-    setPhase('discovering')
-    setCandidates([])
-    setSelectedKey(null)
+    setStep('connect')
+    setHost(defaultHost)
+    setFilePath(null)
+    setProjectId('')
     setBusy(false)
     setError(null)
+    void refreshKnown()
+  }, [open, defaultHost, refreshKnown])
 
-    const connectOne = async (
-      candidate: DiscoveredEmulator,
-      list: DiscoveredEmulator[]
-    ): Promise<void> => {
-      setBusy(true)
-      setPhase('connecting')
+  const handleSelectKnown = (entry: WorkspaceEntry): void => {
+    setSelectedEntryId(entry.id)
+    if (entry.emulatorHost) {
+      setHost(entry.emulatorHost)
+    }
+  }
+
+  const handleConnect = async (): Promise<void> => {
+    const selected = knownEntries.find((entry) => entry.id === selectedEntryId)
+
+    if (knownEntries.length === 0) {
       setError(null)
-
-      try {
-        const connected = await window.api.connection.connectEmulator({
-          host: candidate.firestoreHost,
-          projectId: candidate.projectId
-        })
-
-        if (cancelled) {
-          return
-        }
-
-        if (!connected.ok) {
-          setError(connected.error)
-          setPhase(list.length > 0 ? 'pick' : 'none')
-          return
-        }
-
-        await onConnectedRef.current()
-        onCloseRef.current()
-      } finally {
-        if (!cancelled) {
-          setBusy(false)
-        }
-      }
+      setStep('import')
+      return
     }
 
-    void (async () => {
-      const result = await window.api.emulator.discover()
-      if (cancelled) {
-        return
-      }
-
-      if (!result.ok) {
-        setError(result.error)
-        setPhase('none')
-        return
-      }
-
-      if (result.data.length === 0) {
-        setPhase('none')
-        return
-      }
-
-      setCandidates(result.data)
-      setSelectedKey(candidateKey(result.data[0]))
-
-      if (result.data.length === 1) {
-        await connectOne(result.data[0], result.data)
-        return
-      }
-
-      setPhase('pick')
-    })()
-
-    return () => {
-      cancelled = true
-    }
-  }, [open, discoverToken])
-
-  const handleConnectPicked = async (): Promise<void> => {
-    const selected = candidates.find((candidate) => candidateKey(candidate) === selectedKey)
-    if (!selected) {
-      setError(t('emulator.discover_pick'))
+    if (!selected?.emulatorProjectId) {
+      setError(t('emulator.select_known'))
       return
     }
 
     setBusy(true)
-    setPhase('connecting')
     setError(null)
 
     try {
-      const connected = await window.api.connection.connectEmulator({
-        host: selected.firestoreHost,
-        projectId: selected.projectId
+      const result = await window.api.connection.connectEmulator({
+        host,
+        projectId: selected.emulatorProjectId
       })
 
-      if (!connected.ok) {
-        setError(connected.error)
-        setPhase('pick')
+      if (!result.ok) {
+        setError(result.error)
         return
+      }
+
+      await onConnected()
+      onClose()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleSelectZip = async (): Promise<void> => {
+    setError(null)
+    const selected = await window.api.dataTransfer.selectProjectImportZip()
+
+    if (selected.canceled || !selected.filePath) {
+      return
+    }
+
+    setFilePath(selected.filePath)
+  }
+
+  const handleFinish = async (): Promise<void> => {
+    setBusy(true)
+    setError(null)
+
+    try {
+      if (filePath) {
+        const result = await window.api.emulator.importProjectZip({
+          host,
+          filePath
+        })
+
+        if (!result.ok) {
+          setError(result.error)
+          return
+        }
+      } else {
+        const result = await window.api.connection.connectEmulator({
+          host,
+          projectId: projectId.trim()
+        })
+
+        if (!result.ok) {
+          setError(result.error)
+          return
+        }
       }
 
       await onConnected()
@@ -143,82 +150,121 @@ function EmulatorConnectDialog({
     return null
   }
 
+  const title = t('emulator.title')
   const lead =
-    phase === 'pick'
-      ? t('emulator.discover_pick')
-      : phase === 'none'
-        ? t('emulator.discover_none')
-        : t('emulator.discover_lead')
+    step === 'import'
+      ? t('emulator.connect_import_lead')
+      : knownEntries.length > 0
+        ? t('emulator.lead_known')
+        : t('emulator.lead')
 
   return (
     <div className="project-export-dialog" role="dialog" aria-modal="true">
       <div className="project-export-dialog__backdrop" onClick={busy ? undefined : onClose} />
       <div className="project-export-dialog__panel">
         <header className="project-export-dialog__header">
-          <h2 className="project-export-dialog__title">{t('emulator.title')}</h2>
+          <h2 className="project-export-dialog__title">{title}</h2>
           <p className="project-export-dialog__lead">{lead}</p>
         </header>
 
-        {phase === 'none' && (
-          <p className="project-export-dialog__hint">{t('emulator.process_hint')}</p>
+        {step === 'connect' && (
+          <>
+            <p className="project-export-dialog__hint">{t('emulator.process_hint')}</p>
+            <label className="project-export-dialog__option">
+              <span>{t('emulator.host')}</span>
+              <input
+                className="bulk-actions__input"
+                value={host}
+                onChange={(event) => setHost(event.target.value)}
+                disabled={busy}
+                spellCheck={false}
+              />
+            </label>
+            {knownEntries.length > 0 ? (
+              <ul className="workspace-panel__list">
+                {knownEntries.map((entry) => {
+                  const selected = entry.id === selectedEntryId
+
+                  return (
+                    <li key={entry.id}>
+                      <button
+                        type="button"
+                        className={
+                          selected
+                            ? 'workspace-panel__item workspace-panel__item--focused'
+                            : 'workspace-panel__item'
+                        }
+                        onClick={() => handleSelectKnown(entry)}
+                        disabled={busy}
+                      >
+                        <span
+                          className="workspace-panel__dot"
+                          style={{ backgroundColor: entry.color }}
+                          aria-hidden
+                        />
+                        <span className="workspace-panel__item-body">
+                          <span className="workspace-panel__label">
+                            {entry.emulatorProjectId ?? entry.id}
+                          </span>
+                          <span className="workspace-panel__meta">
+                            {workspaceAuthLabel(entry.authType)}
+                            {entry.readOnly ? ' · read-only' : ''}
+                            {entry.label ? ` · ${entry.label}` : ''}
+                          </span>
+                        </span>
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+            ) : null}
+          </>
         )}
 
-        {phase === 'pick' && (
-          <ul className="workspace-panel__list">
-            {candidates.map((candidate) => {
-              const key = candidateKey(candidate)
-              const selected = key === selectedKey
-
-              return (
-                <li key={key}>
-                  <button
-                    type="button"
-                    className={
-                      selected
-                        ? 'workspace-panel__item workspace-panel__item--focused'
-                        : 'workspace-panel__item'
-                    }
-                    onClick={() => setSelectedKey(key)}
-                    disabled={busy}
-                  >
-                    <span className="workspace-panel__item-body">
-                      <span className="workspace-panel__label">{candidate.firestoreHost}</span>
-                      <span className="workspace-panel__meta">
-                        {candidate.projectId || t('emulator.discover_unnamed')}
-                      </span>
-                    </span>
-                  </button>
-                </li>
-              )
-            })}
-          </ul>
+        {step === 'import' && (
+          <>
+            <div className="project-export-dialog__actions" style={{ justifyContent: 'flex-start' }}>
+              <Button onClick={() => void handleSelectZip()} disabled={busy}>
+                {t('emulator.select_zip')}
+              </Button>
+            </div>
+            {filePath ? (
+              <p className="project-export-dialog__hint">{filePath}</p>
+            ) : (
+              <label className="project-export-dialog__option">
+                <span>{t('emulator.project_id')}</span>
+                <input
+                  className="bulk-actions__input"
+                  value={projectId}
+                  onChange={(event) => setProjectId(event.target.value)}
+                  disabled={busy}
+                  spellCheck={false}
+                />
+              </label>
+            )}
+          </>
         )}
 
-        {(phase === 'discovering' || phase === 'connecting' || busy) && (
-          <p className="project-export-dialog__hint">
-            {phase === 'connecting' ? t('common.busy') : t('emulator.discovering')}
-          </p>
-        )}
+        {busy && <p className="project-export-dialog__hint">{t('common.busy')}</p>}
         {error && <p className="project-export-dialog__error">{error}</p>}
 
         <div className="project-export-dialog__actions">
           <Button onClick={onClose} disabled={busy}>
             {t('common.cancel')}
           </Button>
-          {phase === 'none' && (
+          {step === 'connect' ? (
             <Button
               variant="primary"
-              onClick={() => setDiscoverToken((current) => current + 1)}
-              disabled={busy}
+              onClick={() => void handleConnect()}
+              disabled={busy || (knownEntries.length > 0 && !selectedEntryId)}
             >
-              {t('emulator.discover_retry')}
+              {knownEntries.length > 0 ? t('emulator.import') : t('common.next')}
             </Button>
-          )}
-          {phase === 'pick' && (
+          ) : (
             <Button
               variant="primary"
-              onClick={() => void handleConnectPicked()}
-              disabled={busy || !selectedKey}
+              onClick={() => void handleFinish()}
+              disabled={busy}
             >
               {t('emulator.import')}
             </Button>

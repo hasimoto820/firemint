@@ -48,7 +48,7 @@ function jobTitle(input: StartScriptJobInput): string {
     case 'export_collection':
       return `Export · Collection · ${input.collectionPath}`
     case 'import_collection':
-      return `Import · Collection · ${input.collectionPath}`
+      return 'Import · Collection'
     case 'export_project':
       return `Export · Project · ${input.projectId}`
     case 'import_project':

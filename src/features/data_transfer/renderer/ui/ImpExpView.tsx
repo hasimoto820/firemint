@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useOptionalAutocompleteApi } from '@features/autocomplete/renderer/hooks'
 import { matchesAutocompleteNeedle } from '@features/autocomplete/renderer/catalog'
 import type { AutocompleteItem } from '@features/autocomplete/shared/types'
@@ -82,7 +82,7 @@ function fileKindLabel(intent: ImpExpIntent): string {
     return intent.target === 'collection' ? 'JSON' : 'ZIP'
   }
 
-  return intent.target === 'collection' ? 'JSON' : 'ZIP'
+  return intent.target === 'collection' ? 'JSON / CSV' : 'ZIP'
 }
 
 function projectOptionLabel(
@@ -160,48 +160,8 @@ function ImpExpView({
     return extras.length === 0 ? fromPool : [...fromPool, ...extras]
   }, [autocomplete, destRootCollections, destinationId, draft.collectionPath])
 
-  const collectionPathRef = useRef(draft.collectionPath)
-  collectionPathRef.current = draft.collectionPath
-
-  const applyInferredCollection = async (
-    filePath: string,
-    overwrite: boolean
-  ): Promise<string | null> => {
-    const peek = await window.api.dataTransfer.peekCollectionImportJson(filePath)
-    if (!peek.ok) {
-      setFormError(peek.error)
-      return null
-    }
-
-    if (!peek.collectionPath) {
-      return null
-    }
-
-    if (!overwrite && collectionPathRef.current.trim()) {
-      return collectionPathRef.current.trim()
-    }
-
-    onDraftChange({ collectionPath: peek.collectionPath })
-    collectionPathRef.current = peek.collectionPath
-    return peek.collectionPath
-  }
-
   useEffect(() => {
-    if (draft.direction !== 'import' || draft.target !== 'collection' || !draft.filePath) {
-      return
-    }
-
-    if (draft.collectionPath.trim()) {
-      return
-    }
-
-    void applyInferredCollection(draft.filePath, false)
-    // 空のときだけ JSON から埋める。ユーザー入力は上書きしない。
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draft.filePath, draft.direction, draft.target])
-
-  useEffect(() => {
-    if (draft.target !== 'collection' || !destinationId) {
+    if (draft.direction === 'import' || draft.target !== 'collection' || !destinationId) {
       setDestRootCollections([])
       return
     }
@@ -227,7 +187,7 @@ function ImpExpView({
     return () => {
       cancelled = true
     }
-  }, [autocomplete, destinationId, draft.target])
+  }, [autocomplete, destinationId, draft.direction, draft.target])
 
   useEffect(() => {
     let cancelled = false
@@ -310,11 +270,7 @@ function ImpExpView({
 
     if (draft.target === 'collection') {
       const peek = await window.api.dataTransfer.peekCollectionImportJson(result.filePath)
-      resetValidation({
-        filePath: result.filePath,
-        collectionPath:
-          peek.ok && peek.collectionPath ? peek.collectionPath : draft.collectionPath
-      })
+      resetValidation({ filePath: result.filePath })
       if (!peek.ok) {
         setFormError(peek.error)
       }
@@ -354,19 +310,8 @@ function ImpExpView({
       return null
     }
 
-    let collectionPath = draft.collectionPath.trim() || collectionPathRef.current.trim()
-    if (!collectionPath) {
-      collectionPath = (await applyInferredCollection(draft.filePath, false)) ?? ''
-    }
-
-    if (!collectionPath) {
-      setFormError('JSON からコレクションを特定できません。コレクション path を指定してください')
-      return null
-    }
-
     const result = await window.api.dataTransfer.validateCollectionImport({
       projectId: loadedProjectId,
-      collectionPath,
       filePath: draft.filePath,
       includeSubcollections: draft.includeSubcollections
     })
@@ -494,22 +439,6 @@ function ImpExpView({
       }
 
       if (draft.target === 'collection') {
-        const collectionPath = collectionPathRef.current.trim() || draft.collectionPath.trim()
-        if (!collectionPath) {
-          const inferred = await applyInferredCollection(draft.filePath, false)
-          if (!inferred) {
-            setFormError('JSON からコレクションを特定できません。コレクション path を指定してください')
-            return
-          }
-        }
-
-        const resolvedPath =
-          collectionPathRef.current.trim() || draft.collectionPath.trim()
-        if (!resolvedPath) {
-          setFormError('JSON からコレクションを特定できません。コレクション path を指定してください')
-          return
-        }
-
         const loadedProjectId = await ensureDestinationLoaded()
         if (!loadedProjectId) {
           return
@@ -531,7 +460,6 @@ function ImpExpView({
         const result = await window.api.scriptRunner.start({
           kind: 'import_collection',
           projectId: loadedProjectId,
-          collectionPath: resolvedPath,
           filePath: draft.filePath,
           includeSubcollections: draft.includeSubcollections
         })
@@ -646,9 +574,11 @@ function ImpExpView({
         </div>
 
         <p className="imp-exp-form__lead">
-          {draft.direction === 'import'
-            ? 'ファイルを選んで実行。検証は任意です。衝突したドキュメントはスキップして先に進みます。'
-            : '範囲を選んでから実行。'}
+          {draft.direction === 'import' && draft.target === 'collection'
+            ? '選ぶのはプロジェクトだけ。コレクションはファイルの path どおり。'
+            : draft.direction === 'import'
+              ? 'ファイルを選んで実行。検証は任意です。衝突したドキュメントはスキップして先に進みます。'
+              : '範囲を選んでから実行。'}
           ファイルは {fileKindLabel(draft)} です。
         </p>
 
@@ -675,7 +605,7 @@ function ImpExpView({
           </label>
         )}
 
-        {draft.target === 'collection' && (
+        {draft.direction === 'export' && draft.target === 'collection' && (
           <label className="imp-exp-form__field">
             コレクション
             <AutocompleteInput

@@ -53,7 +53,8 @@ export type ImportDocument = {
 
 export type ImportCollectionJsonInput = {
   projectId: string
-  collectionPath: string
+  /** 互換用。書込先はファイルの path。指定しても無視する */
+  collectionPath?: string
   filePath: string
   /** true = path が配下サブコレのものも書く */
   includeSubcollections: boolean

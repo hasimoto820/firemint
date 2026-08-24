@@ -2,12 +2,13 @@ import { readFile } from 'fs/promises'
 import type { BrowserWindow } from 'electron'
 import { dialog } from 'electron'
 import { ensureFirestoreWritable } from '@features/workspace/main/guard'
-import { getCollectionRef, getDocumentRef, joinDocumentPath } from '@shared/firestore/paths'
+import { getCollectionRef, getDocumentRef } from '@shared/firestore/paths'
 import { getFirestore, isFirestoreConnected } from '@shared/firestore/client'
 import { deserializeDocumentData } from '@shared/firestore/serialize'
 import { FIRESTORE_BATCH_LIMIT } from '@shared/safety/operations'
 import { isCanceledError, throwIfCanceled } from '@shared/safety/canceled'
 import { logError, logInfo } from '@shared/logging/logger'
+import { csvToDocuments, looksLikeCsv } from './format'
 import type {
   ImportCollectionJsonInput,
   ImportDocumentsJsonInput,
@@ -84,11 +85,7 @@ function isDirectDocumentPath(documentPath: string, collectionPath: string): boo
   return rest.length > 0 && !rest.includes('/')
 }
 
-function isUnderCollectionPath(documentPath: string, collectionPath: string): boolean {
-  return documentPath.startsWith(`${collectionPath}/`)
-}
-
-function parseImportDocuments(raw: string): ImportDocument[] {
+function parseImportJson(raw: string): ImportDocument[] {
   const parsed: unknown = JSON.parse(raw)
 
   if (!Array.isArray(parsed)) {
@@ -118,6 +115,14 @@ function parseImportDocuments(raw: string): ImportDocument[] {
       data: record.data as Record<string, unknown>
     }
   })
+}
+
+function parseImportDocuments(raw: string, filePath?: string): ImportDocument[] {
+  if (looksLikeCsv(raw, filePath)) {
+    return csvToDocuments(raw)
+  }
+
+  return parseImportJson(raw)
 }
 
 function collectionParentOfDocument(documentPath: string): string | null {
@@ -168,69 +173,56 @@ function inferCollectionPath(documents: ImportDocument[]): string | null {
 }
 
 /**
- * 書込先 path を決める。
- * 仕様: path はヒント。id があるときは「親 + id」を正とする（001_008）。
+ * 書込先はファイルの path。コレクション欄への載せ替えはしない。
  */
 function resolveDocumentPath(
   document: ImportDocument,
-  collectionPath: string,
-  includeSubcollections: boolean
-): string | 'auto' | 'skip' {
+  includeSubcollections: boolean,
+  rootCollectionPath: string | null
+): string | 'skip' {
+  const path = document.path?.trim() ?? ''
+  if (!path) {
+    throw new Error('ドキュメントに path がありません')
+  }
+
+  if (!isDocumentPath(path)) {
+    throw new Error(`不正なドキュメント path です: ${path}`)
+  }
+
+  if (
+    rootCollectionPath &&
+    !includeSubcollections &&
+    !isDirectDocumentPath(path, rootCollectionPath)
+  ) {
+    return 'skip'
+  }
+
   if (document.id) {
-    if (document.path && isDocumentPath(document.path) && isUnderCollectionPath(document.path, collectionPath)) {
-      if (!includeSubcollections && !isDirectDocumentPath(document.path, collectionPath)) {
-        return 'skip'
-      }
-
-      const segments = document.path.split('/').filter(Boolean)
-      segments[segments.length - 1] = document.id
-      return segments.join('/')
-    }
-
-    return joinDocumentPath(collectionPath, document.id)
+    const segments = path.split('/').filter(Boolean)
+    segments[segments.length - 1] = document.id
+    return segments.join('/')
   }
 
-  if (document.path) {
-    if (!isDocumentPath(document.path)) {
-      throw new Error(`不正なドキュメント path です: ${document.path}`)
-    }
-
-    if (!isUnderCollectionPath(document.path, collectionPath)) {
-      return 'skip'
-    }
-
-    if (!includeSubcollections && !isDirectDocumentPath(document.path, collectionPath)) {
-      return 'skip'
-    }
-
-    return document.path
-  }
-
-  return 'auto'
+  return path
 }
 
 function planWrites(
   documents: ImportDocument[],
-  collectionPath: string,
   includeSubcollections: boolean
 ): { planned: PlannedWrite[]; skippedOutsideCount: number } {
   const planned: PlannedWrite[] = []
   let skippedOutsideCount = 0
+  const rootCollectionPath = inferCollectionPath(documents)
 
   for (const document of documents) {
-    const resolved = resolveDocumentPath(document, collectionPath, includeSubcollections)
+    const resolved = resolveDocumentPath(
+      document,
+      includeSubcollections,
+      rootCollectionPath
+    )
 
     if (resolved === 'skip') {
       skippedOutsideCount += 1
-      continue
-    }
-
-    if (resolved === 'auto') {
-      planned.push({
-        kind: 'autoId',
-        collectionPath,
-        data: document.data
-      })
       continue
     }
 
@@ -532,7 +524,7 @@ async function loadAndPlanFromPaths(
   onProgress?: ProgressReporter
 ): Promise<PlannedWrite[]> {
   if (!filePath.trim()) {
-    throw new Error('JSON ファイルを指定してください')
+    throw new Error('ファイルを指定してください')
   }
 
   onProgress?.({
@@ -540,11 +532,11 @@ async function loadAndPlanFromPaths(
     processedCount: 0,
     totalCount: 0,
     percent: 5,
-    detail: 'JSON を読み込み中…'
+    detail: 'ファイルを読み込み中…'
   })
 
   const raw = await readFile(filePath, 'utf8')
-  const planned = planWritesFromPaths(parseImportDocuments(raw))
+  const planned = planWritesFromPaths(parseImportDocuments(raw, filePath))
 
   if (planned.length === 0) {
     throw new Error('インポート対象のドキュメントがありません')
@@ -563,14 +555,9 @@ async function loadAndPlan(
   skippedOutsideCount: number
   includeSubcollections: boolean
 }> {
-  const collectionPath = input.collectionPath.trim()
-  if (!collectionPath) {
-    throw new Error('コレクション path を指定してください')
-  }
-
   const filePath = input.filePath.trim()
   if (!filePath) {
-    throw new Error('JSON ファイルを指定してください')
+    throw new Error('ファイルを指定してください')
   }
 
   onProgress?.({
@@ -578,24 +565,20 @@ async function loadAndPlan(
     processedCount: 0,
     totalCount: 0,
     percent: 5,
-    detail: 'JSON を読み込み中…'
+    detail: 'ファイルを読み込み中…'
   })
 
   const raw = await readFile(filePath, 'utf8')
-  const documents = parseImportDocuments(raw)
-  const { planned, skippedOutsideCount } = planWrites(
-    documents,
-    collectionPath,
-    input.includeSubcollections
-  )
+  const documents = parseImportDocuments(raw, filePath)
+  const { planned, skippedOutsideCount } = planWrites(documents, input.includeSubcollections)
 
   if (planned.length === 0) {
-    throw new Error('宛先コレクションに書き込むドキュメントがありません')
+    throw new Error('書き込むドキュメントがありません')
   }
 
   return {
     filePath,
-    collectionPath,
+    collectionPath: inferCollectionPath(documents) ?? '',
     planned,
     skippedOutsideCount,
     includeSubcollections: input.includeSubcollections
@@ -626,9 +609,13 @@ export async function selectCollectionImportJson(
   window: BrowserWindow | null
 ): Promise<{ canceled: boolean; filePath: string | null }> {
   const options = {
-    title: 'インポートする JSON を選択',
+    title: 'インポートする JSON / CSV を選択',
     properties: ['openFile' as const],
-    filters: [{ name: 'JSON', extensions: ['json'] }]
+    filters: [
+      { name: 'JSON / CSV', extensions: ['json', 'csv'] },
+      { name: 'JSON', extensions: ['json'] },
+      { name: 'CSV', extensions: ['csv'] }
+    ]
   }
 
   const result = window
@@ -647,7 +634,7 @@ export async function peekCollectionImportJson(
 ): Promise<PeekCollectionImportResult> {
   try {
     const raw = await readFile(filePath, 'utf8')
-    const documents = parseImportDocuments(raw)
+    const documents = parseImportDocuments(raw, filePath)
     return {
       ok: true,
       collectionPath: inferCollectionPath(documents)
@@ -656,7 +643,7 @@ export async function peekCollectionImportJson(
     logError('data_transfer', 'peekCollectionImportJson failed', error)
     return {
       ok: false,
-      error: error instanceof Error ? error.message : 'JSON を読み取れませんでした'
+      error: error instanceof Error ? error.message : 'ファイルを読み取れませんでした'
     }
   }
 }

@@ -15,10 +15,6 @@ export const en: Record<string, string> = {
   'menu.help': 'Help',
   'menu.import': 'Import',
   'menu.export': 'Export',
-  'menu.transport': 'Transport',
-  'menu.diff': 'Diff',
-  'menu.cloud': 'Cloud',
-  'menu.emulator': 'Emulator',
   'menu.connection': 'Connection',
   'menu.project': 'Project',
   'menu.collection': 'Collection',
@@ -59,7 +55,6 @@ export const en: Record<string, string> = {
   'settings.theme': 'Theme',
   'settings.theme.dark': 'Dark',
   'settings.theme.light': 'Light',
-  'settings.auto_discover': 'Discover on startup',
 
   'connection.lead': 'Connect to Firestore',
   'connection.mode_list': 'List',
@@ -121,15 +116,10 @@ export const en: Record<string, string> = {
   'emulator.title': 'Connect with emulator',
   'emulator.lead': 'Confirm Firestore Emulator is running, then enter the host.',
   'emulator.lead_known': 'Confirm the host, then choose a projectId from the workspace list.',
-  'emulator.discover_lead': 'Looking for a running emulator.',
-  'emulator.discovering': 'Discovering…',
-  'emulator.discover_none': 'No running emulator was found.',
-  'emulator.discover_retry': 'Discover again',
-  'emulator.discover_pick': 'Choose an emulator to connect.',
-  'emulator.discover_unnamed': '(no projectId)',
   'emulator.process_hint':
     'FireMint does not start the emulator. Start it first (for example npm run emulators).',
   'emulator.host': 'Host',
+  'emulator.project_id': 'projectId',
   'emulator.select_known': 'Choose a projectId from the list',
   'emulator.import_lead': 'No collections. Import the JSON as-is.',
   'emulator.select_json': 'Select JSON',
@@ -137,20 +127,15 @@ export const en: Record<string, string> = {
   'emulator.import': 'Connect',
   'emulator.skip': 'Skip import',
   'emulator.connect_import_lead':
-    'ZIP is optional. You can connect without one. If you select a ZIP, it is written to the emulator and appears in the left tree.',
+    'ZIP and projectId are both optional. You can connect with both empty. If you select a ZIP, it is written to the emulator and appears in the left tree.',
   'emulator.import_project_title': 'Add a project to the emulator',
   'emulator.import_project_lead':
     'Select a zip. It will appear as a new row in the left tree and be written to the workspace.',
   'emulator.import_collection_title': 'Add a collection to the emulator',
   'emulator.import_collection_lead':
     'Select a JSON. The destination is the emulator project selected in the left tree.',
-  'emulator.export_project_lead': 'Select the range, then run. The file is a ZIP.',
-  'emulator.export_collection_lead': 'Select the range, then run. The file is JSON.',
   'emulator.destination': 'Destination',
   'emulator.no_destination': 'Select an emulator project in the left tree.',
-  'emulator.import_success': 'Imported {count} documents',
-  'emulator.import_success_with_skip':
-    'Imported {count} documents / skipped {skipped}',
   'emulator.delete_project_confirm':
     'Delete this project from the emulator? Its data will be removed, and it will leave the workspace too.'
 }

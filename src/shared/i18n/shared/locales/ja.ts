@@ -17,10 +17,6 @@ export const ja: MessageCatalog = {
   'menu.help': 'Help',
   'menu.import': 'インポート',
   'menu.export': 'エクスポート',
-  'menu.transport': 'トランスポート',
-  'menu.diff': 'Diff',
-  'menu.cloud': 'クラウド',
-  'menu.emulator': 'エミュレーター',
   'menu.connection': '接続',
   'menu.project': 'プロジェクト',
   'menu.collection': 'コレクション',
@@ -61,7 +57,6 @@ export const ja: MessageCatalog = {
   'settings.theme': 'テーマ',
   'settings.theme.dark': 'ダーク',
   'settings.theme.light': 'ライト',
-  'settings.auto_discover': '起動時に自動検出する',
 
   'connection.lead': 'Firestore に接続',
   'connection.mode_list': 'リスト',
@@ -123,15 +118,10 @@ export const ja: MessageCatalog = {
   'emulator.title': 'エミュレーターで接続',
   'emulator.lead': 'Firestore Emulator の起動を確認し、ホストを入力します。',
   'emulator.lead_known': 'ホストを確認し、workspace の projectId をリストから選びます。',
-  'emulator.discover_lead': '起動中の Emulator を探します。',
-  'emulator.discovering': '検出しています…',
-  'emulator.discover_none': '起動中の Emulator が見つかりませんでした。',
-  'emulator.discover_retry': '再検出',
-  'emulator.discover_pick': '接続する Emulator を選んでください。',
-  'emulator.discover_unnamed': '(projectId なし)',
   'emulator.process_hint':
     'FireMint は Emulator を起動しません。先に npm run emulators などで起動してください。',
   'emulator.host': 'ホスト',
+  'emulator.project_id': 'projectId',
   'emulator.select_known': 'リストから projectId を選択',
   'emulator.import_lead': 'コレクションがありません。JSON を丸ごと入れてください。',
   'emulator.select_json': 'JSON を選択',
@@ -139,18 +129,14 @@ export const ja: MessageCatalog = {
   'emulator.import': '接続',
   'emulator.skip': '入れずに進む',
   'emulator.connect_import_lead':
-    'zip は任意です。空のまま接続できます。zip を選ぶと Emulator に入れて左ツリーに出します。',
+    'zip も projectId も任意です。どちらも空のまま接続できます。zip を選ぶと Emulator に入れて左ツリーに出します。',
   'emulator.import_project_title': 'エミュレーターにプロジェクトを追加',
   'emulator.import_project_lead': 'zip を選びます。左ツリーに新しい行として表示し、workspace に書き込みます。',
   'emulator.import_collection_title': 'エミュレーターにコレクションを追加',
   'emulator.import_collection_lead':
-    'json を選びます。インポート先は左ツリーで選択中のエミュレータープロジェクトです。',
-  'emulator.export_project_lead': '範囲を選んでから実行。ファイルは ZIP です。',
-  'emulator.export_collection_lead': '範囲を選んでから実行。ファイルは JSON です。',
-  'emulator.destination': 'インポート先',
+    'json を選びます。追加先は左ツリーで選択中のエミュレータープロジェクトです。',
+  'emulator.destination': '追加先',
   'emulator.no_destination': '左ツリーでエミュレーターのプロジェクトを選んでください。',
-  'emulator.import_success': '{count} 件をインポートしました',
-  'emulator.import_success_with_skip': '{count} 件をインポートしました / スキップ {skipped} 件',
   'emulator.delete_project_confirm':
     'Emulator 上のこのプロジェクトを削除しますか？ 中身は消え、workspace からも消えます。'
 }

@@ -78,7 +78,7 @@ export function registerDataTransferHandlers(): void {
     async (event, input: ImportCollectionJsonInput) => {
       logInfo(
         'ipc:data_transfer',
-        `validateCollectionImport path=${input.collectionPath} file=${input.filePath}`
+        `validateCollectionImport file=${input.filePath}`
       )
       const reportProgress = (progress: ImportCollectionProgress): void => {
         event.sender.send(IPC_CHANNELS.DATA_TRANSFER_IMPORT_COLLECTION_PROGRESS, progress)
@@ -92,7 +92,7 @@ export function registerDataTransferHandlers(): void {
     async (event, input: ImportCollectionJsonInput) => {
       logInfo(
         'ipc:data_transfer',
-        `importCollectionJson path=${input.collectionPath} file=${input.filePath}`
+        `importCollectionJson file=${input.filePath}`
       )
       const reportProgress = (progress: ImportCollectionProgress): void => {
         event.sender.send(IPC_CHANNELS.DATA_TRANSFER_IMPORT_COLLECTION_PROGRESS, progress)
