@@ -228,6 +228,7 @@ function App(): React.JSX.Element {
           ? {
               openCommandPalette: shellCommands.openCommandPalette,
               openImpExp: shellCommands.openImpExp,
+              openEmulatorImpExp: shellCommands.openEmulatorImpExp,
               openTransport: shellCommands.openTransport,
               openDiff: shellCommands.openDiff,
               toggleSplit: shellCommands.toggleSplit,

@@ -148,6 +148,9 @@ export const en: Record<string, string> = {
   'emulator.export_collection_lead': 'Select the range, then run. The file is JSON.',
   'emulator.destination': 'Destination',
   'emulator.no_destination': 'Select an emulator project in the left tree.',
+  'emulator.import_success': 'Imported {count} documents',
+  'emulator.import_success_with_skip':
+    'Imported {count} documents / skipped {skipped}',
   'emulator.delete_project_confirm':
     'Delete this project from the emulator? Its data will be removed, and it will leave the workspace too.'
 }

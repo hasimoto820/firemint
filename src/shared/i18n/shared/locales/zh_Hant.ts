@@ -146,6 +146,8 @@ export const zhHant: MessageCatalog = {
   'emulator.export_collection_lead': '選擇範圍後執行。檔案為 JSON。',
   'emulator.destination': '目標',
   'emulator.no_destination': '請在左側樹中選取模擬器專案。',
+  'emulator.import_success': '已匯入 {count} 筆',
+  'emulator.import_success_with_skip': '已匯入 {count} 筆 / 略過 {skipped} 筆',
   'emulator.delete_project_confirm':
     '要从模擬器刪除此專案嗎？資料會消失，也會從 workspace 中移除。'
 }

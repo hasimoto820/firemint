@@ -146,6 +146,8 @@ export const zhHans: MessageCatalog = {
   'emulator.export_collection_lead': '选择范围后执行。文件为 JSON。',
   'emulator.destination': '目标',
   'emulator.no_destination': '请在左侧树中选择模拟器项目。',
+  'emulator.import_success': '已导入 {count} 条',
+  'emulator.import_success_with_skip': '已导入 {count} 条 / 跳过 {skipped} 条',
   'emulator.delete_project_confirm':
     '要从模拟器删除此项目吗？数据会消失，也会从 workspace 中移除。'
 }

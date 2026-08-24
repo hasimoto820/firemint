@@ -53,6 +53,7 @@ export type AppMenuContextActions = {
 export type AppShellMenuActions = {
   openCommandPalette?: () => void
   openImpExp?: (intent?: ImpExpIntent) => void
+  openEmulatorImpExp?: () => void
   openTransport?: (intent?: TransportIntent) => void
   openDiff?: (intent?: DiffIntent) => void
   toggleSplit?: () => void
@@ -106,146 +107,111 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
   const context = handlers.context ?? null
   const shell = handlers.shell ?? null
   const t = handlers.t
+  const emulatorSource = Boolean(shell?.sourceIsEmulator)
+  const transportSourceKind = emulatorSource ? 'emulator' : 'cloud'
+
+  const openFocusedImpExp = (intent: ImpExpIntent): void => {
+    if (emulatorSource) {
+      if (intent.direction === 'import' && intent.target === 'project') {
+        handlers.onEmulatorImportProject?.()
+        return
+      }
+      if (intent.direction === 'import' && intent.target === 'collection') {
+        handlers.onEmulatorImportCollection?.()
+        return
+      }
+      if (intent.direction === 'export' && intent.target === 'project') {
+        handlers.onEmulatorExportProject?.()
+        return
+      }
+      handlers.onEmulatorExportCollection?.()
+      return
+    }
+
+    if (shell?.openImpExp) {
+      shell.openImpExp(intent)
+      return
+    }
+
+    if (intent.direction === 'import' && intent.target === 'project') {
+      handlers.onImportProject?.()
+    }
+  }
 
   return [
     {
       id: 'file',
       label: t('menu.file'),
       items: [
-        { type: 'header', label: t('menu.cloud') },
-        { type: 'header', label: t('menu.import'), indent: true },
+        { type: 'header', label: t('menu.import') },
         {
           type: 'item',
           id: 'file-import-project',
           label: t('menu.project'),
-          indent: 2,
-          disabled: !(handlers.canImportProject ?? handlers.connected),
-          onClick: () => {
-            if (shell?.openImpExp) {
-              shell.openImpExp({ direction: 'import', target: 'project' })
-              return
-            }
-            handlers.onImportProject?.()
-          }
+          indent: true,
+          disabled: emulatorSource
+            ? !(handlers.canEmulatorImportProject ?? false)
+            : !(handlers.canImportProject ?? handlers.connected),
+          onClick: () => openFocusedImpExp({ direction: 'import', target: 'project' })
         },
         {
           type: 'item',
           id: 'file-import',
           label: t('menu.collection'),
-          indent: 2,
-          disabled: !handlers.connected,
-          onClick: () => shell?.openImpExp?.({ direction: 'import', target: 'collection' })
+          indent: true,
+          disabled: emulatorSource
+            ? !(handlers.canEmulatorImportCollection ?? false)
+            : !handlers.connected,
+          onClick: () => openFocusedImpExp({ direction: 'import', target: 'collection' })
         },
-        { type: 'header', label: t('menu.export'), indent: true },
+        { type: 'header', label: t('menu.export') },
         {
           type: 'item',
           id: 'file-export-project',
           label: t('menu.project'),
-          indent: 2,
-          disabled: !handlers.connected,
-          onClick: () => shell?.openImpExp?.({ direction: 'export', target: 'project' })
+          indent: true,
+          disabled: emulatorSource
+            ? !(handlers.canEmulatorExport ?? false)
+            : !handlers.connected,
+          onClick: () => openFocusedImpExp({ direction: 'export', target: 'project' })
         },
         {
           type: 'item',
           id: 'file-export',
           label: t('menu.collection'),
-          indent: 2,
-          disabled: !handlers.connected,
-          onClick: () => shell?.openImpExp?.({ direction: 'export', target: 'collection' })
+          indent: true,
+          disabled: emulatorSource
+            ? !(handlers.canEmulatorExport ?? false)
+            : !handlers.connected,
+          onClick: () => openFocusedImpExp({ direction: 'export', target: 'collection' })
         },
-        { type: 'header', label: t('menu.transport'), indent: true },
+        { type: 'header', label: t('menu.transport') },
         {
           type: 'item',
           id: 'file-transport-project',
           label: t('menu.project'),
-          indent: 2,
-          disabled: !handlers.connected || Boolean(shell?.sourceIsEmulator),
-          onClick: () => shell?.openTransport?.({ sourceKind: 'cloud', target: 'project' })
+          indent: true,
+          disabled: !handlers.connected,
+          onClick: () =>
+            shell?.openTransport?.({ sourceKind: transportSourceKind, target: 'project' })
         },
         {
           type: 'item',
           id: 'file-transport-collection',
           label: t('menu.collection'),
-          indent: 2,
-          disabled:
-            !handlers.connected ||
-            Boolean(shell?.sourceIsEmulator) ||
-            !shell?.hasCollectionPath,
-          onClick: () => shell?.openTransport?.({ sourceKind: 'cloud', target: 'collection' })
+          indent: true,
+          disabled: !handlers.connected || !shell?.hasCollectionPath,
+          onClick: () =>
+            shell?.openTransport?.({ sourceKind: transportSourceKind, target: 'collection' })
         },
-        { type: 'header', label: t('menu.diff'), indent: true },
+        { type: 'header', label: t('menu.diff') },
         {
           type: 'item',
           id: 'file-diff-collection',
           label: t('menu.collection'),
-          indent: 2,
-          disabled:
-            !handlers.connected ||
-            Boolean(shell?.sourceIsEmulator) ||
-            !shell?.hasCollectionPath,
-          onClick: () => shell?.openDiff?.({ sourceKind: 'cloud' })
-        },
-        { type: 'separator' },
-        { type: 'header', label: t('menu.emulator') },
-        { type: 'header', label: t('menu.import'), indent: true },
-        {
-          type: 'item',
-          id: 'file-emulator-import-project',
-          label: t('menu.project'),
-          indent: 2,
-          disabled: !(handlers.canEmulatorImportProject ?? false),
-          onClick: handlers.onEmulatorImportProject
-        },
-        {
-          type: 'item',
-          id: 'file-emulator-import-collection',
-          label: t('menu.collection'),
-          indent: 2,
-          disabled: !(handlers.canEmulatorImportCollection ?? false),
-          onClick: handlers.onEmulatorImportCollection
-        },
-        { type: 'header', label: t('menu.export'), indent: true },
-        {
-          type: 'item',
-          id: 'file-emulator-export-project',
-          label: t('menu.project'),
-          indent: 2,
-          disabled: !(handlers.canEmulatorExport ?? false),
-          onClick: handlers.onEmulatorExportProject
-        },
-        {
-          type: 'item',
-          id: 'file-emulator-export-collection',
-          label: t('menu.collection'),
-          indent: 2,
-          disabled: !(handlers.canEmulatorExport ?? false),
-          onClick: handlers.onEmulatorExportCollection
-        },
-        { type: 'header', label: t('menu.transport'), indent: true },
-        {
-          type: 'item',
-          id: 'file-emulator-transport-project',
-          label: t('menu.project'),
-          indent: 2,
-          disabled: !shell?.sourceIsEmulator,
-          onClick: () => shell?.openTransport?.({ sourceKind: 'emulator', target: 'project' })
-        },
-        {
-          type: 'item',
-          id: 'file-emulator-transport-collection',
-          label: t('menu.collection'),
-          indent: 2,
-          disabled: !shell?.sourceIsEmulator || !shell?.hasCollectionPath,
-          onClick: () => shell?.openTransport?.({ sourceKind: 'emulator', target: 'collection' })
-        },
-        { type: 'header', label: t('menu.diff'), indent: true },
-        {
-          type: 'item',
-          id: 'file-emulator-diff-collection',
-          label: t('menu.collection'),
-          indent: 2,
-          disabled: !shell?.sourceIsEmulator || !shell?.hasCollectionPath,
-          onClick: () => shell?.openDiff?.({ sourceKind: 'emulator' })
+          indent: true,
+          disabled: !handlers.connected || !shell?.hasCollectionPath,
+          onClick: () => shell?.openDiff?.({ sourceKind: transportSourceKind })
         },
         { type: 'separator' },
         { type: 'header', label: t('menu.connection') },
@@ -464,7 +430,13 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
           id: 'view-imp-exp',
           label: shell?.impExpActive ? 'Imp/Exp ✓' : 'Imp/Exp',
           disabled: !handlers.connected,
-          onClick: shell?.openImpExp
+          onClick: () => {
+            if (emulatorSource) {
+              shell?.openEmulatorImpExp?.()
+              return
+            }
+            shell?.openImpExp?.()
+          }
         },
         { type: 'separator' },
         {

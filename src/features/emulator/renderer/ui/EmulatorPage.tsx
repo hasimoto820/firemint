@@ -100,6 +100,7 @@ function EmulatorPage({
   const [filePath, setFilePath] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
   const [exportRoots, setExportRoots] = useState<string[]>([])
   const [selectedRoots, setSelectedRoots] = useState<string[]>([])
   const [collectionPath, setCollectionPath] = useState('')
@@ -108,6 +109,7 @@ function EmulatorPage({
   useEffect(() => {
     setFilePath(null)
     setError(null)
+    setSuccess(null)
   }, [mode])
 
   useEffect(() => {
@@ -189,13 +191,25 @@ function EmulatorPage({
     onModeChange?.(emulatorPageModeFromIntent(direction, next))
   }
 
-  const finish = async (): Promise<void> => {
+  const importSuccessMessage = (writtenCount: number, skippedCount: number): string => {
+    if (skippedCount > 0) {
+      return t('emulator.import_success_with_skip', {
+        count: writtenCount,
+        skipped: skippedCount
+      })
+    }
+
+    return t('emulator.import_success', { count: writtenCount })
+  }
+
+  const finish = async (message: string): Promise<void> => {
+    setSuccess(message)
     await onWorkspaceChanged()
-    onClose()
   }
 
   const handleSelectJson = async (): Promise<void> => {
     setError(null)
+    setSuccess(null)
     const selected = await window.api.dataTransfer.selectCollectionImportJson()
 
     if (selected.canceled || !selected.filePath) {
@@ -215,6 +229,7 @@ function EmulatorPage({
 
   const handleSelectZip = async (): Promise<void> => {
     setError(null)
+    setSuccess(null)
     const selected = await window.api.dataTransfer.selectProjectImportZip()
 
     if (selected.canceled || !selected.filePath) {
@@ -237,6 +252,7 @@ function EmulatorPage({
 
     setBusy(true)
     setError(null)
+    setSuccess(null)
 
     try {
       const result = await window.api.emulator.importCollectionJson({
@@ -249,7 +265,9 @@ function EmulatorPage({
         return
       }
 
-      finish()
+      await finish(
+        importSuccessMessage(result.data.writtenCount, result.data.skippedCollisionCount)
+      )
     } finally {
       setBusy(false)
     }
@@ -263,6 +281,7 @@ function EmulatorPage({
 
     setBusy(true)
     setError(null)
+    setSuccess(null)
 
     try {
       const result = await window.api.emulator.importProjectZip({
@@ -275,7 +294,7 @@ function EmulatorPage({
         return
       }
 
-      finish()
+      await finish(importSuccessMessage(result.writtenCount, 0))
     } finally {
       setBusy(false)
     }
@@ -289,6 +308,7 @@ function EmulatorPage({
 
     setBusy(true)
     setError(null)
+    setSuccess(null)
 
     try {
       const loaded = await window.api.workspace.loadProject(poolId)
@@ -530,6 +550,7 @@ function EmulatorPage({
 
       {busy && <p className="connection-panel__loading">{t('common.busy')}</p>}
       {error && <p className="connection-panel__error">{error}</p>}
+      {success && <p className="simple-main__success">{success}</p>}
 
       {direction === 'export' &&
         (job ? (

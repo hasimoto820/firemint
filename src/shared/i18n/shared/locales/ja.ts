@@ -149,6 +149,8 @@ export const ja: MessageCatalog = {
   'emulator.export_collection_lead': '範囲を選んでから実行。ファイルは JSON です。',
   'emulator.destination': 'インポート先',
   'emulator.no_destination': '左ツリーでエミュレーターのプロジェクトを選んでください。',
+  'emulator.import_success': '{count} 件をインポートしました',
+  'emulator.import_success_with_skip': '{count} 件をインポートしました / スキップ {skipped} 件',
   'emulator.delete_project_confirm':
     'Emulator 上のこのプロジェクトを削除しますか？ 中身は消え、workspace からも消えます。'
 }
