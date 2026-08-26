@@ -1,7 +1,4 @@
-import type {
-  ImportCollectionValidation,
-  ImportProjectValidation
-} from './types'
+import type { OfficialImportValidation } from './official'
 
 export type ImpExpDirection = 'import' | 'export'
 export type ImpExpTarget = 'collection' | 'group' | 'project'
@@ -18,8 +15,7 @@ export type ImpExpDraft = ImpExpIntent & {
   selectedRoots: string[]
   destinationProjectId: string
   acceptMismatch: boolean
-  collectionValidation: ImportCollectionValidation | null
-  projectValidation: ImportProjectValidation | null
+  projectValidation: OfficialImportValidation | null
 }
 
 export function lastPathSegment(path: string): string {
@@ -37,7 +33,6 @@ export function createImpExpDraft(projectId: string): ImpExpDraft {
     selectedRoots: [],
     destinationProjectId: projectId,
     acceptMismatch: false,
-    collectionValidation: null,
     projectValidation: null
   }
 }
@@ -69,7 +64,6 @@ export function applyImpExpIntent(
       draft.selectedRoots.length === 0
         ? rootCollectionIds
         : draft.selectedRoots,
-    collectionValidation: switched ? null : draft.collectionValidation,
     projectValidation: switched ? null : draft.projectValidation
   }
 }

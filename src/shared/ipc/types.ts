@@ -49,13 +49,13 @@ import type {
 } from '@features/bulk_operations/shared/types'
 
 import type {
-  CollectionDiffInput,
-  CollectionDiffProgress,
-  CollectionDiffResult,
-  CollectionDiffSummary,
+  DumpDiffInput,
+  DiffProgress,
+  DumpDiffResult,
+  DiffSummary,
   DiffExportFormat,
   DiffExportResult,
-  PeekDiffJsonResult
+  PeekDiffDumpResult
 } from '@features/diff/shared/types'
 
 import type {
@@ -65,24 +65,7 @@ import type {
   TransportValidationResult
 } from '@features/transport/shared/types'
 
-import type {
-  ExportCollectionJsonInput,
-  ExportDocumentsInput,
-  ExportProjectInput,
-  ExportProjectProgress,
-  ExportProjectResult,
-  ExportResult,
-  ImportCollectionJsonInput,
-  ImportDocumentsJsonInput,
-  ImportCollectionProgress,
-  ImportCollectionValidationResult,
-  ImportProjectInput,
-  ImportProjectProgress,
-  ImportProjectResult,
-  ImportProjectValidationResult,
-  ImportResult,
-  PeekCollectionImportResult
-} from '@features/data_transfer/shared/types'
+import type { ImportProjectProgress } from '@features/data_transfer/shared/types'
 import type {
   OfficialImportInput,
   OfficialImportValidationResult
@@ -96,7 +79,6 @@ import type {
 } from '@features/script_runner/shared/types'
 
 import type {
-  ImportEmulatorCollectionJsonInput,
   ImportEmulatorProjectZipInput,
   ImportEmulatorProjectZipResult,
   DeleteEmulatorProjectInput,
@@ -239,28 +221,6 @@ export type BulkOperationsIpcApi = {
 }
 
 export type DataTransferIpcApi = {
-  exportCollectionJson: (input: ExportCollectionJsonInput) => Promise<ExportResult>
-  exportDocumentsJson: (input: ExportDocumentsInput) => Promise<ExportResult>
-  exportDocumentsCsv: (input: ExportDocumentsInput) => Promise<ExportResult>
-  selectCollectionImportJson: () => Promise<{ canceled: boolean; filePath: string | null }>
-  peekCollectionImportJson: (filePath: string) => Promise<PeekCollectionImportResult>
-  validateCollectionImport: (
-    input: ImportCollectionJsonInput
-  ) => Promise<ImportCollectionValidationResult>
-  importCollectionJson: (input: ImportCollectionJsonInput) => Promise<ImportResult>
-  importDocumentsJson: (input: ImportDocumentsJsonInput) => Promise<ImportResult>
-  onImportCollectionProgress: (
-    listener: (progress: ImportCollectionProgress) => void
-  ) => () => void
-  exportProject: (input: ExportProjectInput) => Promise<ExportProjectResult>
-  onExportProjectProgress: (
-    listener: (progress: ExportProjectProgress) => void
-  ) => () => void
-  selectProjectImportZip: () => Promise<{ canceled: boolean; filePath: string | null }>
-  validateProjectImport: (
-    input: ImportProjectInput
-  ) => Promise<ImportProjectValidationResult>
-  importProject: (input: ImportProjectInput) => Promise<ImportProjectResult>
   onImportProjectProgress: (
     listener: (progress: ImportProjectProgress) => void
   ) => () => void
@@ -277,12 +237,11 @@ export type TransportIpcApi = {
 }
 
 export type DiffIpcApi = {
-  selectJson: () => Promise<{ canceled: boolean; filePath: string | null }>
-  peekJson: (filePath: string) => Promise<PeekDiffJsonResult>
-  compareCollection: (input: CollectionDiffInput) => Promise<CollectionDiffResult>
-  onCompareProgress: (listener: (progress: CollectionDiffProgress) => void) => () => void
+  peekDump: (dumpPath: string) => Promise<PeekDiffDumpResult>
+  compareDump: (input: DumpDiffInput) => Promise<DumpDiffResult>
+  onCompareProgress: (listener: (progress: DiffProgress) => void) => () => void
   exportReport: (
-    summary: CollectionDiffSummary,
+    summary: DiffSummary,
     format: DiffExportFormat
   ) => Promise<DiffExportResult>
 }
@@ -329,7 +288,6 @@ export type EmulatorIpcApi = {
   importProjectZip: (
     input: ImportEmulatorProjectZipInput
   ) => Promise<ImportEmulatorProjectZipResult>
-  importCollectionJson: (input: ImportEmulatorCollectionJsonInput) => Promise<ImportResult>
   deleteProject: (input: DeleteEmulatorProjectInput) => Promise<DeleteEmulatorProjectResult>
   discover: () => Promise<DiscoverEmulatorsResult>
 }

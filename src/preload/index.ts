@@ -99,54 +99,6 @@ const api: IpcApi = {
     delete: (input) => ipcRenderer.invoke(IPC_CHANNELS.BULK_DELETE, input)
   },
   dataTransfer: {
-    exportCollectionJson: (input) =>
-      ipcRenderer.invoke(IPC_CHANNELS.DATA_TRANSFER_EXPORT_COLLECTION_JSON, input),
-    exportDocumentsJson: (input) =>
-      ipcRenderer.invoke(IPC_CHANNELS.DATA_TRANSFER_EXPORT_DOCUMENTS_JSON, input),
-    exportDocumentsCsv: (input) =>
-      ipcRenderer.invoke(IPC_CHANNELS.DATA_TRANSFER_EXPORT_DOCUMENTS_CSV, input),
-    selectCollectionImportJson: () =>
-      ipcRenderer.invoke(IPC_CHANNELS.DATA_TRANSFER_SELECT_COLLECTION_IMPORT_JSON),
-    peekCollectionImportJson: (filePath) =>
-      ipcRenderer.invoke(IPC_CHANNELS.DATA_TRANSFER_PEEK_COLLECTION_IMPORT_JSON, filePath),
-    validateCollectionImport: (input) =>
-      ipcRenderer.invoke(IPC_CHANNELS.DATA_TRANSFER_VALIDATE_COLLECTION_IMPORT, input),
-    importCollectionJson: (input) =>
-      ipcRenderer.invoke(IPC_CHANNELS.DATA_TRANSFER_IMPORT_COLLECTION_JSON, input),
-    importDocumentsJson: (input) =>
-      ipcRenderer.invoke(IPC_CHANNELS.DATA_TRANSFER_IMPORT_DOCUMENTS_JSON, input),
-    onImportCollectionProgress: (listener) => {
-      const handler = (
-        _event: Electron.IpcRendererEvent,
-        progress: Parameters<typeof listener>[0]
-      ): void => {
-        listener(progress)
-      }
-      ipcRenderer.on(IPC_CHANNELS.DATA_TRANSFER_IMPORT_COLLECTION_PROGRESS, handler)
-      return () => {
-        ipcRenderer.removeListener(IPC_CHANNELS.DATA_TRANSFER_IMPORT_COLLECTION_PROGRESS, handler)
-      }
-    },
-    exportProject: (input) =>
-      ipcRenderer.invoke(IPC_CHANNELS.DATA_TRANSFER_EXPORT_PROJECT, input),
-    onExportProjectProgress: (listener) => {
-      const handler = (
-        _event: Electron.IpcRendererEvent,
-        progress: Parameters<typeof listener>[0]
-      ): void => {
-        listener(progress)
-      }
-      ipcRenderer.on(IPC_CHANNELS.DATA_TRANSFER_EXPORT_PROJECT_PROGRESS, handler)
-      return () => {
-        ipcRenderer.removeListener(IPC_CHANNELS.DATA_TRANSFER_EXPORT_PROJECT_PROGRESS, handler)
-      }
-    },
-    selectProjectImportZip: () =>
-      ipcRenderer.invoke(IPC_CHANNELS.DATA_TRANSFER_SELECT_PROJECT_IMPORT_ZIP),
-    validateProjectImport: (input) =>
-      ipcRenderer.invoke(IPC_CHANNELS.DATA_TRANSFER_VALIDATE_PROJECT_IMPORT, input),
-    importProject: (input) =>
-      ipcRenderer.invoke(IPC_CHANNELS.DATA_TRANSFER_IMPORT_PROJECT, input),
     onImportProjectProgress: (listener) => {
       const handler = (
         _event: Electron.IpcRendererEvent,
@@ -181,10 +133,8 @@ const api: IpcApi = {
     }
   },
   diff: {
-    selectJson: () => ipcRenderer.invoke(IPC_CHANNELS.DIFF_SELECT_JSON),
-    peekJson: (filePath) => ipcRenderer.invoke(IPC_CHANNELS.DIFF_PEEK_JSON, filePath),
-    compareCollection: (input) =>
-      ipcRenderer.invoke(IPC_CHANNELS.DIFF_COMPARE_COLLECTION, input),
+    peekDump: (dumpPath) => ipcRenderer.invoke(IPC_CHANNELS.DIFF_PEEK_DUMP, dumpPath),
+    compareDump: (input) => ipcRenderer.invoke(IPC_CHANNELS.DIFF_COMPARE_DUMP, input),
     onCompareProgress: (listener) => {
       const handler = (
         _event: Electron.IpcRendererEvent,
@@ -203,8 +153,6 @@ const api: IpcApi = {
   emulator: {
     importProjectZip: (input) =>
       ipcRenderer.invoke(IPC_CHANNELS.EMULATOR_IMPORT_PROJECT_ZIP, input),
-    importCollectionJson: (input) =>
-      ipcRenderer.invoke(IPC_CHANNELS.EMULATOR_IMPORT_COLLECTION_JSON, input),
     deleteProject: (input) => ipcRenderer.invoke(IPC_CHANNELS.EMULATOR_DELETE_PROJECT, input),
     discover: () => ipcRenderer.invoke(IPC_CHANNELS.EMULATOR_DISCOVER)
   },

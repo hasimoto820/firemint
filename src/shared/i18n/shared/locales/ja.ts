@@ -21,6 +21,10 @@ export const ja: MessageCatalog = {
   'menu.project': 'プロジェクト',
   'menu.group': 'グループ',
   'menu.collection': 'コレクション',
+  'menu.diff': 'Diff',
+  'menu.cloud': 'Cloud',
+  'menu.emulator': 'エミュレーター',
+  'menu.transport': 'Transport',
   'menu.connect_list': 'リストから接続…',
   'menu.connect_json': 'JSON で接続…',
   'menu.connect_google': 'Google で接続…',
@@ -124,25 +128,27 @@ export const ja: MessageCatalog = {
   'emulator.host': 'ホスト',
   'emulator.project_id': 'projectId',
   'emulator.select_known': 'リストから projectId を選択',
-  'emulator.import_lead': 'コレクションがありません。JSON を丸ごと入れてください。',
-  'emulator.select_json': 'JSON を選択',
+  'emulator.import_lead': 'コレクションがありません。フォルダ / ZIP を入れられます。',
+  'emulator.select_json': 'フォルダ / ZIP を選択',
   'emulator.select_zip': 'フォルダ / ZIP を選択',
   'emulator.import': '接続',
   'emulator.skip': '入れずに進む',
   'emulator.connect_import_lead':
-    '公式ダンプも projectId も任意です。どちらも空のまま接続できます。ダンプを選ぶと Emulator に入れて左ツリーに出します。',
+    'フォルダ / ZIP も projectId も任意です。どちらも空のまま接続できます。選ぶと Emulator に入れて左ツリーに出します。',
   'emulator.import_project_title': 'エミュレーターにプロジェクトを追加',
   'emulator.import_project_lead':
-    '公式ダンプ（フォルダまたは ZIP）を選びます。左ツリーに新しい行として表示し、workspace に書き込みます。',
+    'フォルダまたは ZIP を選びます。左ツリーに新しい行として表示し、workspace に書き込みます。',
   'emulator.import_collection_title': 'エミュレーターにコレクションを追加',
+  'emulator.import_success': '{count} 件をインポートしました',
+  'emulator.import_success_with_skip': '{count} 件をインポートしました（スキップ {skipped} 件）',
   'emulator.import_collection_lead':
-    'json を選びます。追加先は左ツリーで選択中のエミュレータープロジェクトです。',
+    'フォルダまたは ZIP を選びます。追加先は左ツリーで選択中のエミュレータープロジェクトです。',
   'emulator.export_collection_lead':
-    'この path の範囲を公式 zip に出します。ファイルは ZIP です。',
+    'この path の範囲を zip に出します。ファイルは ZIP です。',
   'emulator.export_group_lead':
-    '同じコレクション ID の全部（グループ）を公式 zip に出します。ファイルは ZIP です。',
+    '同じコレクション ID の全部（グループ）を zip に出します。ファイルは ZIP です。',
   'emulator.export_project_lead':
-    '選んだルートを公式 zip に出します。ファイルは ZIP です。',
+    '選んだルートを zip に出します。ファイルは ZIP です。',
   'emulator.destination': '追加先',
   'emulator.no_destination': '左ツリーでエミュレーターのプロジェクトを選んでください。',
   'emulator.delete_project_confirm':

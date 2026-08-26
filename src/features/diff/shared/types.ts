@@ -1,13 +1,11 @@
-export type CollectionDiffStatus = 'json_only' | 'collection_only' | 'changed'
+export type DiffRowStatus = 'dump_only' | 'project_only' | 'changed'
 
-export type CollectionDiffInput = {
+export type DumpDiffInput = {
   projectId: string
-  collectionPath: string
-  filePath: string
-  includeSubcollections: boolean
+  dumpPath: string
 }
 
-export type CollectionDiffProgress = {
+export type DiffProgress = {
   phase: 'loading' | 'reading' | 'comparing' | 'done'
   processedCount: number
   totalCount: number
@@ -15,35 +13,32 @@ export type CollectionDiffProgress = {
   detail: string | null
 }
 
-export type CollectionDiffRow = {
+export type DiffRow = {
   id: string
   path: string
   collectionPath: string
-  status: CollectionDiffStatus
-  json: Record<string, unknown> | null
-  collection: Record<string, unknown> | null
+  status: DiffRowStatus
+  dump: Record<string, unknown> | null
+  project: Record<string, unknown> | null
 }
 
-export type CollectionDiffSummary = {
+export type DiffSummary = {
   projectId: string
-  collectionPath: string
-  filePath: string
-  includeSubcollections: boolean
-  jsonCount: number
-  collectionCount: number
+  dumpPath: string
+  sourceProjectId: string | null
+  dumpCount: number
+  projectCount: number
   sameCount: number
-  jsonOnlyCount: number
-  collectionOnlyCount: number
+  dumpOnlyCount: number
+  projectOnlyCount: number
   changedCount: number
-  missingIdCount: number
-  skippedOutsideCount: number
-  rows: CollectionDiffRow[]
+  rows: DiffRow[]
 }
 
-export type CollectionDiffResult =
+export type DumpDiffResult =
   | {
       ok: true
-      data: CollectionDiffSummary
+      data: DiffSummary
     }
   | {
       ok: false
@@ -51,10 +46,12 @@ export type CollectionDiffResult =
       canceled?: boolean
     }
 
-export type PeekDiffJsonResult =
+export type PeekDiffDumpResult =
   | {
       ok: true
-      collectionPath: string | null
+      documentCount: number
+      samplePaths: string[]
+      sourceProjectId: string | null
     }
   | {
       ok: false

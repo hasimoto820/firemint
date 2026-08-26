@@ -241,7 +241,6 @@ function ImpExpView({
 
   const resetValidation = (patch: Partial<ImpExpDraft> = {}): void => {
     onDraftChange({
-      collectionValidation: null,
       projectValidation: null,
       ...patch
     })
@@ -281,12 +280,7 @@ function ImpExpView({
   }
 
   const handleSelectFile = async (): Promise<void> => {
-    const result =
-      draft.direction === 'import'
-        ? await window.api.dataTransfer.selectOfficialDump()
-        : draft.target === 'collection'
-          ? await window.api.dataTransfer.selectCollectionImportJson()
-          : await window.api.dataTransfer.selectProjectImportZip()
+    const result = await window.api.dataTransfer.selectOfficialDump()
 
     if (result.canceled || !result.filePath) {
       return
@@ -338,17 +332,7 @@ function ImpExpView({
     }
 
     onDraftChange({
-      projectValidation: {
-        filePath: result.data.dumpPath,
-        documentCount: result.data.documentCount,
-        rootCollectionIds: [],
-        includeSubcollections: true,
-        sourceProjectId: result.data.sourceProjectId ?? 'official',
-        projectIdMismatch: false,
-        hasCollisions: result.data.hasCollisions,
-        collisionSamples: result.data.collisionSamples,
-        checkedCount: result.data.checkedCount
-      }
+      projectValidation: result.data
     })
     if (result.data.hasCollisions) {
       setFormError(
@@ -363,7 +347,7 @@ function ImpExpView({
     setBusy(true)
     setValidateProgress(null)
     setFormError(null)
-    onDraftChange({ collectionValidation: null, projectValidation: null })
+    onDraftChange({ projectValidation: null })
 
     try {
       await validateOfficial()
@@ -557,10 +541,10 @@ function ImpExpView({
               ? 'この Emulator に、ダンプのプロジェクトを新しい行として入れます。既存のプロジェクトには混ぜません。書く先はダンプが持っている path です。'
               : '選んだクラウドプロジェクトへ、ダンプの path どおり書きます。衝突したドキュメントはスキップします。'
             : draft.target === 'group'
-              ? '同じコレクション ID の全部（グループ）を公式 zip に出します。'
+              ? '同じコレクション ID の全部（グループ）を zip に出します。'
               : draft.target === 'collection'
-                ? 'この path の範囲を公式 zip に出します。'
-                : '選んだルートを公式 zip に出します。'}
+                ? 'この path の範囲を zip に出します。'
+                : '選んだルートを zip に出します。'}
           ファイルは {fileKindLabel(draft)} です。
         </p>
 

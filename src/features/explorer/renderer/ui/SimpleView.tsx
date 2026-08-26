@@ -566,7 +566,7 @@ function SimpleView({
   }
 
   const handleImportCollection = (): void => {
-    onOpenImpExp?.({ direction: 'import', target: 'collection' })
+    onOpenImpExp?.({ direction: 'import', target: 'project' })
   }
 
   const duplicateOpenCollection = async (): Promise<void> => {

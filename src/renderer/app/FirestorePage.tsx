@@ -102,8 +102,6 @@ type FirestorePageProps = {
   onNavigate: (view: AppView) => void
   onWorkspaceChanged: () => void
   onShellCommandsChange?: (commands: ShellCommands | null) => void
-  /** インクリメントするとルートコレクション一覧を再読込 */
-  rootsReloadToken?: number
   /** インクリメントすると左ツリーのプロジェクト一覧を再取得 */
   workspaceRefreshToken?: number
   workspaceEntries?: WorkspaceEntry[]
@@ -143,7 +141,6 @@ function FirestorePageInner({
   onNavigate,
   onWorkspaceChanged,
   onShellCommandsChange,
-  rootsReloadToken = 0,
   workspaceRefreshToken = 0,
   workspaceEntries = [],
   loadedProjectIds = [],
@@ -307,14 +304,6 @@ function FirestorePageInner({
   }, [projectId])
 
   useEffect(() => {
-    if (rootsReloadToken <= 0) {
-      return
-    }
-
-    void loadRootCollections()
-  }, [rootsReloadToken, loadRootCollections])
-
-  useEffect(() => {
     let cancelled = false
 
     void window.api.scriptRunner.getSnapshot().then((snapshot) => {
@@ -340,8 +329,6 @@ function FirestorePageInner({
     }
 
     if (
-      impExpJob.kind !== 'import_collection' &&
-      impExpJob.kind !== 'import_project' &&
       impExpJob.kind !== 'import_official' &&
       impExpJob.kind !== 'transport'
     ) {
@@ -553,14 +540,7 @@ function FirestorePageInner({
       setMainSection('firestore')
 
       if (intent) {
-        setDiffDraft((current) =>
-          applyDiffIntent(current, intent, lastCollectionPathRef.current || lastCollectionPath)
-        )
-      } else {
-        setDiffDraft((current) => ({
-          ...current,
-          collectionPath: current.collectionPath || lastCollectionPathRef.current || lastCollectionPath
-        }))
+        setDiffDraft((current) => applyDiffIntent(current, intent))
       }
 
       setTabs((current) => {
@@ -581,7 +561,7 @@ function FirestorePageInner({
         return [...current, created]
       })
     },
-    [lastCollectionPath, projectId]
+    [projectId]
   )
 
   const handleImpExpDraftChange = useCallback((patch: Partial<ImpExpDraft>): void => {

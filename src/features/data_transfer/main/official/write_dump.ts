@@ -41,7 +41,7 @@ function previewWriteProjectId(
   }
 
   if (!sourceProjectId) {
-    throw new Error('公式ダンプから projectId が取れません。Emulator にプロジェクトとして入れられません。')
+    throw new Error('ダンプから projectId が取れません。Emulator にプロジェクトとして入れられません。')
   }
 
   if (dest.emulatorProjectId === sourceProjectId) {
@@ -67,7 +67,7 @@ async function resolveWriteProjectId(
   }
 
   if (!sourceProjectId) {
-    throw new Error('公式ダンプから projectId が取れません。Emulator にプロジェクトとして入れられません。')
+    throw new Error('ダンプから projectId が取れません。Emulator にプロジェクトとして入れられません。')
   }
 
   if (!dest.emulatorHost) {
@@ -93,7 +93,7 @@ async function resolveWriteProjectId(
 }
 
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : '公式ダンプのインポートに失敗しました'
+  return error instanceof Error ? error.message : 'ダンプのインポートに失敗しました'
 }
 
 function pathDepth(path: string): number {
@@ -182,7 +182,7 @@ export async function selectOfficialDump(
         buttons: ['フォルダ', 'ZIP', 'キャンセル'],
         defaultId: 0,
         cancelId: 2,
-        message: '公式ダンプを選ぶ',
+        message: 'フォルダ / ZIP を選ぶ',
         detail: 'コンソール / gcloud / Emulator のフォルダ、またはその zip。'
       })
     : { response: 0 }
@@ -194,12 +194,12 @@ export async function selectOfficialDump(
   const options =
     choice.response === 1
       ? {
-          title: '公式ダンプ ZIP を選択',
+          title: 'ZIP を選択',
           properties: ['openFile' as const],
           filters: [{ name: 'ZIP', extensions: ['zip'] }]
         }
       : {
-          title: '公式ダンプ フォルダを選択',
+          title: 'フォルダを選択',
           properties: ['openDirectory' as const]
         }
 
@@ -228,7 +228,7 @@ export async function validateOfficialImport(
       processedCount: 0,
       totalCount: 0,
       percent: 5,
-      detail: '公式ダンプを読み込み中…'
+      detail: 'ダンプを読み込み中…'
     })
 
     const loaded = await readOfficialDump(input.dumpPath)
@@ -238,7 +238,7 @@ export async function validateOfficialImport(
 
     const documents = loaded.data.documents
     if (documents.length === 0) {
-      return { ok: false, error: '公式ダンプにドキュメントがありません' }
+      return { ok: false, error: 'ダンプにドキュメントがありません' }
     }
 
     const writtenProjectId = previewWriteProjectId(
@@ -325,7 +325,7 @@ export async function importOfficialDump(
       processedCount: 0,
       totalCount: 0,
       percent: 5,
-      detail: '公式ダンプを読み込み中…'
+      detail: 'ダンプを読み込み中…'
     })
 
     const loaded = await readOfficialDump(input.dumpPath)
@@ -335,7 +335,7 @@ export async function importOfficialDump(
 
     const documents = loaded.data.documents
     if (documents.length === 0) {
-      return { ok: false, error: '公式ダンプにドキュメントがありません' }
+      return { ok: false, error: 'ダンプにドキュメントがありません' }
     }
 
     const writtenProjectId = await resolveWriteProjectId(

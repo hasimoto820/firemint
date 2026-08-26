@@ -134,7 +134,6 @@ function WorkspacePane({
           projectId={status.projectId}
           sourceLabel={sourceLabel || status.projectId}
           sourceAuthType={status.authType ?? 'serviceAccount'}
-          rootCollections={rootCollections}
           draft={diffDraft}
           onDraftChange={onDiffDraftChange}
         />

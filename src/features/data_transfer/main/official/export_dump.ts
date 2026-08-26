@@ -3,16 +3,14 @@ import { mkdir, mkdtemp, rm, writeFile } from 'fs/promises'
 import { tmpdir } from 'os'
 import { basename, join } from 'path'
 import { finished } from 'stream/promises'
-import type { QueryDocumentSnapshot } from 'firebase-admin/firestore'
 import type { BrowserWindow } from 'electron'
 import { dialog } from 'electron'
 import { ZipArchive } from 'archiver'
 import { getWorkspaceEntry } from '@features/workspace/main/service'
-import { getFirestore, isFirestoreConnected } from '@shared/firestore/client'
-import { serializeFirestoreValue } from '@shared/firestore/serialize'
+import { isFirestoreConnected } from '@shared/firestore/client'
 import { logError, logInfo } from '@shared/logging/logger'
 import { isCanceledError, throwIfCanceled } from '@shared/safety/canceled'
-import { iterateExportDocuments } from '../project_export_service'
+import { iterateExportDocuments, iterateGroupDocuments } from '../project_export_service'
 import { sanitizeFileName } from '../format'
 import type { ExportDocument } from '../../shared/types'
 import type {
@@ -23,12 +21,10 @@ import type {
 import { documentToEntity } from './document_to_entity'
 import { writeLeveldbRecords } from './leveldb_log'
 
-const PAGE_SIZE = 500
-
 type ProgressReporter = (progress: OfficialExportProgress) => void
 
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : '公式ダンプのエクスポートに失敗しました'
+  return error instanceof Error ? error.message : 'ダンプのエクスポートに失敗しました'
 }
 
 function ensureConnected(projectId: string): void {
@@ -78,7 +74,7 @@ export async function chooseOfficialExportZipPath(
   input: OfficialExportInput
 ): Promise<string | null> {
   const options = {
-    title: '公式ダンプ ZIP を保存',
+    title: 'ZIP を保存',
     defaultPath: defaultZipName(input),
     filters: [{ name: 'ZIP', extensions: ['zip'] }]
   }
@@ -94,44 +90,6 @@ export async function chooseOfficialExportZipPath(
   return result.filePath.toLowerCase().endsWith('.zip')
     ? result.filePath
     : `${result.filePath}.zip`
-}
-
-async function* iterateGroupDocuments(
-  projectId: string,
-  collectionId: string,
-  signal?: AbortSignal
-): AsyncGenerator<ExportDocument> {
-  const db = getFirestore(projectId)
-  let lastDocument: QueryDocumentSnapshot | undefined
-
-  while (true) {
-    throwIfCanceled(signal)
-    let query = db.collectionGroup(collectionId).orderBy('__name__').limit(PAGE_SIZE)
-    if (lastDocument) {
-      query = query.startAfter(lastDocument)
-    }
-
-    const snapshot = await query.get()
-    if (snapshot.empty) {
-      break
-    }
-
-    for (const doc of snapshot.docs) {
-      yield {
-        id: doc.id,
-        path: doc.ref.path,
-        data: serializeFirestoreValue(doc.data() as Record<string, unknown>) as Record<
-          string,
-          unknown
-        >
-      }
-    }
-
-    lastDocument = snapshot.docs[snapshot.docs.length - 1]
-    if (snapshot.size < PAGE_SIZE) {
-      break
-    }
-  }
 }
 
 async function collectDocuments(

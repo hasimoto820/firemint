@@ -1,17 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
-import { useOptionalAutocompleteApi } from '@features/autocomplete/renderer/hooks'
-import { matchesAutocompleteNeedle } from '@features/autocomplete/renderer/catalog'
-import type { AutocompleteItem } from '@features/autocomplete/shared/types'
+import { useEffect, useState } from 'react'
 import type { DiffDraft } from '@features/diff/shared/diff'
 import { DIFF_PREVIEW_LIMIT, diffRowPreview } from '@features/diff/shared/diff'
-import type {
-  CollectionDiffProgress,
-  CollectionDiffRow,
-  CollectionDiffStatus,
-  DiffExportFormat
-} from '@features/diff/shared/types'
+import type { DiffProgress, DiffRow, DiffRowStatus, DiffExportFormat } from '@features/diff/shared/types'
 import type { WorkspaceAuthType } from '@features/workspace/shared/types'
-import AutocompleteInput from '@shared/ui/AutocompleteInput'
 import Button from '@shared/ui/Button'
 import { useT } from '@shared/i18n/renderer/I18nProvider'
 
@@ -19,17 +10,16 @@ type DiffViewProps = {
   projectId: string
   sourceLabel: string
   sourceAuthType: WorkspaceAuthType
-  rootCollections: string[]
   draft: DiffDraft
   onDraftChange: (patch: Partial<DiffDraft>) => void
 }
 
-function statusLabel(status: CollectionDiffStatus): string {
+function statusLabel(status: DiffRowStatus): string {
   switch (status) {
-    case 'json_only':
-      return 'JSON'
-    case 'collection_only':
-      return 'コレクション'
+    case 'dump_only':
+      return 'ダンプ'
+    case 'project_only':
+      return 'プロジェクト'
     case 'changed':
       return '中身が違う'
   }
@@ -47,47 +37,15 @@ function DiffView({
   projectId,
   sourceLabel,
   sourceAuthType,
-  rootCollections,
   draft,
   onDraftChange
 }: DiffViewProps): React.JSX.Element {
   const t = useT()
-  const autocomplete = useOptionalAutocompleteApi()
   const [busy, setBusy] = useState(false)
   const [exportBusy, setExportBusy] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [exportMessage, setExportMessage] = useState<string | null>(null)
-  const [progress, setProgress] = useState<CollectionDiffProgress | null>(null)
-
-  const collectionItems = useMemo(() => {
-    void autocomplete.revision
-    const fromPool = autocomplete.query(projectId, draft.collectionPath, ['collection_path'])
-    const seen = new Set(fromPool.map((item) => item.value))
-    const needle = draft.collectionPath.trim().toLowerCase()
-    const extras: AutocompleteItem[] = []
-
-    for (const rootId of rootCollections) {
-      if (seen.has(rootId)) {
-        continue
-      }
-
-      if (needle && !matchesAutocompleteNeedle(rootId, needle)) {
-        continue
-      }
-
-      extras.push({ kind: 'collection_path', value: rootId })
-    }
-
-    return extras.length === 0 ? fromPool : [...fromPool, ...extras]
-  }, [autocomplete, draft.collectionPath, projectId, rootCollections])
-
-  useEffect(() => {
-    if (!projectId) {
-      return
-    }
-
-    autocomplete.addCollectionPaths(projectId, rootCollections)
-  }, [autocomplete, projectId, rootCollections])
+  const [progress, setProgress] = useState<DiffProgress | null>(null)
 
   useEffect(() => {
     if (!busy) {
@@ -107,37 +65,33 @@ function DiffView({
     setExportMessage(null)
   }
 
-  const handleSelectFile = async (): Promise<void> => {
-    const result = await window.api.diff.selectJson()
-    if (result.canceled || !result.filePath) {
+  const handleSelectDump = async (): Promise<void> => {
+    const selected = await window.api.dataTransfer.selectOfficialDump()
+    if (selected.canceled || !selected.filePath) {
       return
     }
 
-    const nextPath = result.filePath
-    if (draft.collectionPath.trim()) {
-      resetResult({ filePath: nextPath })
-      return
-    }
-
-    const peek = await window.api.diff.peekJson(nextPath)
-    resetResult({
-      filePath: nextPath,
-      collectionPath: peek.ok && peek.collectionPath ? peek.collectionPath : draft.collectionPath
-    })
+    const nextPath = selected.filePath
+    const peek = await window.api.diff.peekDump(nextPath)
     if (!peek.ok) {
+      resetResult({ dumpPath: nextPath, peek: null })
       setFormError(peek.error)
+      return
     }
+
+    resetResult({
+      dumpPath: nextPath,
+      peek: {
+        documentCount: peek.documentCount,
+        samplePaths: peek.samplePaths,
+        sourceProjectId: peek.sourceProjectId
+      }
+    })
   }
 
   const handleCompare = async (): Promise<void> => {
-    const collectionPath = draft.collectionPath.trim()
-    if (!collectionPath) {
-      setFormError('コレクションを指定してください')
-      return
-    }
-
-    if (!draft.filePath) {
-      setFormError('JSON ファイルを選んでください')
+    if (!draft.dumpPath) {
+      setFormError('フォルダ / ZIP を選んでください')
       return
     }
 
@@ -148,11 +102,9 @@ function DiffView({
     onDraftChange({ result: null })
 
     try {
-      const result = await window.api.diff.compareCollection({
+      const result = await window.api.diff.compareDump({
         projectId,
-        collectionPath,
-        filePath: draft.filePath,
-        includeSubcollections: draft.includeSubcollections
+        dumpPath: draft.dumpPath
       })
 
       if (!result.ok) {
@@ -192,22 +144,23 @@ function DiffView({
     }
   }
 
-  const canCompare =
-    !busy && Boolean(draft.collectionPath.trim()) && Boolean(draft.filePath)
+  const canCompare = !busy && Boolean(draft.dumpPath)
   const result = draft.result
-  const previewRows: CollectionDiffRow[] = result ? diffRowPreview(result) : []
-  const showPath = Boolean(result?.includeSubcollections)
+  const previewRows: DiffRow[] = result ? diffRowPreview(result) : []
   const sourceKindLabel = sourceAuthType === 'emulator' ? t('menu.emulator') : t('menu.cloud')
   const progressLabel = progress
     ? `${progress.processedCount} 件${progress.detail ? ` / ${progress.detail}` : ''}`
     : null
+  const sourceMismatch =
+    draft.peek?.sourceProjectId &&
+    draft.peek.sourceProjectId !== projectId.replace(/_emulator$/, '')
 
   return (
     <div className="imp-exp-view imp-exp-view--diff">
       <div className="imp-exp-form">
         <h1 className="imp-exp-form__title">{t('menu.diff')}</h1>
         <p className="imp-exp-form__lead">
-          コレクションと JSON を比べます。どちらにも追加・削除・変更はしません。
+          ダンプと、今のプロジェクトを path どおり比べます。どちらにも書きません。
         </p>
 
         <div className="imp-exp-form__hint-block">
@@ -216,38 +169,27 @@ function DiffView({
           </p>
         </div>
 
-        <label className="imp-exp-form__field">
-          コレクション
-          <AutocompleteInput
-            value={draft.collectionPath}
-            items={collectionItems}
-            disabled={busy}
-            placeholder="equipment / users/uid/posts"
-            aria-label="コレクション path"
-            onChange={(value) => {
-              resetResult({ collectionPath: value })
-            }}
-          />
-        </label>
-
-        <label className="imp-exp-form__check">
-          <input
-            type="checkbox"
-            checked={draft.includeSubcollections}
-            disabled={busy}
-            onChange={(event) => {
-              resetResult({ includeSubcollections: event.target.checked })
-            }}
-          />
-          サブコレクションを含む
-        </label>
-
         <div className="imp-exp-form__file">
-          <Button onClick={() => void handleSelectFile()} disabled={busy}>
-            JSON を選択…
+          <Button onClick={() => void handleSelectDump()} disabled={busy}>
+            フォルダ / ZIP を選択…
           </Button>
-          {draft.filePath && <span className="imp-exp-form__path">{draft.filePath}</span>}
+          {draft.dumpPath && <span className="imp-exp-form__path">{draft.dumpPath}</span>}
         </div>
+
+        {draft.peek && (
+          <p className="imp-exp-form__hint">
+            ダンプ {draft.peek.documentCount} 件
+            {draft.peek.sourceProjectId ? ` ／ 出所 ${draft.peek.sourceProjectId}` : ''}
+            {draft.peek.samplePaths.length > 0
+              ? ` ／ 例 ${draft.peek.samplePaths.slice(0, 3).join(', ')}`
+              : ''}
+          </p>
+        )}
+        {sourceMismatch && (
+          <p className="imp-exp-form__hint">
+            ダンプの projectId と今のプロジェクトが違います。path どおり比べます。
+          </p>
+        )}
 
         {progressLabel && busy && <p className="imp-exp-form__hint">比較中 {progressLabel}</p>}
         {formError && <p className="simple-main__error">{formError}</p>}
@@ -261,12 +203,9 @@ function DiffView({
 
         {result && (
           <p className="imp-exp-form__hint">
-            JSON {result.jsonCount} ／ コレクション {result.collectionCount} ／ JSON だけ{' '}
-            {result.jsonOnlyCount} ／ コレクションだけ {result.collectionOnlyCount} ／ 中身が違う{' '}
-            {result.changedCount} ／ 同じ {result.sameCount} ／ id無が {result.missingIdCount} 行
-            {result.skippedOutsideCount > 0
-              ? ` ／ 宛先外除外 ${result.skippedOutsideCount}`
-              : ''}
+            ダンプ {result.dumpCount} ／ プロジェクト {result.projectCount} ／ ダンプだけ{' '}
+            {result.dumpOnlyCount} ／ プロジェクトだけ {result.projectOnlyCount} ／ 中身が違う{' '}
+            {result.changedCount} ／ 同じ {result.sameCount}
           </p>
         )}
       </div>
@@ -277,13 +216,13 @@ function DiffView({
             onClick={() => void handleExport('json')}
             disabled={!result || exportBusy || busy}
           >
-            {exportBusy ? '保存中…' : 'JSON を排出'}
+            {exportBusy ? '保存中…' : 'レポート JSON'}
           </Button>
           <Button
             onClick={() => void handleExport('csv')}
             disabled={!result || exportBusy || busy}
           >
-            {exportBusy ? '保存中…' : 'CSV を排出'}
+            {exportBusy ? '保存中…' : 'レポート CSV'}
           </Button>
           {result ? (
             <span className="document-table-panel__count">
@@ -303,16 +242,16 @@ function DiffView({
             <thead>
               <tr>
                 <th>ID</th>
-                {showPath ? <th>path</th> : null}
+                <th>path</th>
                 <th>固有</th>
-                <th>JSON</th>
-                <th>コレクション</th>
+                <th>ダンプ</th>
+                <th>プロジェクト</th>
               </tr>
             </thead>
             <tbody>
               {previewRows.length === 0 ? (
                 <tr>
-                  <td className="document-table__empty" colSpan={showPath ? 5 : 4}>
+                  <td className="document-table__empty" colSpan={5}>
                     {result ? '同じものだけです' : '—'}
                   </td>
                 </tr>
@@ -320,13 +259,13 @@ function DiffView({
                 previewRows.map((row) => (
                   <tr key={row.path}>
                     <td>{row.id}</td>
-                    {showPath ? <td className="diff-table__path">{row.path}</td> : null}
+                    <td className="diff-table__path">{row.path}</td>
                     <td>{statusLabel(row.status)}</td>
-                    <td className="diff-table__json" title={formatData(row.json)}>
-                      {formatData(row.json)}
+                    <td className="diff-table__json" title={formatData(row.dump)}>
+                      {formatData(row.dump)}
                     </td>
-                    <td className="diff-table__json" title={formatData(row.collection)}>
-                      {formatData(row.collection)}
+                    <td className="diff-table__json" title={formatData(row.project)}>
+                      {formatData(row.project)}
                     </td>
                   </tr>
                 ))

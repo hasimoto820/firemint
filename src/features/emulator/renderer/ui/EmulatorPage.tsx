@@ -199,7 +199,7 @@ function EmulatorPage({
   }, [collectionItems])
 
   const setDirection = (next: EmulatorPageDirection): void => {
-    const nextTarget = next === 'import' && target === 'group' ? 'project' : target
+    const nextTarget = next === 'import' ? 'project' : target
     onModeChange?.(emulatorPageModeFromIntent(next, nextTarget))
   }
 
@@ -229,26 +229,6 @@ function EmulatorPage({
     await onWorkspaceChanged()
   }
 
-  const handleSelectJson = async (): Promise<void> => {
-    setError(null)
-    setSuccess(null)
-    const selected = await window.api.dataTransfer.selectCollectionImportJson()
-
-    if (selected.canceled || !selected.filePath) {
-      return
-    }
-
-    const peek = await window.api.dataTransfer.peekCollectionImportJson(selected.filePath)
-
-    if (!peek.ok) {
-      setFilePath(null)
-      setError(peek.error)
-      return
-    }
-
-    setFilePath(selected.filePath)
-  }
-
   const handleSelectZip = async (): Promise<void> => {
     setError(null)
     setSuccess(null)
@@ -259,40 +239,6 @@ function EmulatorPage({
     }
 
     setFilePath(selected.filePath)
-  }
-
-  const handleImportJson = async (): Promise<void> => {
-    if (!poolId) {
-      setError(t('emulator.no_destination'))
-      return
-    }
-
-    if (!filePath) {
-      setError(t('emulator.select_json'))
-      return
-    }
-
-    setBusy(true)
-    setError(null)
-    setSuccess(null)
-
-    try {
-      const result = await window.api.emulator.importCollectionJson({
-        projectId: poolId,
-        filePath
-      })
-
-      if (!result.ok) {
-        setError(result.error)
-        return
-      }
-
-      await finish(
-        importSuccessMessage(result.data.writtenCount, result.data.skippedCollisionCount)
-      )
-    } finally {
-      setBusy(false)
-    }
   }
 
   const handleImportZip = async (): Promise<void> => {
@@ -401,13 +347,11 @@ function EmulatorPage({
   const lead =
     mode === 'import-project'
       ? t('emulator.import_project_lead')
-      : mode === 'import-collection'
-        ? t('emulator.import_collection_lead')
-        : mode === 'export-project'
-          ? t('emulator.export_project_lead')
-          : mode === 'export-group'
-            ? t('emulator.export_group_lead')
-            : t('emulator.export_collection_lead')
+      : mode === 'export-project'
+        ? t('emulator.export_project_lead')
+        : mode === 'export-group'
+          ? t('emulator.export_group_lead')
+          : t('emulator.export_collection_lead')
 
   const destinationText =
     destinationLabel ?? destinationPoolId ?? t('emulator.no_destination')
@@ -436,24 +380,19 @@ function EmulatorPage({
             ]}
             onChange={setDirection}
           />
-          <ToggleBar
-            ariaLabel="対象"
-            value={target}
-            disabled={togglesDisabled}
-            options={
-              direction === 'export'
-                ? [
-                    { id: 'collection', label: 'Collection' },
-                    { id: 'group', label: 'Group' },
-                    { id: 'project', label: 'Project' }
-                  ]
-                : [
-                    { id: 'collection', label: 'Collection' },
-                    { id: 'project', label: 'Project' }
-                  ]
-            }
-            onChange={setTarget}
-          />
+          {direction === 'export' ? (
+            <ToggleBar
+              ariaLabel="対象"
+              value={target}
+              disabled={togglesDisabled}
+              options={[
+                { id: 'collection', label: 'Collection' },
+                { id: 'group', label: 'Group' },
+                { id: 'project', label: 'Project' }
+              ]}
+              onChange={setTarget}
+            />
+          ) : null}
         </div>
         <p className="imp-exp-form__lead">{lead}</p>
 
@@ -469,32 +408,6 @@ function EmulatorPage({
               <Button
                 onClick={() => void handleImportZip()}
                 disabled={busy || !filePath}
-                variant="primary"
-              >
-                {t('emulator.import')}
-              </Button>
-              <Button onClick={onClose} disabled={busy}>
-                {t('common.cancel')}
-              </Button>
-            </div>
-          </>
-        )}
-
-        {mode === 'import-collection' && (
-          <>
-            <p className="emulator-page__destination">
-              {t('emulator.destination')}: {destinationText}
-            </p>
-            <div className="connection-panel__actions">
-              <Button onClick={() => void handleSelectJson()} disabled={busy || !poolId}>
-                {t('emulator.select_json')}
-              </Button>
-            </div>
-            {filePath && <p className="connection-panel__file">{filePath}</p>}
-            <div className="connection-panel__actions">
-              <Button
-                onClick={() => void handleImportJson()}
-                disabled={busy || !filePath || !poolId}
                 variant="primary"
               >
                 {t('emulator.import')}

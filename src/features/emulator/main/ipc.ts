@@ -3,15 +3,9 @@ import { IPC_CHANNELS } from '@shared/ipc/channels'
 import { logInfo } from '@shared/logging/logger'
 import type {
   DeleteEmulatorProjectInput,
-  ImportEmulatorCollectionJsonInput,
   ImportEmulatorProjectZipInput
 } from '@features/emulator/shared/types'
-import {
-  deleteEmulatorProject,
-  discoverEmulators,
-  importEmulatorCollectionJson,
-  importEmulatorProjectZip
-} from './service'
+import { deleteEmulatorProject, discoverEmulators, importEmulatorProjectZip } from './service'
 
 export function registerEmulatorHandlers(): void {
   ipcMain.handle(
@@ -19,17 +13,6 @@ export function registerEmulatorHandlers(): void {
     async (_event, input: ImportEmulatorProjectZipInput) => {
       logInfo('ipc:emulator', `importProjectZip host=${input.host} file=${input.filePath}`)
       return importEmulatorProjectZip(input)
-    }
-  )
-
-  ipcMain.handle(
-    IPC_CHANNELS.EMULATOR_IMPORT_COLLECTION_JSON,
-    async (_event, input: ImportEmulatorCollectionJsonInput) => {
-      logInfo(
-        'ipc:emulator',
-        `importCollectionJson project=${input.projectId} file=${input.filePath}`
-      )
-      return importEmulatorCollectionJson(input)
     }
   )
 

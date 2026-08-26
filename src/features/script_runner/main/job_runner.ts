@@ -3,17 +3,12 @@ import { IPC_CHANNELS } from '@shared/ipc/channels'
 import { logError, logInfo } from '@shared/logging/logger'
 import { formatUnavailableFirestoreMessage } from '@shared/firestore/native_check'
 import { isCanceledError } from '@shared/safety/canceled'
-import type {
-  ImportCollectionProgress,
-  ImportProjectProgress
-} from '@features/data_transfer/shared/types'
 import type { OfficialExportProgress } from '@features/data_transfer/shared/official'
 import type { TransportProgress } from '@features/transport/shared/types'
+import type { ImportProjectProgress } from '@features/data_transfer/shared/types'
 import {
   promptIncludeSubcollections
 } from '@features/data_transfer/main/service'
-import { importCollectionJson } from '@features/data_transfer/main/import_service'
-import { importProject } from '@features/data_transfer/main/project_import_service'
 import { importOfficialDump } from '@features/data_transfer/main/official/write_dump'
 import {
   chooseOfficialExportZipPath,
@@ -46,14 +41,10 @@ function jobTitle(input: StartScriptJobInput): string {
       return `Export · Collection · ${input.collectionPath}`
     case 'export_group':
       return `Export · Group · ${input.collectionId}`
-    case 'import_collection':
-      return 'Import · Collection'
     case 'export_project':
       return `Export · Project · ${input.projectId}`
-    case 'import_project':
-      return `Import · Project · ${input.projectId}`
     case 'import_official':
-      return `Import · Official · ${input.projectId}`
+      return `Import · ${input.projectId}`
     case 'transport':
       return `Transport · ${input.target} · ${input.sourceProjectId} → ${input.destinationProjectId}`
   }
@@ -127,7 +118,7 @@ function onTransportProgress(progress: TransportProgress): void {
 }
 
 function onImportProgress(
-  progress: ImportCollectionProgress | ImportProjectProgress
+  progress: ImportProjectProgress
 ): void {
   const written =
     progress.phase === 'writing' || progress.phase === 'done'
@@ -166,24 +157,6 @@ async function runJob(
       patchSnapshot({
         resultSummary: `${result.data.documentCount} 件を ${result.data.filePath} に保存しました`
       })
-      return
-    }
-    case 'import_collection': {
-      const result = await importCollectionJson(input, onImportProgress, signal)
-      if (!result.ok) {
-        throw Object.assign(new Error(result.error), { canceled: result.canceled })
-      }
-      patchSnapshot({
-        writtenCount: result.data.writtenCount,
-        resultSummary: `${result.data.writtenCount} 件をインポートしました${
-          result.data.skippedCollisionCount > 0
-            ? ` / スキップ ${result.data.skippedCollisionCount} 件`
-            : ''
-        }`
-      })
-      if (result.data.collisionSamples.length > 0) {
-        appendLog('info', `スキップ例: ${result.data.collisionSamples.join(', ')}`)
-      }
       return
     }
     case 'export_group': {
@@ -229,22 +202,6 @@ async function runJob(
       patchSnapshot({
         resultSummary: `${result.data.documentCount} 件を ${result.data.filePath} に保存しました`
       })
-      return
-    }
-    case 'import_project': {
-      const result = await importProject(input, onImportProgress, signal)
-      if (!result.ok) {
-        throw Object.assign(new Error(result.error), { canceled: result.canceled })
-      }
-      patchSnapshot({
-        writtenCount: result.data.writtenCount,
-        resultSummary: `${result.data.writtenCount} 件をインポートしました${
-          result.data.skippedCount > 0 ? ` / スキップ ${result.data.skippedCount} 件` : ''
-        }`
-      })
-      if (result.data.collisionSamples.length > 0) {
-        appendLog('info', `スキップ例: ${result.data.collisionSamples.join(', ')}`)
-      }
       return
     }
     case 'import_official': {

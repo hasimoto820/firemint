@@ -1,4 +1,4 @@
-import type { CollectionDiffSummary } from './types'
+import type { DiffSummary } from './types'
 
 export const DIFF_PREVIEW_LIMIT = 100
 
@@ -8,37 +8,33 @@ export type DiffIntent = {
   sourceKind: DiffSourceKind
 }
 
+export type DiffPeek = {
+  documentCount: number
+  samplePaths: string[]
+  sourceProjectId: string | null
+}
+
 export type DiffDraft = {
-  collectionPath: string
-  filePath: string | null
-  includeSubcollections: boolean
-  result: CollectionDiffSummary | null
+  dumpPath: string | null
+  peek: DiffPeek | null
+  result: DiffSummary | null
 }
 
 export function createDiffDraft(): DiffDraft {
   return {
-    collectionPath: '',
-    filePath: null,
-    includeSubcollections: true,
+    dumpPath: null,
+    peek: null,
     result: null
   }
 }
 
-export function applyDiffIntent(
-  draft: DiffDraft,
-  intent: DiffIntent,
-  lastCollectionPath: string
-): DiffDraft {
+export function applyDiffIntent(draft: DiffDraft, _intent: DiffIntent): DiffDraft {
   return {
     ...draft,
-    collectionPath:
-      intent.sourceKind === 'cloud' || intent.sourceKind === 'emulator'
-        ? lastCollectionPath || draft.collectionPath
-        : draft.collectionPath,
     result: null
   }
 }
 
-export function diffRowPreview(result: CollectionDiffSummary): CollectionDiffSummary['rows'] {
+export function diffRowPreview(result: DiffSummary): DiffSummary['rows'] {
   return result.rows.slice(0, DIFF_PREVIEW_LIMIT)
 }

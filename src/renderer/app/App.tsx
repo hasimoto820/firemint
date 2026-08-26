@@ -5,7 +5,6 @@ import ConnectionPanel from '@features/connection/renderer/ui/ConnectionPanel'
 import GoogleConnectDialog from '@features/connection/renderer/ui/GoogleConnectDialog'
 import ListConnectDialog from '@features/connection/renderer/ui/ListConnectDialog'
 import EmulatorConnectDialog from '@features/emulator/renderer/ui/EmulatorConnectDialog'
-import ProjectImportDialog from '@features/data_transfer/renderer/ui/ProjectImportDialog'
 import FirestorePage, { type ShellCommands } from './FirestorePage'
 import type { AppView } from '@shared/shell/AppNav'
 import AppChrome from '@shared/shell/AppChrome'
@@ -30,11 +29,9 @@ function App(): React.JSX.Element {
   const [refreshKey, setRefreshKey] = useState(0)
   const [menuContext, setMenuContext] = useState<AppMenuContextActions | null>(null)
   const [shellCommands, setShellCommands] = useState<ShellCommands | null>(null)
-  const [projectImportOpen, setProjectImportOpen] = useState(false)
   const [googleConnectOpen, setGoogleConnectOpen] = useState(false)
   const [listConnectOpen, setListConnectOpen] = useState(false)
   const [emulatorConnectOpen, setEmulatorConnectOpen] = useState(false)
-  const [rootsReloadToken, setRootsReloadToken] = useState(0)
 
   const refreshStatus = useCallback(async (): Promise<void> => {
     const [status, workspace] = await Promise.all([
@@ -134,19 +131,13 @@ function App(): React.JSX.Element {
   )
   const canEmulatorImportProject = Boolean(loadedEmulator)
   const emulatorHasCollections = focusedIsEmulator && shellCommands?.hasRootCollections === true
-  const canEmulatorImportCollection = emulatorHasCollections
   const canEmulatorExport =
     emulatorHasCollections && Boolean(shellCommands?.openEmulatorImpExp)
   const platform = window.electron.process.platform
   const useWindowMenuActions = platform === 'linux'
 
   const handleImportProject = useCallback((): void => {
-    if (shellCommands) {
-      shellCommands.openImpExp({ direction: 'import', target: 'project' })
-      return
-    }
-
-    setProjectImportOpen(true)
+    shellCommands?.openImpExp({ direction: 'import', target: 'project' })
   }, [shellCommands])
 
   const handleListConnect = useCallback((): void => {
@@ -163,10 +154,6 @@ function App(): React.JSX.Element {
 
   const handleEmulatorImportProject = useCallback((): void => {
     shellCommands?.openEmulatorImpExp('import-project')
-  }, [shellCommands])
-
-  const handleEmulatorImportCollection = useCallback((): void => {
-    shellCommands?.openEmulatorImpExp('import-collection')
   }, [shellCommands])
 
   const handleEmulatorExportProject = useCallback((): void => {
@@ -198,10 +185,6 @@ function App(): React.JSX.Element {
     handleWorkspaceChanged()
   }, [handleWorkspaceChanged])
 
-  const handleProjectImported = useCallback((): void => {
-    setRootsReloadToken((current) => current + 1)
-  }, [])
-
   const menus = useMemo(
     () =>
       buildAppMenus({
@@ -221,12 +204,10 @@ function App(): React.JSX.Element {
         onJsonConnect: () => void handleJsonConnect(),
         onEmulatorConnect: handleEmulatorConnect,
         onEmulatorImportProject: handleEmulatorImportProject,
-        onEmulatorImportCollection: handleEmulatorImportCollection,
         onEmulatorExportProject: handleEmulatorExportProject,
         onEmulatorExportGroup: handleEmulatorExportGroup,
         onEmulatorExportCollection: handleEmulatorExportCollection,
         canEmulatorImportProject,
-        canEmulatorImportCollection,
         canEmulatorExport,
         context: menuContext,
         shell: shellCommands
@@ -275,12 +256,10 @@ function App(): React.JSX.Element {
       handleJsonConnect,
       handleEmulatorConnect,
       handleEmulatorImportProject,
-      handleEmulatorImportCollection,
       handleEmulatorExportProject,
       handleEmulatorExportGroup,
       handleEmulatorExportCollection,
       canEmulatorImportProject,
-      canEmulatorImportCollection,
       canEmulatorExport,
       menuContext,
       shellCommands,
@@ -313,7 +292,6 @@ function App(): React.JSX.Element {
         onNavigate={setView}
         onWorkspaceChanged={handleWorkspaceChanged}
         onShellCommandsChange={setShellCommands}
-        rootsReloadToken={rootsReloadToken}
         workspaceRefreshToken={refreshKey}
         workspaceEntries={workspaceEntries}
         loadedProjectIds={loadedProjectIds}
@@ -340,13 +318,6 @@ function App(): React.JSX.Element {
           open={emulatorConnectOpen}
           onClose={() => setEmulatorConnectOpen(false)}
           onConnected={handleWorkspaceChanged}
-        />
-        <ProjectImportDialog
-          projectId={connectionStatus?.projectId ?? null}
-          destinations={workspaceEntries}
-          open={projectImportOpen}
-          onClose={() => setProjectImportOpen(false)}
-          onImported={handleProjectImported}
         />
       </AppChrome>
     </AppMenuRegistryProvider>

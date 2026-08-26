@@ -6,10 +6,8 @@ import {
   DEFAULT_EMULATOR_HUB,
   parseEmulatorHost
 } from '@features/connection/shared/emulator'
-import { importDocumentsJson } from '@features/data_transfer/main/import_service'
 import { importOfficialDump } from '@features/data_transfer/main/official/write_dump'
 import { readOfficialDump } from '@features/data_transfer/main/official/read_dump'
-import type { ImportResult } from '@features/data_transfer/shared/types'
 import { getWorkspaceEntry, removeEntry } from '@features/workspace/main/service'
 import { logError, logInfo } from '@shared/logging/logger'
 import type {
@@ -17,7 +15,6 @@ import type {
   DeleteEmulatorProjectResult,
   DiscoveredEmulator,
   DiscoverEmulatorsResult,
-  ImportEmulatorCollectionJsonInput,
   ImportEmulatorProjectZipInput,
   ImportEmulatorProjectZipResult
 } from '@features/emulator/shared/types'
@@ -222,7 +219,7 @@ export async function importEmulatorProjectZip(
 
   const sourceProjectId = loaded.data.sourceProjectId
   if (!sourceProjectId) {
-    return { ok: false, error: '公式ダンプから projectId が取れません。Emulator にプロジェクトとして入れられません。' }
+    return { ok: false, error: 'ダンプから projectId が取れません。Emulator にプロジェクトとして入れられません。' }
   }
 
   const connected = await connectWithEmulator({
@@ -255,13 +252,6 @@ export async function importEmulatorProjectZip(
     sourceProjectId,
     writtenCount: imported.data.writtenCount
   }
-}
-
-export async function importEmulatorCollectionJson(
-  input: ImportEmulatorCollectionJsonInput
-): Promise<ImportResult> {
-  logInfo('emulator', `importCollectionJson project=${input.projectId} file=${input.filePath}`)
-  return importDocumentsJson(input)
 }
 
 export async function deleteEmulatorProject(

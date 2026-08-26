@@ -88,12 +88,10 @@ export type AppMenuHandlers = {
   onJsonConnect?: () => void
   onEmulatorConnect?: () => void
   onEmulatorImportProject?: () => void
-  onEmulatorImportCollection?: () => void
   onEmulatorExportProject?: () => void
   onEmulatorExportGroup?: () => void
   onEmulatorExportCollection?: () => void
   canEmulatorImportProject?: boolean
-  canEmulatorImportCollection?: boolean
   canEmulatorExport?: boolean
   onMinimize?: () => void
   onMaximizeToggle?: () => void
@@ -115,10 +113,6 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
     if (emulatorSource) {
       if (intent.direction === 'import' && intent.target === 'project') {
         handlers.onEmulatorImportProject?.()
-        return
-      }
-      if (intent.direction === 'import' && intent.target === 'collection') {
-        handlers.onEmulatorImportCollection?.()
         return
       }
       if (intent.direction === 'export' && intent.target === 'project') {
@@ -158,16 +152,6 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
             ? !(handlers.canEmulatorImportProject ?? false)
             : !(handlers.canImportProject ?? handlers.connected),
           onClick: () => openFocusedImpExp({ direction: 'import', target: 'project' })
-        },
-        {
-          type: 'item',
-          id: 'file-import',
-          label: t('menu.collection'),
-          indent: true,
-          disabled: emulatorSource
-            ? !(handlers.canEmulatorImportCollection ?? false)
-            : !handlers.connected,
-          onClick: () => openFocusedImpExp({ direction: 'import', target: 'collection' })
         },
         { type: 'header', label: t('menu.export') },
         {

@@ -1,29 +1,26 @@
-import { readFile, writeFile } from 'fs/promises'
+import { writeFile } from 'fs/promises'
 import type { BrowserWindow } from 'electron'
 import { dialog } from 'electron'
-import { fetchExportDocuments } from '@features/data_transfer/main/service'
-import { joinDocumentPath } from '@shared/firestore/paths'
+import { listRootCollections } from '@features/explorer/main/service'
+import { readOfficialDump } from '@features/data_transfer/main/official/read_dump'
+import { iterateExportDocuments, iterateGroupDocuments } from '@features/data_transfer/main/project_export_service'
+import type { OfficialDumpSummary } from '@features/data_transfer/shared/official'
+import type { ExportDocument } from '@features/data_transfer/shared/types'
 import { isFirestoreConnected } from '@shared/firestore/client'
 import { logError, logInfo } from '@shared/logging/logger'
 import { isCanceledError } from '@shared/safety/canceled'
 import type {
-  CollectionDiffInput,
-  CollectionDiffProgress,
-  CollectionDiffResult,
-  CollectionDiffRow,
-  CollectionDiffSummary,
   DiffExportFormat,
   DiffExportResult,
-  PeekDiffJsonResult
+  DiffProgress,
+  DiffRow,
+  DiffSummary,
+  DumpDiffInput,
+  DumpDiffResult,
+  PeekDiffDumpResult
 } from '@features/diff/shared/types'
 
-type ProgressReporter = (progress: CollectionDiffProgress) => void
-
-type DiffJsonDocument = {
-  id?: string
-  path?: string
-  data: Record<string, unknown>
-}
+type ProgressReporter = (progress: DiffProgress) => void
 
 function ensureConnected(projectId: string): void {
   if (!isFirestoreConnected(projectId)) {
@@ -49,30 +46,23 @@ function escapeCsvCell(value: unknown): string {
   return text
 }
 
-function statusLabel(status: CollectionDiffRow['status']): string {
+function statusLabel(status: DiffRow['status']): string {
   switch (status) {
-    case 'json_only':
-      return 'JSON'
-    case 'collection_only':
-      return 'コレクション'
+    case 'dump_only':
+      return 'ダンプ'
+    case 'project_only':
+      return 'プロジェクト'
     case 'changed':
       return '中身が違う'
   }
 }
 
-function summaryToCsv(summary: CollectionDiffSummary): string {
-  const header = ['id', 'path', 'collectionPath', '固有', 'JSON', 'コレクション']
+function summaryToCsv(summary: DiffSummary): string {
+  const header = ['id', 'path', 'collectionPath', '固有', 'ダンプ', 'プロジェクト']
     .map(escapeCsvCell)
     .join(',')
   const rows = summary.rows.map((row) =>
-    [
-      row.id,
-      row.path,
-      row.collectionPath,
-      statusLabel(row.status),
-      row.json,
-      row.collection
-    ]
+    [row.id, row.path, row.collectionPath, statusLabel(row.status), row.dump, row.project]
       .map(escapeCsvCell)
       .join(',')
   )
@@ -80,9 +70,9 @@ function summaryToCsv(summary: CollectionDiffSummary): string {
   return [header, ...rows].join('\n')
 }
 
-function toDiffError(error: unknown, canceled = false): CollectionDiffResult {
+function toDiffError(error: unknown, canceled = false): DumpDiffResult {
   const wasCanceled = canceled || isCanceledError(error)
-  logError('diff', 'compareCollectionJson failed', error)
+  logError('diff', 'compareOfficialDump failed', error)
 
   if (wasCanceled) {
     return { ok: false, error: '比較をキャンセルしました', canceled: true }
@@ -90,27 +80,8 @@ function toDiffError(error: unknown, canceled = false): CollectionDiffResult {
 
   return {
     ok: false,
-    error: error instanceof Error ? error.message : 'Compare collection failed'
+    error: error instanceof Error ? error.message : 'Compare dump failed'
   }
-}
-
-function isDocumentPath(path: string): boolean {
-  const segments = path.split('/').filter(Boolean)
-  return segments.length > 0 && segments.length % 2 === 0
-}
-
-function isDirectDocumentPath(documentPath: string, collectionPath: string): boolean {
-  const prefix = `${collectionPath}/`
-  if (!documentPath.startsWith(prefix)) {
-    return false
-  }
-
-  const rest = documentPath.slice(prefix.length)
-  return rest.length > 0 && !rest.includes('/')
-}
-
-function isUnderCollectionPath(documentPath: string, collectionPath: string): boolean {
-  return documentPath.startsWith(`${collectionPath}/`)
 }
 
 function collectionParentOfDocument(documentPath: string): string {
@@ -123,42 +94,9 @@ function documentIdOfPath(documentPath: string): string {
   return segments[segments.length - 1] ?? documentPath
 }
 
-function commonCollectionPrefix(collectionPaths: string[]): string | null {
-  if (collectionPaths.length === 0) {
-    return null
-  }
-
-  const split = collectionPaths.map((path) => path.split('/').filter(Boolean))
-  const minLen = Math.min(...split.map((segments) => segments.length))
-  let count = 0
-
-  while (count < minLen && split.every((segments) => segments[count] === split[0][count])) {
-    count += 1
-  }
-
-  const collectionCount = count % 2 === 1 ? count : count - 1
-  if (collectionCount <= 0) {
-    return null
-  }
-
-  return split[0].slice(0, collectionCount).join('/')
-}
-
-function inferCollectionPath(documents: DiffJsonDocument[]): string | null {
-  const parents: string[] = []
-
-  for (const document of documents) {
-    if (!document.path) {
-      continue
-    }
-
-    const parent = collectionParentOfDocument(document.path)
-    if (parent) {
-      parents.push(parent)
-    }
-  }
-
-  return commonCollectionPrefix(parents)
+function collectionIdOfPath(documentPath: string): string {
+  const segments = documentPath.split('/').filter(Boolean)
+  return segments.length >= 2 ? segments[segments.length - 2] : ''
 }
 
 function sortKeys(value: unknown): unknown {
@@ -184,199 +122,205 @@ function canonicalize(value: Record<string, unknown>): string {
   return JSON.stringify(sortKeys(value))
 }
 
-function parseDiffDocuments(raw: string): DiffJsonDocument[] {
-  const parsed: unknown = JSON.parse(raw)
-
-  if (!Array.isArray(parsed)) {
-    throw new Error('JSON は ExportDocument の配列である必要があります')
-  }
-
-  return parsed.map((item, index) => {
-    if (item === null || typeof item !== 'object' || Array.isArray(item)) {
-      throw new Error(`${index + 1} 件目の形式が不正です（オブジェクトではありません）`)
-    }
-
-    const record = item as Record<string, unknown>
-    if (record.data === null || typeof record.data !== 'object' || Array.isArray(record.data)) {
-      throw new Error(`${index + 1} 件目に data オブジェクトがありません`)
-    }
-
-    const id = typeof record.id === 'string' && record.id.trim() ? record.id.trim() : undefined
-    const path = typeof record.path === 'string' && record.path.trim() ? record.path.trim() : undefined
-
-    return {
-      id,
-      path,
-      data: record.data as Record<string, unknown>
-    }
-  })
+function isAllKindsDump(summary: OfficialDumpSummary): boolean {
+  return summary.outputFiles.some((filePath) => /(?:^|[/\\])all_kinds(?:[/\\]|$)/.test(filePath))
 }
 
-/**
- * 突合せ path。id が無い行は呼ばない。
- * path はヒント。id があるときは親 + id を正とする（import と同じ）。
- */
-function resolveDiffDocumentPath(
-  document: DiffJsonDocument,
-  collectionPath: string,
-  includeSubcollections: boolean
-): string | 'skip' {
-  const id = document.id
-  if (!id) {
-    return 'skip'
+function uniqueCollectionParents(documents: ExportDocument[]): string[] {
+  const parents = new Set<string>()
+  for (const document of documents) {
+    const parent = collectionParentOfDocument(document.path)
+    if (parent) {
+      parents.add(parent)
+    }
+  }
+  return Array.from(parents).sort()
+}
+
+function collectionTreeRoot(parents: string[]): string | null {
+  if (parents.length === 0) {
+    return null
   }
 
-  if (document.path && isDocumentPath(document.path) && isUnderCollectionPath(document.path, collectionPath)) {
-    if (!includeSubcollections && !isDirectDocumentPath(document.path, collectionPath)) {
-      return 'skip'
+  const sorted = [...parents].sort((left, right) => left.length - right.length || left.localeCompare(right))
+  const root = sorted[0]
+  if (sorted.every((parent) => parent === root || parent.startsWith(`${root}/`))) {
+    return root
+  }
+
+  return null
+}
+
+function inferGroupId(documents: ExportDocument[]): string | null {
+  const ids = new Set(
+    documents.map((document) => collectionIdOfPath(document.path)).filter((id) => id.length > 0)
+  )
+  if (ids.size !== 1) {
+    return null
+  }
+
+  if (collectionTreeRoot(uniqueCollectionParents(documents))) {
+    return null
+  }
+
+  return Array.from(ids)[0] ?? null
+}
+
+async function collectLiveDocuments(
+  projectId: string,
+  dump: OfficialDumpSummary,
+  onProgress?: ProgressReporter
+): Promise<ExportDocument[]> {
+  const documents: ExportDocument[] = []
+
+  const report = (detail: string): void => {
+    onProgress?.({
+      phase: 'reading',
+      processedCount: documents.length,
+      totalCount: 0,
+      percent: Math.min(80, 12 + Math.round(Math.min(documents.length, 5000) / 70)),
+      detail
+    })
+  }
+
+  if (isAllKindsDump(dump)) {
+    const roots = await listRootCollections(projectId)
+    const listed = roots.ok ? roots.data : []
+    const dumpRoots = [
+      ...new Set(
+        dump.documents
+          .map((document) => document.path.split('/').filter(Boolean)[0])
+          .filter((rootId): rootId is string => Boolean(rootId))
+      )
+    ]
+    const rootIds = [...new Set([...listed, ...dumpRoots])].sort()
+
+    for (const rootId of rootIds) {
+      for await (const document of iterateExportDocuments(projectId, rootId, true)) {
+        documents.push(document)
+        if (documents.length === 1 || documents.length % 50 === 0) {
+          report(document.path)
+        }
+      }
     }
 
-    const segments = document.path.split('/').filter(Boolean)
-    segments[segments.length - 1] = id
-    return segments.join('/')
+    return documents
   }
 
-  return joinDocumentPath(collectionPath, id)
+  const groupId = inferGroupId(dump.documents)
+  if (groupId) {
+    for await (const document of iterateGroupDocuments(projectId, groupId)) {
+      documents.push(document)
+      if (documents.length === 1 || documents.length % 50 === 0) {
+        report(document.path)
+      }
+    }
+    return documents
+  }
+
+  for (const collectionPath of uniqueCollectionParents(dump.documents)) {
+    for await (const document of iterateExportDocuments(projectId, collectionPath, false)) {
+      documents.push(document)
+      if (documents.length === 1 || documents.length % 50 === 0) {
+        report(document.path)
+      }
+    }
+  }
+
+  return documents
 }
 
-export async function selectDiffJson(
-  window: BrowserWindow | null
-): Promise<{ canceled: boolean; filePath: string | null }> {
-  const options = {
-    title: '比べる JSON を選択',
-    properties: ['openFile' as const],
-    filters: [{ name: 'JSON', extensions: ['json'] }]
-  }
-
-  const result = window
-    ? await dialog.showOpenDialog(window, options)
-    : await dialog.showOpenDialog(options)
-
-  if (result.canceled || result.filePaths.length === 0) {
-    return { canceled: true, filePath: null }
-  }
-
-  return { canceled: false, filePath: result.filePaths[0] }
-}
-
-export async function peekDiffJson(filePath: string): Promise<PeekDiffJsonResult> {
+export async function peekDiffDump(dumpPath: string): Promise<PeekDiffDumpResult> {
   try {
-    const raw = await readFile(filePath, 'utf8')
-    const documents = parseDiffDocuments(raw)
+    const result = await readOfficialDump(dumpPath)
+    if (!result.ok) {
+      return result
+    }
+
     return {
       ok: true,
-      collectionPath: inferCollectionPath(documents)
+      documentCount: result.data.documents.length,
+      samplePaths: result.data.documents.slice(0, 8).map((document) => document.path),
+      sourceProjectId: result.data.sourceProjectId
     }
   } catch (error) {
-    logError('diff', 'peekDiffJson failed', error)
+    logError('diff', 'peekDiffDump failed', error)
     return {
       ok: false,
-      error: error instanceof Error ? error.message : 'JSON を読み取れませんでした'
+      error: error instanceof Error ? error.message : 'ダンプを読み取れませんでした'
     }
   }
 }
 
-export async function compareCollectionJson(
-  input: CollectionDiffInput,
+export async function compareOfficialDump(
+  input: DumpDiffInput,
   onProgress?: ProgressReporter
-): Promise<CollectionDiffResult> {
+): Promise<DumpDiffResult> {
   try {
     ensureConnected(input.projectId)
 
-    const collectionPath = input.collectionPath.trim()
-    if (!collectionPath) {
-      throw new Error('コレクション path を指定してください')
+    if (!input.dumpPath) {
+      throw new Error('ダンプを選んでください')
     }
 
-    if (!input.filePath) {
-      throw new Error('JSON ファイルを選んでください')
-    }
-
-    logInfo(
-      'diff',
-      `compareCollectionJson projectId=${input.projectId} path=${collectionPath} file=${input.filePath}`
-    )
+    logInfo('diff', `compareOfficialDump projectId=${input.projectId} dump=${input.dumpPath}`)
 
     onProgress?.({
       phase: 'loading',
       processedCount: 0,
       totalCount: 0,
-      percent: 2,
-      detail: input.filePath
+      percent: 4,
+      detail: input.dumpPath
     })
 
-    const raw = await readFile(input.filePath, 'utf8')
-    const jsonDocuments = parseDiffDocuments(raw)
+    const dump = await readOfficialDump(input.dumpPath)
+    if (!dump.ok) {
+      return dump
+    }
 
-    const jsonByPath = new Map<string, Record<string, unknown>>()
-    let missingIdCount = 0
-    let skippedOutsideCount = 0
+    if (dump.data.documents.length === 0) {
+      throw new Error('ダンプにドキュメントがありません')
+    }
 
-    for (const document of jsonDocuments) {
-      if (!document.id) {
-        missingIdCount += 1
-        continue
-      }
-
-      const resolved = resolveDiffDocumentPath(document, collectionPath, input.includeSubcollections)
-      if (resolved === 'skip') {
-        skippedOutsideCount += 1
-        continue
-      }
-
-      jsonByPath.set(resolved, document.data)
+    const dumpByPath = new Map<string, Record<string, unknown>>()
+    for (const document of dump.data.documents) {
+      dumpByPath.set(document.path, document.data)
     }
 
     onProgress?.({
       phase: 'reading',
       processedCount: 0,
       totalCount: 0,
-      percent: 8,
-      detail: collectionPath
+      percent: 12,
+      detail: input.projectId
     })
 
-    const collectionDocuments = await fetchExportDocuments(
-      input.projectId,
-      collectionPath,
-      input.includeSubcollections,
-      {
-        onProgress: (documentCount, currentCollectionPath) => {
-          onProgress?.({
-            phase: 'reading',
-            processedCount: documentCount,
-            totalCount: 0,
-            percent: Math.min(80, 8 + Math.round(Math.min(documentCount, 5000) / 70)),
-            detail: currentCollectionPath
-          })
-        }
-      }
-    )
-
-    const collectionByPath = new Map(
-      collectionDocuments.map((document) => [document.path, document.data])
+    const liveDocuments = await collectLiveDocuments(input.projectId, dump.data, onProgress)
+    const projectByPath = new Map(
+      liveDocuments.map((document) => [document.path, document.data])
     )
 
     onProgress?.({
       phase: 'comparing',
       processedCount: 0,
-      totalCount: jsonByPath.size + collectionByPath.size,
-      percent: 85,
+      totalCount: dumpByPath.size + projectByPath.size,
+      percent: 88,
       detail: null
     })
 
-    const paths = new Set<string>([...jsonByPath.keys(), ...collectionByPath.keys()])
-    const rows: CollectionDiffRow[] = []
+    const paths = new Set<string>([...dumpByPath.keys(), ...projectByPath.keys()])
+    const rows: DiffRow[] = []
     let sameCount = 0
-    let jsonOnlyCount = 0
-    let collectionOnlyCount = 0
+    let dumpOnlyCount = 0
+    let projectOnlyCount = 0
     let changedCount = 0
 
     for (const path of Array.from(paths).sort()) {
-      const json = jsonByPath.get(path) ?? null
-      const collection = collectionByPath.get(path) ?? null
+      const dumpData = dumpByPath.get(path) ?? null
+      const projectData = projectByPath.get(path) ?? null
 
-      if (json && collection) {
-        if (canonicalize(json) === canonicalize(collection)) {
+      if (dumpData && projectData) {
+        if (canonicalize(dumpData) === canonicalize(projectData)) {
           sameCount += 1
           continue
         }
@@ -387,49 +331,46 @@ export async function compareCollectionJson(
           path,
           collectionPath: collectionParentOfDocument(path),
           status: 'changed',
-          json,
-          collection
+          dump: dumpData,
+          project: projectData
         })
         continue
       }
 
-      if (json) {
-        jsonOnlyCount += 1
+      if (dumpData) {
+        dumpOnlyCount += 1
         rows.push({
           id: documentIdOfPath(path),
           path,
           collectionPath: collectionParentOfDocument(path),
-          status: 'json_only',
-          json,
-          collection: null
+          status: 'dump_only',
+          dump: dumpData,
+          project: null
         })
         continue
       }
 
-      collectionOnlyCount += 1
+      projectOnlyCount += 1
       rows.push({
         id: documentIdOfPath(path),
         path,
         collectionPath: collectionParentOfDocument(path),
-        status: 'collection_only',
-        json: null,
-        collection
+        status: 'project_only',
+        dump: null,
+        project: projectData
       })
     }
 
-    const data: CollectionDiffSummary = {
+    const data: DiffSummary = {
       projectId: input.projectId,
-      collectionPath,
-      filePath: input.filePath,
-      includeSubcollections: input.includeSubcollections,
-      jsonCount: jsonByPath.size,
-      collectionCount: collectionDocuments.length,
+      dumpPath: input.dumpPath,
+      sourceProjectId: dump.data.sourceProjectId,
+      dumpCount: dumpByPath.size,
+      projectCount: liveDocuments.length,
       sameCount,
-      jsonOnlyCount,
-      collectionOnlyCount,
+      dumpOnlyCount,
+      projectOnlyCount,
       changedCount,
-      missingIdCount,
-      skippedOutsideCount,
       rows
     }
 
@@ -441,19 +382,24 @@ export async function compareCollectionJson(
       detail: null
     })
 
+    logInfo(
+      'diff',
+      `compareOfficialDump done dump=${data.dumpCount} project=${data.projectCount} changed=${changedCount} dumpOnly=${dumpOnlyCount} projectOnly=${projectOnlyCount}`
+    )
+
     return { ok: true, data }
   } catch (error) {
     return toDiffError(error)
   }
 }
 
-export async function exportCollectionDiffReport(
-  summary: CollectionDiffSummary,
+export async function exportDumpDiffReport(
+  summary: DiffSummary,
   format: DiffExportFormat,
   window: BrowserWindow | null
 ): Promise<DiffExportResult> {
   try {
-    const baseName = sanitizeFileName(`diff_${summary.collectionPath}`)
+    const baseName = sanitizeFileName(`diff_${summary.projectId}`)
     const extension = format === 'csv' ? 'csv' : 'json'
     const defaultPath = `${baseName}.${extension}`
     const filters =
@@ -482,21 +428,18 @@ export async function exportCollectionDiffReport(
         : JSON.stringify(
             {
               version: 1,
-              kind: 'firemint-collection-diff',
+              kind: 'firemint-dump-diff',
               createdAt: new Date().toISOString(),
               projectId: summary.projectId,
-              collectionPath: summary.collectionPath,
-              filePath: summary.filePath,
-              includeSubcollections: summary.includeSubcollections,
+              dumpPath: summary.dumpPath,
+              sourceProjectId: summary.sourceProjectId,
               counts: {
-                jsonCount: summary.jsonCount,
-                collectionCount: summary.collectionCount,
+                dumpCount: summary.dumpCount,
+                projectCount: summary.projectCount,
                 sameCount: summary.sameCount,
-                jsonOnlyCount: summary.jsonOnlyCount,
-                collectionOnlyCount: summary.collectionOnlyCount,
-                changedCount: summary.changedCount,
-                missingIdCount: summary.missingIdCount,
-                skippedOutsideCount: summary.skippedOutsideCount
+                dumpOnlyCount: summary.dumpOnlyCount,
+                projectOnlyCount: summary.projectOnlyCount,
+                changedCount: summary.changedCount
               },
               rows: summary.rows
             },
@@ -507,12 +450,12 @@ export async function exportCollectionDiffReport(
     await writeFile(result.filePath, content, 'utf8')
     logInfo(
       'diff',
-      `exportCollectionDiffReport format=${format} file=${result.filePath} rows=${summary.rows.length}`
+      `exportDumpDiffReport format=${format} file=${result.filePath} rows=${summary.rows.length}`
     )
 
     return { ok: true, data: { filePath: result.filePath } }
   } catch (error) {
-    logError('diff', 'exportCollectionDiffReport failed', error)
+    logError('diff', 'exportDumpDiffReport failed', error)
     return {
       ok: false,
       error: error instanceof Error ? error.message : 'Export diff report failed'

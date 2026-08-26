@@ -36,11 +36,6 @@ export type ImportEmulatorProjectZipResult =
       error: string
     }
 
-export type ImportEmulatorCollectionJsonInput = {
-  projectId: string
-  filePath: string
-}
-
 export type DeleteEmulatorProjectInput = {
   projectId: string
 }

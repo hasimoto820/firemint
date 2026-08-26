@@ -10,7 +10,7 @@ import { listOutputFiles } from './list_output_files'
 import { logError, logInfo } from '@shared/logging/logger'
 
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : '公式ダンプの読み込みに失敗しました'
+  return error instanceof Error ? error.message : 'ダンプの読み込みに失敗しました'
 }
 
 async function readFirebaseExportProjectId(inputDir: string): Promise<string | null> {
@@ -109,7 +109,7 @@ function pickSourceProjectId(projectIds: string[]): string | null {
 async function readFromRoot(sourcePath: string, dumpRoot: string): Promise<OfficialDumpSummary> {
   const outputFiles = await listOutputFiles(dumpRoot)
   if (outputFiles.length === 0 && !(await isOfficialDumpRoot(dumpRoot))) {
-    throw new Error('公式ダンプではありません（output-* または overall_export_metadata がありません）')
+    throw new Error('ダンプではありません（output-* または overall_export_metadata がありません）')
   }
 
   const documents: ExportDocument[] = []
