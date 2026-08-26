@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { AuthUser } from '@features/auth_users/shared/types'
 import Button from '@shared/ui/Button'
+import SplitPane from '@shared/ui/SplitPane'
 import { confirmAction } from '@shared/ui/confirmAction'
 import { useT } from '@shared/i18n/renderer/I18nProvider'
 
@@ -378,7 +379,17 @@ function AuthUsersView({ projectId, readOnly }: AuthUsersViewProps): React.JSX.E
 
       {error && <p className="auth-users__error">{error}</p>}
 
-      <div className="auth-users__body">
+      <SplitPane
+        className="auth-users__body"
+        orientation="horizontal"
+        storageKey="auth.detail"
+        sizeTarget="second"
+        defaultSize={36}
+        unit="percent"
+        minFirst={260}
+        minSecond={240}
+        ariaLabel="ユーザー詳細の幅"
+        first={
         <div className="auth-users__table-wrap">
           <table className="auth-users__table">
             <thead>
@@ -443,7 +454,8 @@ function AuthUsersView({ projectId, readOnly }: AuthUsersViewProps): React.JSX.E
             </div>
           )}
         </div>
-
+        }
+        second={
         <aside className="auth-users__detail">
           {!editingUser || !draft ? (
             <p className="auth-users__empty">{t('auth_users.edit_hint')}</p>
@@ -527,7 +539,8 @@ function AuthUsersView({ projectId, readOnly }: AuthUsersViewProps): React.JSX.E
             </>
           )}
         </aside>
-      </div>
+        }
+      />
     </div>
   )
 }

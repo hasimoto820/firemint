@@ -3,6 +3,8 @@ import { useFieldAutocompleteItems } from '@features/autocomplete/renderer/hooks
 import type { DocumentSummary } from '@features/explorer/shared/types'
 import Button from '@shared/ui/Button'
 import AutocompleteInput from '@shared/ui/AutocompleteInput'
+import ColumnResizeHandle from '@shared/ui/ColumnResizeHandle'
+import { CHECKBOX_COLUMN_WIDTH, useColumnWidths } from '@shared/ui/column_widths'
 import {
   createEmptyFilterClause,
   filterDocuments,
@@ -48,6 +50,7 @@ type DocumentTableProps = {
   onBulkToggle?: (documentPath: string, checked: boolean) => void
   onBulkToggleAll?: (checked: boolean) => void
   tableKey?: string
+  columnWidthsKey?: string
   projectId?: string
   paging?: DocumentTablePaging
 }
@@ -214,6 +217,7 @@ function DocumentTable({
   onBulkToggle,
   onBulkToggleAll,
   tableKey,
+  columnWidthsKey,
   projectId = '',
   paging
 }: DocumentTableProps): React.JSX.Element {
@@ -290,6 +294,12 @@ function DocumentTable({
   }
 
   const fieldItems = useFieldAutocompleteItems(projectId, columnOrder)
+  const { widthOf, resizeBy, reset } = useColumnWidths(
+    columnWidthsKey ?? `table.col:${tableKey ?? 'documents'}`
+  )
+  const tableWidth =
+    visibleColumns.reduce((sum, column) => sum + widthOf(column), 0) +
+    (selectable ? CHECKBOX_COLUMN_WIDTH : 0)
 
   if (documents.length === 0) {
     return (
@@ -421,7 +431,13 @@ function DocumentTable({
       )}
 
       <div className="document-table__wrap">
-        <table className="document-table">
+        <table className="document-table document-table--fixed" style={{ width: tableWidth }}>
+          <colgroup>
+            {selectable && <col style={{ width: CHECKBOX_COLUMN_WIDTH }} />}
+            {visibleColumns.map((column) => (
+              <col key={column} style={{ width: widthOf(column) }} />
+            ))}
+          </colgroup>
           <thead>
             <tr>
               {selectable && (
@@ -439,11 +455,17 @@ function DocumentTable({
                   <button
                     type="button"
                     className="document-table__sort"
+                    title={column}
                     onClick={() => setSort((current) => nextSortState(current, column))}
                   >
                     {column}
                     {sortIndicator(sort, column)}
                   </button>
+                  <ColumnResizeHandle
+                    ariaLabel={`${column} 列の幅`}
+                    onResize={(delta) => resizeBy(column, delta)}
+                    onReset={() => reset(column)}
+                  />
                 </th>
               ))}
             </tr>
@@ -487,9 +509,14 @@ function DocumentTable({
                         />
                       </td>
                     )}
-                    {visibleColumns.map((column) => (
-                      <td key={column}>{getCellText(document, column)}</td>
-                    ))}
+                    {visibleColumns.map((column) => {
+                      const text = getCellText(document, column)
+                      return (
+                        <td key={column} className="document-table__cell" title={text}>
+                          {text}
+                        </td>
+                      )
+                    })}
                   </tr>
                 )
               })

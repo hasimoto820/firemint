@@ -11,6 +11,8 @@ import Button from '@shared/ui/Button'
 import AutocompleteInput from '@shared/ui/AutocompleteInput'
 import { confirmAction } from '@shared/ui/confirmAction'
 import DiffPreviewPanel from '@shared/ui/DiffPreviewPanel'
+import ResizeFrame from '@shared/ui/ResizeFrame'
+import SplitPane from '@shared/ui/SplitPane'
 import { collectDataColumns } from '@shared/ui/document_table_utils'
 
 type FieldBulkRenameDialogProps = {
@@ -399,7 +401,14 @@ function FieldBulkRenameDialog({
   return (
     <div className="project-export-dialog" role="dialog" aria-modal="true">
       <div className="project-export-dialog__backdrop" onClick={busy ? undefined : onClose} />
-      <div className="project-export-dialog__panel project-export-dialog__panel--wide">
+      <ResizeFrame
+        className="project-export-dialog__panel project-export-dialog__panel--wide"
+        storageKey="field_bulk.box"
+        defaultWidth={560}
+        defaultHeight={640}
+        minWidth={420}
+        minHeight={360}
+      >
         <header className="project-export-dialog__header">
           <h2 className="project-export-dialog__title">フィールド一括</h2>
           <p className="project-export-dialog__lead">
@@ -407,137 +416,157 @@ function FieldBulkRenameDialog({
           </p>
         </header>
 
-        <div className="project-export-dialog__actions" style={{ justifyContent: 'flex-start' }}>
-          <Button
-            variant={mode === 'create' ? 'primary' : undefined}
-            onClick={() => {
-              setMode('create')
-              clearPreview()
-              setError(null)
-            }}
-            disabled={busy}
-          >
-            新規
-          </Button>
-          <Button
-            variant={mode === 'update' ? 'primary' : undefined}
-            onClick={() => {
-              setMode('update')
-              clearPreview()
-              setError(null)
-            }}
-            disabled={busy}
-          >
-            値変更
-          </Button>
-          <Button
-            variant={mode === 'rename' ? 'primary' : undefined}
-            onClick={() => {
-              setMode('rename')
-              clearPreview()
-              setError(null)
-            }}
-            disabled={busy}
-          >
-            リネーム
-          </Button>
-          <Button
-            variant={mode === 'delete' ? 'danger' : undefined}
-            onClick={() => {
-              setMode('delete')
-              clearPreview()
-              setError(null)
-            }}
-            disabled={busy}
-          >
-            削除
-          </Button>
-        </div>
-
-        <label className="project-export-dialog__option">
-          <input
-            type="checkbox"
-            checked={includeSubcollections}
-            disabled={busy}
-            onChange={(event) => {
-              setIncludeSubcollections(event.target.checked)
-              clearPreview()
-              setError(null)
-            }}
-          />
-          サブコレクションを含む
-        </label>
-
-        {mode === 'create'
-          ? renderValueInputs(createField, setCreateField, createValue, setCreateValue, 'フィールド名')
-          : mode === 'update'
-            ? renderValueInputs(
-                updateFieldName,
-                setUpdateFieldName,
-                updateValue,
-                setUpdateValue,
-                'フィールド名'
-              )
-            : mode === 'rename' ? (
-              <div className="bulk-actions__update-row">
-                <AutocompleteInput
-                  className="bulk-actions__field-wrap"
-                  fieldClassName="bulk-actions__input"
-                  value={fromField}
-                  items={fieldItems}
-                  disabled={busy}
-                  autoFocus
-                  placeholder="旧フィールド名"
-                  aria-label="旧フィールド名"
-                  onChange={(nextValue) => {
-                    setFromField(nextValue)
+        <SplitPane
+          className="field-bulk-split"
+          orientation="vertical"
+          storageKey="field_bulk.preview"
+          sizeTarget="second"
+          defaultSize={42}
+          unit="percent"
+          minFirst={120}
+          minSecond={80}
+          ariaLabel="プレビューの高さ"
+          first={
+            <div className="field-bulk-split__form">
+              <div className="project-export-dialog__actions" style={{ justifyContent: 'flex-start' }}>
+                <Button
+                  variant={mode === 'create' ? 'primary' : undefined}
+                  onClick={() => {
+                    setMode('create')
                     clearPreview()
                     setError(null)
                   }}
-                />
+                  disabled={busy}
+                >
+                  新規
+                </Button>
+                <Button
+                  variant={mode === 'update' ? 'primary' : undefined}
+                  onClick={() => {
+                    setMode('update')
+                    clearPreview()
+                    setError(null)
+                  }}
+                  disabled={busy}
+                >
+                  値変更
+                </Button>
+                <Button
+                  variant={mode === 'rename' ? 'primary' : undefined}
+                  onClick={() => {
+                    setMode('rename')
+                    clearPreview()
+                    setError(null)
+                  }}
+                  disabled={busy}
+                >
+                  リネーム
+                </Button>
+                <Button
+                  variant={mode === 'delete' ? 'danger' : undefined}
+                  onClick={() => {
+                    setMode('delete')
+                    clearPreview()
+                    setError(null)
+                  }}
+                  disabled={busy}
+                >
+                  削除
+                </Button>
+              </div>
+
+              <label className="project-export-dialog__option">
                 <input
-                  className="bulk-actions__input"
-                  value={toField}
+                  type="checkbox"
+                  checked={includeSubcollections}
                   disabled={busy}
-                  placeholder="新フィールド名"
                   onChange={(event) => {
-                    setToField(event.target.value)
+                    setIncludeSubcollections(event.target.checked)
                     clearPreview()
                     setError(null)
                   }}
                 />
-              </div>
-            ) : (
-              <div className="bulk-actions__update-row">
-                <AutocompleteInput
-                  className="bulk-actions__field-wrap"
-                  fieldClassName="bulk-actions__input"
-                  value={deleteFieldName}
-                  items={fieldItems}
-                  disabled={busy}
-                  autoFocus
-                  placeholder="削除するフィールド名"
-                  aria-label="削除するフィールド名"
-                  onChange={(nextValue) => {
-                    setDeleteFieldName(nextValue)
-                    clearPreview()
-                    setError(null)
-                  }}
-                />
-              </div>
-            )}
+                サブコレクションを含む
+              </label>
 
-        {error && <p className="project-export-dialog__error">{error}</p>}
+              {mode === 'create'
+                ? renderValueInputs(createField, setCreateField, createValue, setCreateValue, 'フィールド名')
+                : mode === 'update'
+                  ? renderValueInputs(
+                      updateFieldName,
+                      setUpdateFieldName,
+                      updateValue,
+                      setUpdateValue,
+                      'フィールド名'
+                    )
+                  : mode === 'rename' ? (
+                    <div className="bulk-actions__update-row">
+                      <AutocompleteInput
+                        className="bulk-actions__field-wrap"
+                        fieldClassName="bulk-actions__input"
+                        value={fromField}
+                        items={fieldItems}
+                        disabled={busy}
+                        autoFocus
+                        placeholder="旧フィールド名"
+                        aria-label="旧フィールド名"
+                        onChange={(nextValue) => {
+                          setFromField(nextValue)
+                          clearPreview()
+                          setError(null)
+                        }}
+                      />
+                      <input
+                        className="bulk-actions__input"
+                        value={toField}
+                        disabled={busy}
+                        placeholder="新フィールド名"
+                        onChange={(event) => {
+                          setToField(event.target.value)
+                          clearPreview()
+                          setError(null)
+                        }}
+                      />
+                    </div>
+                  ) : (
+                    <div className="bulk-actions__update-row">
+                      <AutocompleteInput
+                        className="bulk-actions__field-wrap"
+                        fieldClassName="bulk-actions__input"
+                        value={deleteFieldName}
+                        items={fieldItems}
+                        disabled={busy}
+                        autoFocus
+                        placeholder="削除するフィールド名"
+                        aria-label="削除するフィールド名"
+                        onChange={(nextValue) => {
+                          setDeleteFieldName(nextValue)
+                          clearPreview()
+                          setError(null)
+                        }}
+                      />
+                    </div>
+                  )}
 
-        {preview && preview.skippedCount > 0 && (
-          <p className="project-export-dialog__hint">
-            衝突のためスキップ予定: {preview.skippedCount} 件
-          </p>
-        )}
+              {error && <p className="project-export-dialog__error">{error}</p>}
 
-        {preview && (preview.items.length > 0 || preview.matchedCount > 0) && (
-          <DiffPreviewPanel items={preview.items} matchedCount={preview.matchedCount} />
-        )}
+              {preview && preview.skippedCount > 0 && (
+                <p className="project-export-dialog__hint">
+                  衝突のためスキップ予定: {preview.skippedCount} 件
+                </p>
+              )}
+            </div>
+          }
+          second={
+            <div className="field-bulk-split__preview">
+              {preview && (preview.items.length > 0 || preview.matchedCount > 0) ? (
+                <DiffPreviewPanel items={preview.items} matchedCount={preview.matchedCount} />
+              ) : (
+                <p className="project-export-dialog__hint">プレビューすると差分がここに出ます</p>
+              )}
+            </div>
+          }
+        />
 
         <div className="project-export-dialog__actions">
           <Button onClick={onClose} disabled={busy}>
@@ -554,7 +583,7 @@ function FieldBulkRenameDialog({
             {busy ? '実行中…' : applyLabel}
           </Button>
         </div>
-      </div>
+      </ResizeFrame>
     </div>
   )
 }

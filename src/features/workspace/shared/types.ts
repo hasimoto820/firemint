@@ -1,9 +1,9 @@
 export type WorkspaceAuthType = 'serviceAccount' | 'google' | 'emulator'
 
-/** 左ツリーのドット。旧デフォルト #607D8B は未設定として扱う */
-export const DEFAULT_ENTRY_COLOR = '#07e940'
+/** 左ツリーのドット。クラウド／Google の初期色。旧デフォルトは未設定として扱う */
+export const DEFAULT_ENTRY_COLOR = '#ff7e29'
 export const DEFAULT_EMULATOR_ENTRY_COLOR = '#456280'
-const LEGACY_DEFAULT_ENTRY_COLOR = '#607d8b'
+const LEGACY_DEFAULT_ENTRY_COLORS = ['#607d8b', '#07e940']
 
 export function defaultWorkspaceEntryColor(
   authType: WorkspaceAuthType,
@@ -15,7 +15,7 @@ export function defaultWorkspaceEntryColor(
 
   const existing = options?.existing?.trim()
 
-  if (existing && existing.toLowerCase() !== LEGACY_DEFAULT_ENTRY_COLOR) {
+  if (existing && !LEGACY_DEFAULT_ENTRY_COLORS.includes(existing.toLowerCase())) {
     return existing
   }
 

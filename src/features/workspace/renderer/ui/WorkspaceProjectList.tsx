@@ -7,6 +7,7 @@ import {
   type WorkspaceState
 } from '@features/workspace/shared/types'
 import Button from '@shared/ui/Button'
+import SplitPane from '@shared/ui/SplitPane'
 import { confirmAction } from '@shared/ui/confirmAction'
 import { useT } from '@shared/i18n/renderer/I18nProvider'
 
@@ -233,6 +234,137 @@ function WorkspaceProjectList({
   const busy = disabled || loading
   const treeMode = focusedChildren !== undefined
 
+  const entryList = (
+    <ul className="project-list__items">
+      {entries.map((entry) => {
+        const isFocused = entry.id === focusedId
+        const isLoaded = loadedIds.has(entry.id)
+        const isOpen = settingsFor === entry.id
+
+        return (
+          <li key={entry.id} className="project-list__entry">
+            <div
+              className={
+                isFocused
+                  ? 'project-list__row project-list__row--focused'
+                  : 'project-list__row'
+              }
+            >
+              {treeMode && (
+                <button
+                  type="button"
+                  className="project-list__chevron"
+                  onClick={() => void handleFocus(entry.id)}
+                  disabled={busy}
+                  aria-hidden
+                  tabIndex={-1}
+                >
+                  {isFocused ? '▾' : '▸'}
+                </button>
+              )}
+              <button
+                type="button"
+                className="project-list__select"
+                onClick={() => void handleFocus(entry.id)}
+                disabled={busy}
+              >
+                <span
+                  className="project-list__dot"
+                  style={{ backgroundColor: entry.color }}
+                  aria-hidden
+                />
+                <span className="project-list__body">
+                  <span className="project-list__label">{entry.label}</span>
+                  <span className="project-list__meta">
+                    {workspaceAuthLabel(entry.authType)}
+                    {entry.readOnly ? ' · read-only' : ''}
+                    {isLoaded ? ' · loaded' : ''}
+                  </span>
+                </span>
+              </button>
+              <button
+                type="button"
+                className={
+                  isOpen
+                    ? 'project-list__gear project-list__gear--open'
+                    : 'project-list__gear'
+                }
+                onClick={() => handleToggleSettings(entry)}
+                disabled={busy}
+                title="プロジェクト設定"
+                aria-label="プロジェクト設定"
+                aria-expanded={isOpen}
+              >
+                ⚙
+              </button>
+            </div>
+
+            {isOpen && (
+              <div className="project-list__settings">
+                <label className="project-list__field">
+                  {t('workspace.display_name')}
+                  <input
+                    className="project-list__input"
+                    value={labelDraft}
+                    onChange={(event) => setLabelDraft(event.target.value)}
+                    disabled={busy}
+                  />
+                </label>
+                <label className="project-list__field">
+                  {t('workspace.color')}
+                  <input
+                    className="project-list__input project-list__input--color"
+                    type="color"
+                    value={colorDraft}
+                    onChange={(event) => setColorDraft(event.target.value)}
+                    disabled={busy}
+                  />
+                </label>
+                <label className="project-list__readonly">
+                  <input
+                    type="checkbox"
+                    checked={entry.readOnly}
+                    onChange={() => void handleToggleReadOnly(entry)}
+                    disabled={busy}
+                  />
+                  {t('workspace.read_only')}
+                </label>
+                <div className="project-list__settings-actions">
+                  <Button onClick={() => void handleSaveMeta(entry.id)} disabled={busy}>
+                    {t('common.save')}
+                  </Button>
+                  <Button
+                    onClick={() => void handleDisconnect(entry.id)}
+                    disabled={busy}
+                  >
+                    {t('common.disconnect')}
+                  </Button>
+                  {entry.authType === 'emulator' ? (
+                    <Button
+                      variant="danger"
+                      onClick={() => void handleDeleteEmulator(entry.id)}
+                      disabled={busy || entry.readOnly}
+                    >
+                      {t('common.delete')}
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="danger"
+                      onClick={() => void handleRemove(entry.id)}
+                      disabled={busy}
+                    >
+                      {t('workspace.unregister')}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
+          </li>
+        )
+      })}
+    </ul>
+  )
+
   return (
     <section className="project-list">
       <div className="project-list__header">
@@ -255,138 +387,22 @@ function WorkspaceProjectList({
         <p className="project-list__empty">{t('workspace.no_connected')}</p>
       )}
 
-      <ul className="project-list__items">
-        {entries.map((entry) => {
-          const isFocused = entry.id === focusedId
-          const isLoaded = loadedIds.has(entry.id)
-          const isOpen = settingsFor === entry.id
-
-          return (
-            <li key={entry.id} className="project-list__entry">
-              <div
-                className={
-                  isFocused
-                    ? 'project-list__row project-list__row--focused'
-                    : 'project-list__row'
-                }
-              >
-                {treeMode && (
-                  <button
-                    type="button"
-                    className="project-list__chevron"
-                    onClick={() => void handleFocus(entry.id)}
-                    disabled={busy}
-                    aria-hidden
-                    tabIndex={-1}
-                  >
-                    {isFocused ? '▾' : '▸'}
-                  </button>
-                )}
-                <button
-                  type="button"
-                  className="project-list__select"
-                  onClick={() => void handleFocus(entry.id)}
-                  disabled={busy}
-                >
-                  <span
-                    className="project-list__dot"
-                    style={{ backgroundColor: entry.color }}
-                    aria-hidden
-                  />
-                  <span className="project-list__body">
-                    <span className="project-list__label">{entry.label}</span>
-                    <span className="project-list__meta">
-                      {workspaceAuthLabel(entry.authType)}
-                      {entry.readOnly ? ' · read-only' : ''}
-                      {isLoaded ? ' · loaded' : ''}
-                    </span>
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  className={
-                    isOpen
-                      ? 'project-list__gear project-list__gear--open'
-                      : 'project-list__gear'
-                  }
-                  onClick={() => handleToggleSettings(entry)}
-                  disabled={busy}
-                  title="プロジェクト設定"
-                  aria-label="プロジェクト設定"
-                  aria-expanded={isOpen}
-                >
-                  ⚙
-                </button>
-              </div>
-
-              {treeMode && isFocused && (
-                <div className="project-list__children">{focusedChildren}</div>
-              )}
-
-              {isOpen && (
-                <div className="project-list__settings">
-                  <label className="project-list__field">
-                    {t('workspace.display_name')}
-                    <input
-                      className="project-list__input"
-                      value={labelDraft}
-                      onChange={(event) => setLabelDraft(event.target.value)}
-                      disabled={busy}
-                    />
-                  </label>
-                  <label className="project-list__field">
-                    {t('workspace.color')}
-                    <input
-                      className="project-list__input project-list__input--color"
-                      type="color"
-                      value={colorDraft}
-                      onChange={(event) => setColorDraft(event.target.value)}
-                      disabled={busy}
-                    />
-                  </label>
-                  <label className="project-list__readonly">
-                    <input
-                      type="checkbox"
-                      checked={entry.readOnly}
-                      onChange={() => void handleToggleReadOnly(entry)}
-                      disabled={busy}
-                    />
-                    {t('workspace.read_only')}
-                  </label>
-                  <div className="project-list__settings-actions">
-                    <Button onClick={() => void handleSaveMeta(entry.id)} disabled={busy}>
-                      {t('common.save')}
-                    </Button>
-                    <Button
-                      onClick={() => void handleDisconnect(entry.id)}
-                      disabled={busy}
-                    >
-                      {t('common.disconnect')}
-                    </Button>
-                    {entry.authType === 'emulator' ? (
-                      <Button
-                        variant="danger"
-                        onClick={() => void handleDeleteEmulator(entry.id)}
-                        disabled={busy || entry.readOnly}
-                      >
-                        {t('common.delete')}
-                      </Button>
-                    ) : (
-                      <Button
-                        variant="danger"
-                        onClick={() => void handleRemove(entry.id)}
-                        disabled={busy}
-                      >
-                        {t('workspace.unregister')}
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              )}
-            </li>
-          )
-        })}
-      </ul>
+      {treeMode ? (
+        <SplitPane
+          className="project-list__split"
+          orientation="vertical"
+          storageKey="shell.sidebar.tree"
+          defaultSize={32}
+          unit="percent"
+          minFirst={72}
+          minSecond={120}
+          ariaLabel="プロジェクト一覧の高さ"
+          first={entryList}
+          second={<div className="project-list__children">{focusedChildren}</div>}
+        />
+      ) : (
+        entryList
+      )}
     </section>
   )
 }

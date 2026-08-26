@@ -4,7 +4,26 @@ import { DIFF_PREVIEW_LIMIT, diffRowPreview } from '@features/diff/shared/diff'
 import type { DiffProgress, DiffRow, DiffRowStatus, DiffExportFormat } from '@features/diff/shared/types'
 import type { WorkspaceAuthType } from '@features/workspace/shared/types'
 import Button from '@shared/ui/Button'
+import ColumnResizeHandle from '@shared/ui/ColumnResizeHandle'
+import SplitPane from '@shared/ui/SplitPane'
+import { useColumnWidths } from '@shared/ui/column_widths'
 import { useT } from '@shared/i18n/renderer/I18nProvider'
+
+const DIFF_COLUMNS = [
+  { key: 'id', label: 'ID', className: undefined },
+  { key: 'path', label: 'path', className: 'diff-table__path' },
+  { key: 'status', label: '固有', className: undefined },
+  { key: 'dump', label: 'ダンプ', className: 'diff-table__json' },
+  { key: 'project', label: 'プロジェクト', className: 'diff-table__json' }
+] as const
+
+const DIFF_COLUMN_DEFAULTS: Record<string, number> = {
+  id: 88,
+  path: 220,
+  status: 96,
+  dump: 180,
+  project: 180
+}
 
 type DiffViewProps = {
   projectId: string
@@ -31,6 +50,21 @@ function formatData(data: Record<string, unknown> | null): string {
   }
 
   return JSON.stringify(data)
+}
+
+function cellText(row: DiffRow, key: (typeof DIFF_COLUMNS)[number]['key']): string {
+  switch (key) {
+    case 'id':
+      return row.id
+    case 'path':
+      return row.path
+    case 'status':
+      return statusLabel(row.status)
+    case 'dump':
+      return formatData(row.dump)
+    case 'project':
+      return formatData(row.project)
+  }
 }
 
 function DiffView({
@@ -147,6 +181,8 @@ function DiffView({
   const canCompare = !busy && Boolean(draft.dumpPath)
   const result = draft.result
   const previewRows: DiffRow[] = result ? diffRowPreview(result) : []
+  const { widthOf, resizeBy, reset } = useColumnWidths('table.col:diff', DIFF_COLUMN_DEFAULTS)
+  const tableWidth = DIFF_COLUMNS.reduce((sum, column) => sum + widthOf(column.key), 0)
   const sourceKindLabel = sourceAuthType === 'emulator' ? t('menu.emulator') : t('menu.cloud')
   const progressLabel = progress
     ? `${progress.processedCount} 件${progress.detail ? ` / ${progress.detail}` : ''}`
@@ -157,6 +193,17 @@ function DiffView({
 
   return (
     <div className="imp-exp-view imp-exp-view--diff">
+      <SplitPane
+        className="diff-view__split"
+        orientation="vertical"
+        storageKey="diff.table"
+        sizeTarget="second"
+        defaultSize={58}
+        unit="percent"
+        minFirst={120}
+        minSecond={120}
+        ariaLabel="差分テーブルの高さ"
+        first={
       <div className="imp-exp-form">
         <h1 className="imp-exp-form__title">{t('menu.diff')}</h1>
         <p className="imp-exp-form__lead">
@@ -209,7 +256,8 @@ function DiffView({
           </p>
         )}
       </div>
-
+        }
+        second={
       <div className="document-table-panel diff-table-panel">
         <div className="document-table-panel__toolbar">
           <Button
@@ -238,35 +286,50 @@ function DiffView({
         </div>
 
         <div className="document-table__wrap">
-          <table className="document-table">
+          <table className="document-table document-table--fixed" style={{ width: tableWidth }}>
+            <colgroup>
+              {DIFF_COLUMNS.map((column) => (
+                <col key={column.key} style={{ width: widthOf(column.key) }} />
+              ))}
+            </colgroup>
             <thead>
               <tr>
-                <th>ID</th>
-                <th>path</th>
-                <th>固有</th>
-                <th>ダンプ</th>
-                <th>プロジェクト</th>
+                {DIFF_COLUMNS.map((column) => (
+                  <th key={column.key}>
+                    {column.label}
+                    <ColumnResizeHandle
+                      ariaLabel={`${column.label} 列の幅`}
+                      onResize={(delta) => resizeBy(column.key, delta)}
+                      onReset={() => reset(column.key)}
+                    />
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
               {previewRows.length === 0 ? (
                 <tr>
-                  <td className="document-table__empty" colSpan={5}>
+                  <td className="document-table__empty" colSpan={DIFF_COLUMNS.length}>
                     {result ? '同じものだけです' : '—'}
                   </td>
                 </tr>
               ) : (
                 previewRows.map((row) => (
                   <tr key={row.path}>
-                    <td>{row.id}</td>
-                    <td className="diff-table__path">{row.path}</td>
-                    <td>{statusLabel(row.status)}</td>
-                    <td className="diff-table__json" title={formatData(row.dump)}>
-                      {formatData(row.dump)}
-                    </td>
-                    <td className="diff-table__json" title={formatData(row.project)}>
-                      {formatData(row.project)}
-                    </td>
+                    {DIFF_COLUMNS.map((column) => {
+                      const text = cellText(row, column.key)
+                      return (
+                        <td
+                          key={column.key}
+                          className={['document-table__cell', column.className]
+                            .filter(Boolean)
+                            .join(' ')}
+                          title={text}
+                        >
+                          {text}
+                        </td>
+                      )
+                    })}
                   </tr>
                 ))
               )}
@@ -274,6 +337,8 @@ function DiffView({
           </table>
         </div>
       </div>
+        }
+      />
     </div>
   )
 }

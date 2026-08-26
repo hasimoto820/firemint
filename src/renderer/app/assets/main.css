@@ -227,26 +227,218 @@ code {
 
 .app-layout__body {
   display: flex;
-  gap: 12px;
   flex: 1;
   min-height: 0;
   overflow: hidden;
 }
 
+.app-layout__split {
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
 .app-layout__sidebar {
-  width: 240px;
-  flex-shrink: 0;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
   overflow-y: auto;
 }
 
 .app-layout__main {
   flex: 1;
+  width: 100%;
+  height: 100%;
   min-width: 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 12px;
   overflow: hidden;
+}
+
+.split-pane {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.split-pane__pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.split-pane__sash {
+  position: relative;
+  z-index: 2;
+  touch-action: none;
+  background: transparent;
+}
+
+.split-pane--horizontal > .split-pane__sash {
+  cursor: col-resize;
+}
+
+.split-pane--vertical > .split-pane__sash {
+  cursor: row-resize;
+}
+
+.split-pane__sash::before {
+  content: '';
+  position: absolute;
+  background: var(--ev-c-gray-1);
+}
+
+.split-pane--horizontal > .split-pane__sash::before {
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  transform: translateX(-50%);
+}
+
+.split-pane--vertical > .split-pane__sash::before {
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+  transform: translateY(-50%);
+}
+
+.split-pane__sash:hover::before,
+.split-pane__sash:focus-visible::before,
+.split-pane--dragging > .split-pane__sash::before {
+  background: rgba(105, 136, 230, 0.75);
+}
+
+.split-pane__sash:focus-visible {
+  outline: none;
+}
+
+.split-pane--dragging {
+  user-select: none;
+  cursor: inherit;
+}
+
+.split-pane--horizontal.split-pane--dragging,
+.split-pane--horizontal.split-pane--dragging * {
+  cursor: col-resize !important;
+}
+
+.split-pane--vertical.split-pane--dragging,
+.split-pane--vertical.split-pane--dragging * {
+  cursor: row-resize !important;
+}
+
+.resize-frame {
+  position: relative;
+  box-sizing: border-box;
+}
+
+.resize-frame__handle {
+  position: absolute;
+  z-index: 4;
+  touch-action: none;
+}
+
+.resize-frame__handle:hover {
+  background: rgba(105, 136, 230, 0.28);
+}
+
+.resize-frame__handle--n {
+  top: -3px;
+  left: 10px;
+  right: 10px;
+  height: 8px;
+  cursor: ns-resize;
+}
+
+.resize-frame__handle--s {
+  bottom: -3px;
+  left: 10px;
+  right: 10px;
+  height: 8px;
+  cursor: ns-resize;
+}
+
+.resize-frame__handle--e {
+  top: 10px;
+  right: -3px;
+  bottom: 10px;
+  width: 8px;
+  cursor: ew-resize;
+}
+
+.resize-frame__handle--w {
+  top: 10px;
+  left: -3px;
+  bottom: 10px;
+  width: 8px;
+  cursor: ew-resize;
+}
+
+.resize-frame__handle--ne {
+  top: -4px;
+  right: -4px;
+  width: 12px;
+  height: 12px;
+  cursor: nesw-resize;
+}
+
+.resize-frame__handle--nw {
+  top: -4px;
+  left: -4px;
+  width: 12px;
+  height: 12px;
+  cursor: nwse-resize;
+}
+
+.resize-frame__handle--se {
+  bottom: -4px;
+  right: -4px;
+  width: 12px;
+  height: 12px;
+  cursor: nwse-resize;
+}
+
+.resize-frame__handle--sw {
+  bottom: -4px;
+  left: -4px;
+  width: 12px;
+  height: 12px;
+  cursor: nesw-resize;
+}
+
+.split-pane__pane > .app-layout__sidebar,
+.split-pane__pane > .app-layout__main,
+.split-pane__pane > .firestore-split__pane,
+.split-pane__pane > .query-editor,
+.split-pane__pane > .simple-main__workspace,
+.split-pane__pane > .simple-main__json,
+.split-pane__pane > .query-main__after-editor,
+.split-pane__pane > .query-main__workspace,
+.split-pane__pane > .query-main__json,
+.split-pane__pane > .auth-users__table-wrap,
+.split-pane__pane > .auth-users__detail,
+.split-pane__pane > .project-list__items,
+.split-pane__pane > .project-list__children,
+.split-pane__pane > .imp-exp-form,
+.split-pane__pane > .imp-exp-job,
+.split-pane__pane > .diff-table-panel,
+.split-pane__pane > .bulk-actions,
+.split-pane__pane > .field-bulk-split__form,
+.split-pane__pane > .field-bulk-split__preview,
+.split-pane__pane > .job-split__form,
+.split-pane__pane > .document-table-panel {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
 }
 
 .fm-button {
@@ -309,7 +501,8 @@ code {
 .firestore-main > .query-main,
 .firestore-main > .simple-main,
 .firestore-main > .firestore-split,
-.firestore-main > .firestore-split__pane {
+.firestore-main > .firestore-split__pane,
+.firestore-main > .auth-users {
   flex: 1;
   min-height: 0;
 }
@@ -325,7 +518,7 @@ code {
 }
 
 .app-layout:has(.firestore-main) .app-layout__body {
-  gap: 10px;
+  gap: 0;
 }
 
 .app-layout:has(.firestore-main) .app-layout__main {
@@ -333,7 +526,7 @@ code {
 }
 
 .app-layout:has(.firestore-main) .explorer-sidebar {
-  gap: 8px;
+  gap: 0;
 }
 
 .app-layout:has(.firestore-main) .project-list__select {
@@ -427,12 +620,10 @@ code {
 
 .firestore-main .simple-main__json {
   padding-top: 8px;
-  min-height: 140px;
 }
 
 .firestore-main .simple-main__json .document-json-panel__editor {
-  min-height: 108px;
-  max-height: 200px;
+  min-height: 80px;
 }
 
 .firestore-main .document-table-panel {
@@ -513,6 +704,8 @@ code {
 
 .firestore-main .document-json-panel {
   gap: 6px;
+  min-height: 0;
+  height: 100%;
 }
 
 .firestore-main .document-json-panel__title {
@@ -542,7 +735,7 @@ code {
 }
 
 .firestore-main .document-json-panel__editor {
-  min-height: 200px;
+  min-height: 80px;
   padding: 10px;
   font-size: 12px;
   border-radius: 6px;
@@ -587,12 +780,10 @@ code {
 
 .firestore-main .query-main__json {
   padding-top: 8px;
-  min-height: 120px;
 }
 
 .firestore-main .query-main__json .document-json-panel__editor {
-  min-height: 92px;
-  max-height: 168px;
+  min-height: 80px;
 }
 
 .firestore-main .query-main__loading,
@@ -699,7 +890,7 @@ code {
 .workspace-pane > .imp-exp-view {
   flex: 1;
   min-height: 0;
-  overflow: auto;
+  overflow: hidden;
 }
 
 .workspace-pane > .imp-exp-view.imp-exp-view--diff {
@@ -709,13 +900,13 @@ code {
 .workspace-pane > .emulator-page {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 16px;
+  align-items: stretch;
+  gap: 0;
   flex: 1;
   min-height: 0;
-  overflow: auto;
+  overflow: hidden;
   border: none;
-  max-width: 640px;
+  max-width: none;
 }
 
 .imp-exp-view {
@@ -723,39 +914,52 @@ code {
   flex-direction: column;
   justify-content: flex-start;
   align-items: stretch;
-  gap: 16px;
-  min-height: 240px;
+  gap: 0;
+  min-height: 0;
+  flex: 1;
+  height: 100%;
+  overflow: hidden;
   padding: 16px 12px 24px;
 }
 
 .imp-exp-view--job {
-  gap: 20px;
+  gap: 0;
 }
 
 .imp-exp-view--diff {
-  gap: 12px;
+  gap: 0;
   min-height: 0;
   flex: 1;
   overflow: hidden;
 }
 
+.job-split,
+.diff-view__split,
+.bulk-split,
+.field-bulk-split,
+.project-list__split {
+  flex: 1;
+  min-height: 0;
+}
+
 .imp-exp-view--diff .imp-exp-form {
-  flex-shrink: 0;
   max-width: none;
+  height: 100%;
+  overflow: auto;
 }
 
 .imp-exp-view--diff .diff-table-panel {
-  flex: 1;
-  min-height: 120px;
+  height: 100%;
+  min-height: 0;
 }
 
 .diff-table__path,
 .diff-table__json {
-  max-width: 280px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 12px;
   white-space: pre-wrap;
   word-break: break-all;
+  text-overflow: clip;
 }
 
 .imp-exp-form {
@@ -764,6 +968,9 @@ code {
   align-items: flex-start;
   gap: 12px;
   max-width: 720px;
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
 }
 
 .imp-exp-form__toggles {
@@ -855,9 +1062,12 @@ code {
 .imp-exp-job {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: stretch;
   gap: 10px;
   width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .imp-exp-view__header {
@@ -917,8 +1127,9 @@ code {
 }
 
 .imp-exp-view__log {
-  width: min(720px, 100%);
-  max-height: 280px;
+  width: 100%;
+  flex: 1;
+  min-height: 0;
   overflow: auto;
   padding: 8px 10px;
   border: 1px solid var(--ev-c-gray-1);
@@ -1140,8 +1351,6 @@ code {
 }
 
 .firestore-split {
-  display: flex;
-  gap: 0;
   min-height: 0;
   flex: 1;
   overflow: hidden;
@@ -1152,6 +1361,7 @@ code {
   display: flex;
   flex-direction: column;
   flex: 1;
+  height: 100%;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
@@ -1171,12 +1381,6 @@ code {
   flex: 1;
   min-height: 0;
   padding: 24px;
-}
-
-.firestore-split__divider {
-  flex-shrink: 0;
-  width: 1px;
-  background: var(--ev-c-gray-1);
 }
 
 .command-palette {
@@ -1418,7 +1622,10 @@ code {
 .explorer-sidebar {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 0;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .workspace-panel {
@@ -1565,6 +1772,9 @@ code {
 .project-list {
   display: flex;
   flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .project-list__header {
@@ -1573,6 +1783,7 @@ code {
   align-items: center;
   gap: 8px;
   padding: 0 4px 6px;
+  flex-shrink: 0;
 }
 
 .project-list__title {
@@ -1626,6 +1837,9 @@ code {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  overflow: auto;
+  min-height: 0;
+  height: 100%;
 }
 
 .project-list__entry {
@@ -1645,8 +1859,12 @@ code {
 }
 
 .project-list__row--focused {
-  border-color: var(--ev-c-gray-1);
-  background: var(--ev-c-gray-3);
+  border-color: var(--ev-c-project-focus-border);
+  background: var(--ev-c-project-focus);
+}
+
+.project-list__row--focused:hover {
+  background: var(--ev-c-project-focus);
 }
 
 .project-list__chevron {
@@ -1668,10 +1886,13 @@ code {
 }
 
 .project-list__children {
-  margin: 2px 0 4px;
-  padding-left: 18px;
-  border-left: 1px solid var(--ev-c-gray-1);
-  margin-left: 12px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  margin: 0;
+  padding: 4px 0 0;
 }
 
 .project-list__select {
@@ -1806,6 +2027,14 @@ code {
   font-weight: 600;
 }
 
+.collection-tree {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .collection-tree__title {
   margin: 0 0 6px;
   padding: 0 4px;
@@ -1820,6 +2049,12 @@ code {
   list-style: none;
   padding: 0;
   margin: 0;
+}
+
+.collection-tree__roots {
+  overflow: auto;
+  flex: 1;
+  min-height: 0;
 }
 
 .collection-tree__branch {
@@ -1964,6 +2199,7 @@ code {
   margin-top: 10px;
   padding-top: 8px;
   border-top: 1px solid var(--ev-c-gray-1);
+  flex-shrink: 0;
 }
 
 .auth-nav__button {
@@ -2069,9 +2305,6 @@ code {
 }
 
 .auth-users__body {
-  display: grid;
-  grid-template-columns: minmax(0, 1.6fr) minmax(260px, 0.9fr);
-  gap: 12px;
   min-height: 0;
   flex: 1;
   overflow: hidden;
@@ -2079,6 +2312,7 @@ code {
 
 .auth-users__table-wrap {
   min-height: 0;
+  height: 100%;
   overflow: auto;
   border: 1px solid var(--ev-c-gray-1);
   border-radius: 6px;
@@ -2135,6 +2369,7 @@ code {
 
 .auth-users__detail {
   min-height: 0;
+  height: 100%;
   overflow: auto;
   border: 1px solid var(--ev-c-gray-1);
   border-radius: 6px;
@@ -2182,12 +2417,6 @@ code {
   margin-top: 12px;
 }
 
-@media (max-width: 1100px) {
-  .auth-users__body {
-    grid-template-columns: 1fr;
-  }
-}
-
 .simple-main {
   display: flex;
   flex-direction: column;
@@ -2197,33 +2426,39 @@ code {
   overflow: hidden;
 }
 
+.simple-main__split {
+  flex: 1;
+  min-height: 0;
+}
+
 .simple-main__workspace {
   display: flex;
   flex-direction: column;
   gap: 10px;
   min-height: 0;
   flex: 1;
+  height: 100%;
   overflow: hidden;
 }
 
 .simple-main__json {
-  flex-shrink: 0;
-  max-height: 42%;
-  min-height: 160px;
-  overflow: auto;
-  padding-top: 10px;
-  border-top: 1px solid var(--ev-c-gray-1);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+  padding-top: 4px;
 }
 
 .simple-main__json .document-json-panel__editor {
-  min-height: 120px;
-  max-height: 220px;
+  min-height: 80px;
 }
 
 .simple-main__status {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  flex-shrink: 0;
 }
 
 .simple-main--empty {
@@ -2507,12 +2742,61 @@ code {
   font-size: 13px;
 }
 
+.document-table--fixed {
+  table-layout: fixed;
+}
+
 .document-table th,
 .document-table td {
   border-bottom: 1px solid var(--ev-c-gray-1);
   padding: 8px 10px;
   text-align: left;
   vertical-align: top;
+}
+
+.document-table--fixed th {
+  position: relative;
+}
+
+.document-table--fixed .document-table__sort {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-right: 4px;
+}
+
+.document-table--fixed .document-table__cell {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.document-table__col-resizer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 1;
+  width: 8px;
+  height: 100%;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.document-table__col-resizer::before {
+  content: '';
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  left: 50%;
+  width: 1px;
+  transform: translateX(-50%);
+  background: var(--ev-c-gray-1);
+}
+
+.document-table__col-resizer:hover::before,
+.document-table__col-resizer:active::before {
+  background: rgba(105, 136, 230, 0.75);
 }
 
 .document-table__row--selected {
@@ -2527,6 +2811,9 @@ code {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
 }
 
 .document-json-panel__header {
@@ -2698,8 +2985,10 @@ code {
 
 .document-json-panel__editor {
   width: 100%;
-  min-height: 220px;
-  resize: vertical;
+  flex: 1;
+  min-height: 80px;
+  max-height: none;
+  resize: none;
   border: 1px solid var(--ev-c-gray-1);
   border-radius: 8px;
   background: rgba(0, 0, 0, 0.2);
@@ -2708,6 +2997,13 @@ code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 13px;
   box-sizing: border-box;
+}
+
+.document-json-panel .autocomplete-input {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
 }
 
 .connection-panel__loading {
@@ -2752,32 +3048,46 @@ code {
   overflow: hidden;
 }
 
+.query-main__split {
+  flex: 1;
+  min-height: 0;
+}
+
+.query-main__after-editor .saved-queries-bar {
+  flex-shrink: 0;
+}
+
+.query-main__result-split {
+  flex: 1;
+  min-height: 0;
+}
+
 .query-main__workspace {
   display: flex;
   flex-direction: column;
   gap: 10px;
   min-height: 0;
   flex: 1;
+  height: 100%;
   overflow: hidden;
 }
 
 .query-main__workspace .document-table-panel {
   flex: 1;
-  min-height: 120px;
+  min-height: 80px;
 }
 
 .query-main__json {
-  flex-shrink: 0;
-  max-height: 36%;
-  min-height: 140px;
-  overflow: auto;
-  padding-top: 10px;
-  border-top: 1px solid var(--ev-c-gray-1);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+  padding-top: 4px;
 }
 
 .query-main__json .document-json-panel__editor {
-  min-height: 100px;
-  max-height: 180px;
+  min-height: 80px;
 }
 
 .query-main__error {
@@ -2863,11 +3173,12 @@ code {
   display: flex;
   flex-direction: column;
   gap: 0;
-  flex-shrink: 0;
+  flex: 1;
+  height: 100%;
+  min-height: 0;
   border: 1px solid var(--ev-c-gray-1);
   border-radius: 6px;
-  /* 候補リストをクリップしない（角丸は toolbar / field 側で維持） */
-  overflow: visible;
+  overflow: hidden;
 }
 
 .query-editor__toolbar {
@@ -2875,6 +3186,7 @@ code {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  flex-shrink: 0;
   padding: 8px 10px;
   border-bottom: 1px solid var(--ev-c-gray-1);
   background: rgba(0, 0, 0, 0.12);
@@ -2895,11 +3207,20 @@ code {
   width: auto;
 }
 
+.query-editor__field-wrap {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
 .query-editor__source {
   width: 100%;
-  min-height: 120px;
-  max-height: 28vh;
-  resize: vertical;
+  flex: 1;
+  min-height: 0;
+  height: auto;
+  max-height: none;
+  resize: none;
   border: none;
   background: rgba(0, 0, 0, 0.25);
   color: inherit;
@@ -2915,6 +3236,9 @@ code {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
   padding: 10px 12px;
   border: 1px solid var(--ev-c-gray-1);
   border-radius: 6px;
@@ -2989,6 +3313,11 @@ code {
   resize: vertical;
 }
 
+.query-editor__source.autocomplete-input__field--multiline,
+.document-json-panel__editor.autocomplete-input__field--multiline {
+  resize: none;
+}
+
 /* position / top / left / maxWidth / maxHeight は JS（fixed）で付与 */
 .autocomplete-input__list {
   position: fixed;
@@ -3033,16 +3362,25 @@ code {
   min-width: 180px;
 }
 
+.diff-preview {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+
 .diff-preview__title {
   margin: 0 0 8px;
   font-size: 14px;
+  flex-shrink: 0;
 }
 
 .diff-preview__wrap {
   overflow: auto;
   border: 1px solid var(--ev-c-gray-1);
   border-radius: 8px;
-  max-height: 240px;
+  flex: 1;
+  min-height: 0;
 }
 
 .diff-preview__table {
@@ -3110,6 +3448,13 @@ code {
   padding: 14px 16px;
   border: 1px solid var(--ev-c-gray-1);
   border-radius: 8px;
+}
+
+.connection-panel.emulator-page {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 .connection-panel__brand {
@@ -3420,13 +3765,36 @@ code {
 }
 
 .project-export-dialog__panel--wide {
-  width: min(560px, calc(100vw - 32px));
+  width: auto;
+  max-height: none;
+  overflow: hidden;
+}
+
+.field-bulk-split {
+  flex: 1;
+  min-height: 0;
+}
+
+.field-bulk-split__form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
+}
+
+.field-bulk-split__preview {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .project-export-dialog__header {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  flex-shrink: 0;
 }
 
 .project-export-dialog__title {
@@ -3534,6 +3902,7 @@ code {
   justify-content: flex-end;
   gap: 6px;
   margin-top: 2px;
+  flex-shrink: 0;
 }
 
 .project-export-dialog .fm-button {
@@ -3566,7 +3935,7 @@ code {
 
 .project-export-dialog .diff-preview__wrap {
   border-radius: 5px;
-  max-height: 200px;
+  max-height: none;
 }
 
 .project-export-dialog .diff-preview__table {

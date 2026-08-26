@@ -16,6 +16,8 @@ import { confirmAction } from '@shared/ui/confirmAction'
 import DocumentJsonPanel from '@shared/ui/DocumentJsonPanel'
 import DocumentTable from '@shared/ui/DocumentTable'
 import BulkActionsPanel from '@shared/ui/BulkActionsPanel'
+import SplitPane from '@shared/ui/SplitPane'
+import TableBulkSplit from '@shared/ui/TableBulkSplit'
 import { collectDataColumns } from '@shared/ui/document_table_utils'
 
 type SimpleViewProps = {
@@ -758,66 +760,86 @@ function SimpleView({
         </div>
       )}
 
-      <div className="simple-main__workspace">
-        <DocumentTable
-          documents={documents}
-          selectedDocumentPath={selectedDocumentPath}
-          tableKey={activeCollectionPath}
-          projectId={projectId}
-          selectable={!readOnly}
-          bulkSelectedPaths={bulkSelectedPaths}
-          onBulkToggle={handleBulkToggle}
-          onBulkToggleAll={handleBulkToggleAll}
-          onSelectDocument={(path) => onSelectDocument(path)}
-          paging={{
-            rangeLabel,
-            hasPrev: pageIndex > 0,
-            hasNext: hasMore,
-            hasLast: hasMore,
-            disabled: loading,
-            pageNumber: pageIndex + 1,
-            seeking,
-            seekStatus,
-            onFirst: handleFirstPage,
-            onPrev: handlePrevPage,
-            onNext: handleNextPage,
-            onLast: handleLastPage,
-            onGoToPage: handleGoToPage,
-            onCancelSeek: handleCancelSeek
-          }}
-        />
-        {!readOnly && (
-          <BulkActionsPanel
-            projectId={projectId}
-            environment={status.environment}
-            selectedPaths={Array.from(bulkSelectedPaths)}
-            loading={loading}
-            onLoadingChange={setLoading}
-            onClearSelection={() => setBulkSelectedPaths(new Set())}
-            onOperationComplete={() => void handleBulkOperationComplete()}
-            onError={setError}
-          />
-        )}
-      </div>
-
-      <div className="simple-main__json">
-        <DocumentJsonPanel
-          projectId={projectId}
-          documentPath={selectedDocumentPath}
-          jsonText={jsonText}
-          createTime={selectedCreateTime}
-          updateTime={selectedUpdateTime}
-          documentData={selectedDocumentData}
-          loading={loading}
-          onChange={setJsonText}
-          onSave={() => void handleSave()}
-          onDelete={() => void handleDelete()}
-          onCreate={() => handleCreate()}
-          onDuplicate={() => void handleDuplicateDocument()}
-          onOpenReference={onOpenDocumentPath}
-          readOnly={readOnly}
-        />
-      </div>
+      <SplitPane
+        className="simple-main__split"
+        orientation="vertical"
+        storageKey="simple.json"
+        sizeTarget="second"
+        defaultSize={38}
+        unit="percent"
+        minFirst={120}
+        minSecond={120}
+        ariaLabel="JSON パネルの高さ"
+        first={
+          <div className="simple-main__workspace">
+            <TableBulkSplit
+              table={
+            <DocumentTable
+              documents={documents}
+              selectedDocumentPath={selectedDocumentPath}
+              tableKey={activeCollectionPath}
+              projectId={projectId}
+              selectable={!readOnly}
+              bulkSelectedPaths={bulkSelectedPaths}
+              onBulkToggle={handleBulkToggle}
+              onBulkToggleAll={handleBulkToggleAll}
+              onSelectDocument={(path) => onSelectDocument(path)}
+              paging={{
+                rangeLabel,
+                hasPrev: pageIndex > 0,
+                hasNext: hasMore,
+                hasLast: hasMore,
+                disabled: loading,
+                pageNumber: pageIndex + 1,
+                seeking,
+                seekStatus,
+                onFirst: handleFirstPage,
+                onPrev: handlePrevPage,
+                onNext: handleNextPage,
+                onLast: handleLastPage,
+                onGoToPage: handleGoToPage,
+                onCancelSeek: handleCancelSeek
+              }}
+            />
+              }
+              bulk={
+                !readOnly && bulkSelectedPaths.size > 0 ? (
+              <BulkActionsPanel
+                projectId={projectId}
+                environment={status.environment}
+                selectedPaths={Array.from(bulkSelectedPaths)}
+                loading={loading}
+                onLoadingChange={setLoading}
+                onClearSelection={() => setBulkSelectedPaths(new Set())}
+                onOperationComplete={() => void handleBulkOperationComplete()}
+                onError={setError}
+              />
+                ) : null
+              }
+            />
+          </div>
+        }
+        second={
+          <div className="simple-main__json">
+            <DocumentJsonPanel
+              projectId={projectId}
+              documentPath={selectedDocumentPath}
+              jsonText={jsonText}
+              createTime={selectedCreateTime}
+              updateTime={selectedUpdateTime}
+              documentData={selectedDocumentData}
+              loading={loading}
+              onChange={setJsonText}
+              onSave={() => void handleSave()}
+              onDelete={() => void handleDelete()}
+              onCreate={() => handleCreate()}
+              onDuplicate={() => void handleDuplicateDocument()}
+              onOpenReference={onOpenDocumentPath}
+              readOnly={readOnly}
+            />
+          </div>
+        }
+      />
     </div>
   )
 }

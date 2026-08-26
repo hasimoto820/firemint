@@ -16,6 +16,8 @@
   --ev-c-text-2: rgba(235, 235, 245, 0.6);
   --ev-c-text-3: rgba(235, 235, 245, 0.38);
   --ev-c-text-success: #4ade80;
+  --ev-c-project-focus: rgba(45, 212, 191, 0.16);
+  --ev-c-project-focus-border: rgba(45, 212, 191, 0.48);
 
   --ev-button-alt-border: transparent;
   --ev-button-alt-text: var(--ev-c-text-1);
@@ -49,6 +51,8 @@
   --ev-c-text-2: rgba(20, 20, 24, 0.62);
   --ev-c-text-3: rgba(20, 20, 24, 0.42);
   --ev-c-text-success: #047857;
+  --ev-c-project-focus: rgba(45, 212, 191, 0.18);
+  --ev-c-project-focus-border: rgba(20, 184, 166, 0.42);
 
   --ev-button-alt-border: transparent;
   --ev-button-alt-text: var(--ev-c-text-1);

@@ -17,6 +17,8 @@ import type { WorkspaceTabQueryDraftPatch } from '@shared/shell/workspace_tab'
 import DocumentJsonPanel from '@shared/ui/DocumentJsonPanel'
 import DocumentTable from '@shared/ui/DocumentTable'
 import BulkActionsPanel from '@shared/ui/BulkActionsPanel'
+import SplitPane from '@shared/ui/SplitPane'
+import TableBulkSplit from '@shared/ui/TableBulkSplit'
 import { confirmAction } from '@shared/ui/confirmAction'
 import { collectDataColumns } from '@shared/ui/document_table_utils'
 import QueryEditor from './QueryEditor'
@@ -535,84 +537,120 @@ function QueryView({
 
   return (
     <div className="query-main">
-      <QueryEditor
-        projectId={projectId}
-        source={source}
-        loading={loading}
-        groupTab={groupTab}
-        onChange={(next) => onQueryDraftChange({ querySource: next })}
-        onSelectGroupTab={handleSelectGroupTab}
-        onRun={() => void handleRun()}
-      />
-      <SavedQueriesBar
-        queries={savedQueries}
-        selectedId={querySelectedSavedId}
-        name={querySavedName}
-        loading={loading}
-        onSelect={handleSelectSaved}
-        onNameChange={(name) => onQueryDraftChange({ querySavedName: name })}
-        onLoad={handleLoadSaved}
-        onSave={() => void handleSaveSaved()}
-        onDelete={() => void handleDeleteSaved()}
-      />
-      {error && <p className="query-main__error">{error}</p>}
-      {statusMessage && <p className="query-main__status">{statusMessage}</p>}
-      {loading && <p className="query-main__loading">実行中...</p>}
-      {queryResultCount === null && !loading && (
-        <p className="query-main__empty-hint">
-          Run で絞り込み → 行を選んで JSON を保存、またはチェックして一括。db / admin
-          が使えます。
-        </p>
-      )}
-      {queryResultCount !== null && (
-        <>
-          <div className="query-main__workspace">
-            <div className="query-main__result-label">{queryResultCount} docs</div>
-            <DocumentTable
-              documents={queryDocuments}
-              selectedDocumentPath={queryResultSelectedPath}
-              showPath={showResultPath}
-              tableKey={`js-query:${queryResultCount}:${queryDocuments[0]?.path ?? 'empty'}`}
-              projectId={projectId}
-              selectable={!readOnly}
-              bulkSelectedPaths={bulkSelectedPaths}
-              onBulkToggle={handleBulkToggle}
-              onBulkToggleAll={handleBulkToggleAll}
-              onSelectDocument={(path) => void handleSelectDocument(path)}
+      <SplitPane
+        className="query-main__split"
+        orientation="vertical"
+        storageKey="query.editor"
+        defaultSize={200}
+        unit="px"
+        minFirst={96}
+        minSecond={160}
+        ariaLabel="クエリエディタの高さ"
+        first={
+          <QueryEditor
+            projectId={projectId}
+            source={source}
+            loading={loading}
+            groupTab={groupTab}
+            onChange={(next) => onQueryDraftChange({ querySource: next })}
+            onSelectGroupTab={handleSelectGroupTab}
+            onRun={() => void handleRun()}
+          />
+        }
+        second={
+          <div className="query-main__after-editor">
+            <SavedQueriesBar
+              queries={savedQueries}
+              selectedId={querySelectedSavedId}
+              name={querySavedName}
+              loading={loading}
+              onSelect={handleSelectSaved}
+              onNameChange={(name) => onQueryDraftChange({ querySavedName: name })}
+              onLoad={handleLoadSaved}
+              onSave={() => void handleSaveSaved()}
+              onDelete={() => void handleDeleteSaved()}
             />
-            {!readOnly && (
-              <BulkActionsPanel
-                projectId={projectId}
-                environment={status.environment}
-                selectedPaths={Array.from(bulkSelectedPaths)}
-                loading={loading}
-                onLoadingChange={setLoading}
-                onClearSelection={() => setBulkSelectedPaths(new Set())}
-                onOperationComplete={() => void handleBulkOperationComplete()}
-                onError={setError}
+            {error && <p className="query-main__error">{error}</p>}
+            {statusMessage && <p className="query-main__status">{statusMessage}</p>}
+            {loading && <p className="query-main__loading">実行中...</p>}
+            {queryResultCount === null && !loading && (
+              <p className="query-main__empty-hint">
+                Run で絞り込み → 行を選んで JSON を保存、またはチェックして一括。db / admin
+                が使えます。
+              </p>
+            )}
+            {queryResultCount !== null && (
+              <SplitPane
+                className="query-main__result-split"
+                orientation="vertical"
+                storageKey="query.json"
+                sizeTarget="second"
+                defaultSize={36}
+                unit="percent"
+                minFirst={100}
+                minSecond={100}
+                ariaLabel="JSON パネルの高さ"
+                first={
+                  <div className="query-main__workspace">
+                    <div className="query-main__result-label">{queryResultCount} docs</div>
+                    <TableBulkSplit
+                      table={
+                    <DocumentTable
+                      documents={queryDocuments}
+                      selectedDocumentPath={queryResultSelectedPath}
+                      showPath={showResultPath}
+                      tableKey={`js-query:${queryResultCount}:${queryDocuments[0]?.path ?? 'empty'}`}
+                      columnWidthsKey="table.col:js-query"
+                      projectId={projectId}
+                      selectable={!readOnly}
+                      bulkSelectedPaths={bulkSelectedPaths}
+                      onBulkToggle={handleBulkToggle}
+                      onBulkToggleAll={handleBulkToggleAll}
+                      onSelectDocument={(path) => void handleSelectDocument(path)}
+                    />
+                      }
+                      bulk={
+                        !readOnly && bulkSelectedPaths.size > 0 ? (
+                      <BulkActionsPanel
+                        projectId={projectId}
+                        environment={status.environment}
+                        selectedPaths={Array.from(bulkSelectedPaths)}
+                        loading={loading}
+                        onLoadingChange={setLoading}
+                        onClearSelection={() => setBulkSelectedPaths(new Set())}
+                        onOperationComplete={() => void handleBulkOperationComplete()}
+                        onError={setError}
+                      />
+                        ) : null
+                      }
+                    />
+                  </div>
+                }
+                second={
+                  <div className="query-main__json">
+                    <DocumentJsonPanel
+                      projectId={projectId}
+                      documentPath={queryResultSelectedPath}
+                      jsonText={jsonText}
+                      createTime={selectedCreateTime}
+                      updateTime={selectedUpdateTime}
+                      documentData={selectedDocument?.data ?? null}
+                      loading={loading}
+                      onChange={setJsonText}
+                      onSave={() => void handleSave()}
+                      onDelete={() => void handleDelete()}
+                      onCreate={() => undefined}
+                      showCreate={false}
+                      readOnly={readOnly}
+                      onOpenReference={onOpenDocumentPath}
+                    />
+                  </div>
+                }
               />
             )}
           </div>
-          <div className="query-main__json">
-            <DocumentJsonPanel
-              projectId={projectId}
-              documentPath={queryResultSelectedPath}
-              jsonText={jsonText}
-              createTime={selectedCreateTime}
-              updateTime={selectedUpdateTime}
-              documentData={selectedDocument?.data ?? null}
-              loading={loading}
-              onChange={setJsonText}
-              onSave={() => void handleSave()}
-              onDelete={() => void handleDelete()}
-              onCreate={() => undefined}
-              showCreate={false}
-              readOnly={readOnly}
-              onOpenReference={onOpenDocumentPath}
-            />
-          </div>
-        </>
-      )}
+        }
+      />
     </div>
   )
 }

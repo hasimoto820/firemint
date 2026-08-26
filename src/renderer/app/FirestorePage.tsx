@@ -50,6 +50,7 @@ import {
 import AppHeader from '@shared/shell/AppHeader'
 import type { AppView } from '@shared/shell/AppNav'
 import AppShell from '@shared/shell/AppShell'
+import SplitPane from '@shared/ui/SplitPane'
 import CommandPalette, { type CommandPaletteItem } from '@shared/shell/CommandPalette'
 import TabBar from '@shared/shell/TabBar'
 import WorkspacePane from '@shared/shell/WorkspacePane'
@@ -1699,11 +1700,23 @@ function FirestorePageInner({
                 <p className="simple-main__empty-hint">{t('explorer.open_hint')}</p>
               </div>
             ) : splitEnabled ? (
-              <div className="firestore-split">
-                {renderEditorGroup('primary', primaryTabs, primaryActiveId, primaryTab)}
-                <div className="firestore-split__divider" aria-hidden />
-                {renderEditorGroup('secondary', secondaryTabs, secondaryActiveId, secondaryTab)}
-              </div>
+              <SplitPane
+                className="firestore-split"
+                orientation="horizontal"
+                storageKey="shell.split"
+                defaultSize={50}
+                unit="percent"
+                minFirst={220}
+                minSecond={220}
+                ariaLabel="左右ペインの幅"
+                first={renderEditorGroup('primary', primaryTabs, primaryActiveId, primaryTab)}
+                second={renderEditorGroup(
+                  'secondary',
+                  secondaryTabs,
+                  secondaryActiveId,
+                  secondaryTab
+                )}
+              />
             ) : (
               renderEditorGroup('primary', primaryTabs, primaryActiveId, primaryTab)
             )}

@@ -12,6 +12,7 @@ import type { ScriptJobSnapshot } from '@features/script_runner/shared/types'
 import type { WorkspaceEntry } from '@features/workspace/shared/types'
 import AutocompleteInput from '@shared/ui/AutocompleteInput'
 import Button from '@shared/ui/Button'
+import JobSplitLayout from '@shared/ui/JobSplitLayout'
 import { useT } from '@shared/i18n/renderer/I18nProvider'
 
 type ImpExpViewProps = {
@@ -507,6 +508,8 @@ function ImpExpView({
 
   return (
     <div className="imp-exp-view imp-exp-view--job">
+      <JobSplitLayout
+        form={
       <div className="imp-exp-form">
         <h1 className="imp-exp-form__title">{t('menu.cloud')}</h1>
         <div className="imp-exp-form__toggles">
@@ -732,8 +735,9 @@ function ImpExpView({
           </Button>
         </div>
       </div>
-
-      {job ? (
+        }
+        log={
+      job ? (
         <div className="imp-exp-job">
           <header className="imp-exp-view__header">
             <p className="simple-main__empty-title">{job.title}</p>
@@ -785,7 +789,9 @@ function ImpExpView({
         <p className="simple-main__empty-hint">
           実行中は別のコレクションタブへ戻れます。進捗とログはここに出ます。
         </p>
-      )}
+      )
+        }
+      />
     </div>
   )
 }

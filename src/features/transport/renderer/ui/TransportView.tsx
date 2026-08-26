@@ -5,6 +5,7 @@ import type { ScriptJobSnapshot } from '@features/script_runner/shared/types'
 import type { WorkspaceAuthType, WorkspaceEntry } from '@features/workspace/shared/types'
 import { workspaceAuthLabel } from '@features/workspace/shared/types'
 import Button from '@shared/ui/Button'
+import JobSplitLayout from '@shared/ui/JobSplitLayout'
 import { useT } from '@shared/i18n/renderer/I18nProvider'
 
 type TransportViewProps = {
@@ -330,6 +331,8 @@ function TransportView({
 
   return (
     <div className="imp-exp-view imp-exp-view--job">
+      <JobSplitLayout
+        form={
       <div className="imp-exp-form">
         <h1 className="imp-exp-form__title">{t('menu.transport')}</h1>
         <div className="imp-exp-form__toggles">
@@ -502,8 +505,9 @@ function TransportView({
           </Button>
         </div>
       </div>
-
-      {job && job.kind === 'transport' ? (
+        }
+        log={
+      job && job.kind === 'transport' ? (
         <div className="imp-exp-job">
           <header className="imp-exp-view__header">
             <p className="simple-main__empty-title">{job.title}</p>
@@ -555,7 +559,9 @@ function TransportView({
         <p className="simple-main__empty-hint">
           実行中は別のコレクションタブへ戻れます。進捗とログはここに出ます。
         </p>
-      )}
+      )
+        }
+      />
     </div>
   )
 }

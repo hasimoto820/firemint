@@ -68,6 +68,7 @@ function QueryEditor({
         multiline
         wordCompletion
         disabled={loading}
+        className="query-editor__field-wrap"
         fieldClassName="query-editor__source"
         aria-label="JS Query コード"
         onChange={onChange}
