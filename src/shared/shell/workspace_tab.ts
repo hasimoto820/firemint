@@ -28,6 +28,8 @@ export type WorkspaceTab = {
   view: AppView
   selectedDocumentPath: string | null
   pane: WorkspacePaneId
+  /** null = 未グループ。セッション内のみ（再起動で消える） */
+  groupId: string | null
   /** null = 未初期化。初回 Query 表示で default JS を埋める */
   querySource: string | null
   /** querySource が「未編集の seed」として紐づく path（Saved 読込後は null） */
@@ -77,6 +79,7 @@ export function createWorkspaceTab(input: {
     view: input.view ?? 'simple',
     selectedDocumentPath: input.selectedDocumentPath ?? null,
     pane: input.pane ?? 'primary',
+    groupId: null,
     querySource: null,
     querySeededPath: null,
     querySelectedSavedId: null,

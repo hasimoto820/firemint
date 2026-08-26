@@ -76,6 +76,20 @@ import {
   type WorkspacePaneId,
   type WorkspaceTab
 } from '@shared/shell/workspace_tab'
+import {
+  applyTabBarDrop,
+  assignTabGroup,
+  createTabGroup,
+  nextGroupSerialTitle,
+  nextTabGroupColor,
+  pruneEmptyGroups,
+  splitTabsAfterActive,
+  ungroupTabs,
+  type TabDragSource,
+  type TabDropDest,
+  type TabGroupColor,
+  type WorkspaceTabGroup
+} from '@shared/shell/tab_group'
 
 export type ShellCommands = {
   openCommandPalette: () => void
@@ -151,6 +165,7 @@ function FirestorePageInner({
   const autocomplete = useAutocompleteApi()
   const [rootCollections, setRootCollections] = useState<string[]>([])
   const [tabs, setTabs] = useState<WorkspaceTab[]>([])
+  const [tabGroups, setTabGroups] = useState<WorkspaceTabGroup[]>([])
   const [primaryActiveId, setPrimaryActiveId] = useState<string | null>(null)
   const [secondaryActiveId, setSecondaryActiveId] = useState<string | null>(null)
   const [splitEnabled, setSplitEnabled] = useState(false)
@@ -359,6 +374,13 @@ function FirestorePageInner({
         setSecondaryActiveId(tabId)
       }
       setFocusedPane(pane)
+      if (tab?.groupId) {
+        setTabGroups((current) =>
+          current.map((group) =>
+            group.id === tab.groupId && group.collapsed ? { ...group, collapsed: false } : group
+          )
+        )
+      }
       if (tab && isCollectionTab(tab)) {
         onNavigate(tab.view)
       }
@@ -1059,6 +1081,96 @@ function FirestorePageInner({
     [confirmStopImpExpJob, tabs]
   )
 
+  useEffect(() => {
+    setTabGroups((current) => pruneEmptyGroups(current, tabs))
+  }, [tabs])
+
+  const handleTabDrop = useCallback(
+    (pane: WorkspacePaneId, source: TabDragSource, dest: TabDropDest): void => {
+      setTabs((current) => applyTabBarDrop(current, pane, source, dest))
+    },
+    []
+  )
+
+  const handleCreateGroup = useCallback((pane: WorkspacePaneId, tabId: string): void => {
+    setTabGroups((current) => {
+      const group = createTabGroup(
+        pane,
+        nextTabGroupColor(current.filter((item) => item.pane === pane)),
+        nextGroupSerialTitle(current, t('tab.group'))
+      )
+      setTabs((tabsCurrent) => assignTabGroup(tabsCurrent, pane, tabId, group.id))
+      return [...current, group]
+    })
+  }, [t])
+
+  const handleJoinGroup = useCallback(
+    (pane: WorkspacePaneId, tabId: string, groupId: string): void => {
+      setTabs((current) => assignTabGroup(current, pane, tabId, groupId))
+    },
+    []
+  )
+
+  const handleLeaveGroup = useCallback((pane: WorkspacePaneId, tabId: string): void => {
+    setTabs((current) => assignTabGroup(current, pane, tabId, null))
+  }, [])
+
+  const handleUngroup = useCallback((groupId: string): void => {
+    setTabs((current) => ungroupTabs(current, groupId))
+    setTabGroups((current) => current.filter((group) => group.id !== groupId))
+  }, [])
+
+  const handleRenameGroup = useCallback((groupId: string, title: string): void => {
+    setTabGroups((current) =>
+      current.map((group) => (group.id === groupId ? { ...group, title } : group))
+    )
+  }, [])
+
+  const handleSetGroupColor = useCallback((groupId: string, color: TabGroupColor): void => {
+    setTabGroups((current) =>
+      current.map((group) => (group.id === groupId ? { ...group, color } : group))
+    )
+  }, [])
+
+  const handleToggleGroupCollapsed = useCallback((groupId: string): void => {
+    setTabGroups((current) =>
+      current.map((group) =>
+        group.id === groupId ? { ...group, collapsed: !group.collapsed } : group
+      )
+    )
+  }, [])
+
+  const handleCloseGroup = useCallback(
+    async (groupId: string): Promise<void> => {
+      const members = tabs.filter((tab) => tab.groupId === groupId)
+      if (members.length === 0) {
+        return
+      }
+
+      const hasTool = members.some((tab) => isWorkspaceToolTab(tab))
+      if (hasTool && !(await confirmStopImpExpJob())) {
+        return
+      }
+
+      const pane = members[0].pane
+      const ids = new Set(members.map((tab) => tab.id))
+      const remaining = tabsInPane(tabs, pane).filter((tab) => !ids.has(tab.id))
+      const neighbor = remaining[0] ?? null
+
+      setTabs((current) => current.filter((tab) => !ids.has(tab.id)))
+      setTabGroups((current) => current.filter((group) => group.id !== groupId))
+
+      if (pane === 'primary') {
+        setPrimaryActiveId((active) => (active && ids.has(active) ? (neighbor?.id ?? null) : active))
+      } else {
+        setSecondaryActiveId((active) =>
+          active && ids.has(active) ? (neighbor?.id ?? null) : active
+        )
+      }
+    },
+    [confirmStopImpExpJob, tabs]
+  )
+
   const handleEmulatorWorkspaceChanged = useCallback(async (): Promise<void> => {
     await onWorkspaceChanged()
     void loadRootCollections()
@@ -1103,7 +1215,7 @@ function FirestorePageInner({
   const moveTabToPane = useCallback(
     (tabId: string, pane: WorkspacePaneId): void => {
       setTabs((current) =>
-        current.map((tab) => (tab.id === tabId ? { ...tab, pane } : tab))
+        current.map((tab) => (tab.id === tabId ? { ...tab, pane, groupId: null } : tab))
       )
       activateInPane(tabId, pane)
     },
@@ -1114,27 +1226,22 @@ function FirestorePageInner({
     setSplitEnabled((enabled) => {
       const next = !enabled
       if (next) {
-        const candidates = tabs.filter((tab) => tab.id !== primaryActiveId)
-        const moveTarget = candidates[0] ?? null
-        if (moveTarget) {
-          setTabs((current) =>
-            current.map((tab) =>
-              tab.id === moveTarget.id ? { ...tab, pane: 'secondary' as const } : tab
-            )
-          )
-          setSecondaryActiveId(moveTarget.id)
-        } else {
-          setSecondaryActiveId(null)
-        }
+        const planned = splitTabsAfterActive(tabs, tabGroups, primaryActiveId)
+        setTabs(planned.tabs)
+        setTabGroups(planned.groups)
+        setPrimaryActiveId(planned.primaryActiveId)
+        setSecondaryActiveId(planned.secondaryActiveId)
+        setFocusedPane('secondary')
         return true
       }
 
       setTabs((current) => current.map((tab) => ({ ...tab, pane: 'primary' as const })))
+      setTabGroups((current) => current.map((group) => ({ ...group, pane: 'primary' as const })))
       setSecondaryActiveId(null)
       setFocusedPane('primary')
       return false
     })
-  }, [tabs, primaryActiveId])
+  }, [tabs, tabGroups, primaryActiveId])
 
   // メニュー等の view 変更 → フォーカス中のコレクションタブへ
   useEffect(() => {
@@ -1445,6 +1552,7 @@ function FirestorePageInner({
     >
       <TabBar
         tabs={paneTabs}
+        groups={tabGroups.filter((group) => group.pane === pane)}
         activeTabId={activeId}
         ariaLabel={pane === 'primary' ? '左ペインのタブ' : '右ペインのタブ'}
         impExpBusy={impExpJob?.status === 'running'}
@@ -1452,6 +1560,15 @@ function FirestorePageInner({
         showProjectLabel={showProjectLabel}
         onActivate={(tabId) => activateInPane(tabId, pane)}
         onClose={handleCloseTab}
+        onDrop={(source, dest) => handleTabDrop(pane, source, dest)}
+        onCreateGroup={(tabId) => handleCreateGroup(pane, tabId)}
+        onJoinGroup={(tabId, groupId) => handleJoinGroup(pane, tabId, groupId)}
+        onLeaveGroup={(tabId) => handleLeaveGroup(pane, tabId)}
+        onCloseGroup={(groupId) => void handleCloseGroup(groupId)}
+        onUngroup={handleUngroup}
+        onRenameGroup={handleRenameGroup}
+        onSetGroupColor={handleSetGroupColor}
+        onToggleGroupCollapsed={handleToggleGroupCollapsed}
       />
 
       {active ? (

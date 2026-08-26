@@ -651,6 +651,8 @@ code {
   border-radius: 6px 6px 0 0;
   background: transparent;
   color: var(--ev-c-text-2);
+  cursor: grab;
+  user-select: none;
 }
 
 .tab-bar__tab--active {
@@ -955,6 +957,162 @@ code {
 
 .tab-bar__close:hover {
   opacity: 1;
+}
+
+.tab-bar__tab--drop-before {
+  box-shadow: inset 2px 0 0 var(--ev-c-text-1);
+}
+
+.tab-bar__tab--drop-after {
+  box-shadow: inset -2px 0 0 var(--ev-c-text-1);
+}
+
+.tab-bar__group {
+  display: flex;
+  align-items: stretch;
+  flex-shrink: 0;
+  gap: 2px;
+  max-width: 100%;
+  padding: 0 2px;
+  border-radius: 6px 6px 0 0;
+  background: color-mix(in srgb, var(--tab-group-color) 22%, transparent);
+}
+
+.tab-bar__group--drop-before {
+  box-shadow: inset 2px 0 0 var(--tab-group-color);
+}
+
+.tab-bar__group--drop-after {
+  box-shadow: inset -2px 0 0 var(--tab-group-color);
+}
+
+.tab-bar__group--drop-into {
+  outline: 1px solid var(--tab-group-color);
+  outline-offset: -1px;
+}
+
+.tab-bar__group--blue {
+  --tab-group-color: #8ab4f8;
+}
+
+.tab-bar__group--red {
+  --tab-group-color: #f28b82;
+}
+
+.tab-bar__group--yellow {
+  --tab-group-color: #fdd663;
+}
+
+.tab-bar__group--green {
+  --tab-group-color: #81c995;
+}
+
+.tab-bar__group--pink {
+  --tab-group-color: #ff8bcb;
+}
+
+.tab-bar__group--purple {
+  --tab-group-color: #c58af9;
+}
+
+.tab-bar__group--cyan {
+  --tab-group-color: #78d9ec;
+}
+
+.tab-bar__group--grey {
+  --tab-group-color: #9aa0a6;
+}
+
+.tab-bar__group--active {
+  background: color-mix(in srgb, var(--tab-group-color) 32%, transparent);
+}
+
+.tab-bar__group--collapsed {
+  min-width: 0;
+}
+
+.tab-bar__group-label,
+.tab-bar__group-input {
+  flex-shrink: 0;
+  max-width: 120px;
+  min-width: 36px;
+  margin: 4px 2px;
+  border: none;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--tab-group-color) 28%, transparent);
+  color: inherit;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 0 8px;
+  cursor: pointer;
+}
+
+.tab-bar__group-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tab-bar__group-input {
+  width: 96px;
+  cursor: text;
+}
+
+.tab-bar__group .tab-bar__tab {
+  background: transparent;
+}
+
+.tab-bar__color-row {
+  display: flex;
+  gap: 5px;
+  padding: 4px 10px 8px;
+}
+
+.tab-bar__color-dot {
+  width: 12px;
+  height: 12px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.tab-bar__color-dot--active {
+  outline: 2px solid var(--ev-c-text-1);
+  outline-offset: 1px;
+}
+
+.tab-bar__color-dot--blue {
+  background: #8ab4f8;
+}
+
+.tab-bar__color-dot--red {
+  background: #f28b82;
+}
+
+.tab-bar__color-dot--yellow {
+  background: #fdd663;
+}
+
+.tab-bar__color-dot--green {
+  background: #81c995;
+}
+
+.tab-bar__color-dot--pink {
+  background: #ff8bcb;
+}
+
+.tab-bar__color-dot--purple {
+  background: #c58af9;
+}
+
+.tab-bar__color-dot--cyan {
+  background: #78d9ec;
+}
+
+.tab-bar__color-dot--grey {
+  background: #9aa0a6;
 }
 
 .workspace-pane {
