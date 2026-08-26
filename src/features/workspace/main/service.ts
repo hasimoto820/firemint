@@ -62,6 +62,31 @@ export function getWorkspaceEntry(projectId: string): WorkspaceEntry | null {
   return store.entries.find((entry) => entry.id === projectId) ?? null
 }
 
+/** id または label。CLI 用。複数ヒットや未登録は null。 */
+export function resolveWorkspaceEntry(idOrLabel: string): WorkspaceEntry | null {
+  const trimmed = idOrLabel.trim()
+  if (!trimmed) {
+    return null
+  }
+
+  const byId = getWorkspaceEntry(trimmed)
+  if (byId) {
+    return byId
+  }
+
+  const needle = trimmed.toLowerCase()
+  const matches = store.entries.filter(
+    (entry) => entry.id.toLowerCase() === needle || entry.label.toLowerCase() === needle
+  )
+  return matches.length === 1 ? matches[0] : null
+}
+
+/** 名簿だけ読む。再接続も保存もしない（CLI）。 */
+export async function hydrateWorkspaceStore(): Promise<void> {
+  store = await loadWorkspaceStore()
+  syncFocusedFromStore()
+}
+
 export function getWorkspaceState(): WorkspaceState {
   return {
     entries: store.entries.map((entry) => ({ ...entry })),
@@ -347,7 +372,10 @@ export async function addEmulatorEntryAndLoad(
   }
 }
 
-export async function loadProject(projectId: string): Promise<WorkspaceResult<WorkspaceEntry>> {
+export async function loadProject(
+  projectId: string,
+  options?: { persist?: boolean }
+): Promise<WorkspaceResult<WorkspaceEntry>> {
   const entry = getWorkspaceEntry(projectId)
 
   if (!entry) {
@@ -364,7 +392,9 @@ export async function loadProject(projectId: string): Promise<WorkspaceResult<Wo
     return result
   }
 
-  await persistStore()
+  if (options?.persist !== false) {
+    await persistStore()
+  }
   return { ok: true, data: entry }
 }
 

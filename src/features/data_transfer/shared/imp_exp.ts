@@ -4,7 +4,7 @@ import type {
 } from './types'
 
 export type ImpExpDirection = 'import' | 'export'
-export type ImpExpTarget = 'collection' | 'project'
+export type ImpExpTarget = 'collection' | 'group' | 'project'
 
 export type ImpExpIntent = {
   direction: ImpExpDirection
@@ -20,6 +20,11 @@ export type ImpExpDraft = ImpExpIntent & {
   acceptMismatch: boolean
   collectionValidation: ImportCollectionValidation | null
   projectValidation: ImportProjectValidation | null
+}
+
+export function lastPathSegment(path: string): string {
+  const parts = path.split('/').filter(Boolean)
+  return parts[parts.length - 1] ?? ''
 }
 
 export function createImpExpDraft(projectId: string): ImpExpDraft {
@@ -43,22 +48,24 @@ export function applyImpExpIntent(
   lastCollectionPath: string | null,
   rootCollectionIds: string[] = []
 ): ImpExpDraft {
-  const switched =
-    draft.direction !== intent.direction || draft.target !== intent.target
+  const direction = intent.direction
+  const target = direction === 'import' ? 'project' : intent.target
+  const switched = draft.direction !== direction || draft.target !== target
 
   return {
     ...draft,
-    direction: intent.direction,
-    target: intent.target,
+    direction,
+    target,
     collectionPath:
-      intent.target === 'collection'
+      target === 'collection'
         ? draft.collectionPath || lastCollectionPath || ''
-        : draft.collectionPath,
-    acceptMismatch:
-      intent.direction === 'import' && intent.target === 'project' ? draft.acceptMismatch : false,
+        : target === 'group'
+          ? lastPathSegment(draft.collectionPath || lastCollectionPath || '')
+          : draft.collectionPath,
+    acceptMismatch: false,
     selectedRoots:
-      intent.direction === 'export' &&
-      intent.target === 'project' &&
+      direction === 'export' &&
+      target === 'project' &&
       draft.selectedRoots.length === 0
         ? rootCollectionIds
         : draft.selectedRoots,

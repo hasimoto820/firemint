@@ -2,13 +2,12 @@ import { useEffect, useMemo, useState } from 'react'
 import { useOptionalAutocompleteApi } from '@features/autocomplete/renderer/hooks'
 import { matchesAutocompleteNeedle } from '@features/autocomplete/renderer/catalog'
 import type { AutocompleteItem } from '@features/autocomplete/shared/types'
-import type {
-  ImportCollectionProgress,
-  ImportCollectionValidation,
-  ImportProjectProgress,
-  ImportProjectValidation
-} from '@features/data_transfer/shared/types'
-import type { ImpExpDraft, ImpExpIntent } from '@features/data_transfer/shared/imp_exp'
+import type { ImportProjectProgress } from '@features/data_transfer/shared/types'
+import {
+  lastPathSegment,
+  type ImpExpDraft,
+  type ImpExpIntent
+} from '@features/data_transfer/shared/imp_exp'
 import type { ScriptJobSnapshot } from '@features/script_runner/shared/types'
 import type { WorkspaceEntry } from '@features/workspace/shared/types'
 import AutocompleteInput from '@shared/ui/AutocompleteInput'
@@ -78,18 +77,22 @@ function ToggleBar<T extends string>({
 }
 
 function fileKindLabel(intent: ImpExpIntent): string {
-  if (intent.direction === 'export') {
-    return intent.target === 'collection' ? 'JSON' : 'ZIP'
+  if (intent.direction === 'import') {
+    return 'フォルダ / ZIP'
   }
 
-  return intent.target === 'collection' ? 'JSON / CSV' : 'ZIP'
+  return 'ZIP'
 }
 
 function projectOptionLabel(
   entry: WorkspaceEntry,
-  writeBlockedReasons: Record<string, string>
+  writeBlockedReasons: Record<string, string>,
+  forImport: boolean
 ): string {
   const name = entry.label !== entry.id ? `${entry.label} — ${entry.id}` : entry.id
+  if (forImport && entry.authType === 'emulator') {
+    return `${name}（この Emulator に新規追加）`
+  }
   if (entry.readOnly) {
     return `${name}（read-only）`
   }
@@ -115,16 +118,13 @@ function ImpExpView({
   const t = useT()
   const jobRunning = job?.status === 'running'
   const formDisabled = jobRunning
-  const collectionValidation = draft.collectionValidation
   const projectValidation = draft.projectValidation
   const [entries, setEntries] = useState<WorkspaceEntry[]>([])
   const [writeBlockedReasons, setWriteBlockedReasons] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
   const [destRootCollections, setDestRootCollections] = useState<string[]>([])
   const [formError, setFormError] = useState<string | null>(null)
-  const [validateProgress, setValidateProgress] = useState<
-    ImportCollectionProgress | ImportProjectProgress | null
-  >(null)
+  const [validateProgress, setValidateProgress] = useState<ImportProjectProgress | null>(null)
 
   const destination =
     entries.find((entry) => entry.id === draft.destinationProjectId) ??
@@ -134,9 +134,14 @@ function ImpExpView({
   const destinationId = destination?.id ?? projectId
   const destinationReadOnly = destination?.readOnly ?? readOnly
   const destinationWriteBlockedReason = writeBlockedReasons[destinationId] ?? null
-  const destinationLocked = destinationReadOnly || Boolean(destinationWriteBlockedReason)
+  const destinationLocked =
+    destination?.authType === 'emulator'
+      ? false
+      : destinationReadOnly || Boolean(destinationWriteBlockedReason)
   const showProjectSelect =
-    draft.target === 'collection' || (draft.direction === 'import' && draft.target === 'project')
+    draft.direction === 'import' ||
+    draft.target === 'collection' ||
+    draft.target === 'group'
 
   const collectionItems = useMemo(() => {
     void autocomplete.revision
@@ -160,8 +165,26 @@ function ImpExpView({
     return extras.length === 0 ? fromPool : [...fromPool, ...extras]
   }, [autocomplete, destRootCollections, destinationId, draft.collectionPath])
 
+  const groupItems = useMemo(() => {
+    const seen = new Set<string>()
+    const items: AutocompleteItem[] = []
+    for (const item of collectionItems) {
+      const id = lastPathSegment(item.value)
+      if (!id || seen.has(id)) {
+        continue
+      }
+      seen.add(id)
+      items.push({ kind: 'collection_path', value: id })
+    }
+    return items
+  }, [collectionItems])
+
   useEffect(() => {
-    if (draft.direction === 'import' || draft.target !== 'collection' || !destinationId) {
+    if (
+      draft.direction === 'import' ||
+      (draft.target !== 'collection' && draft.target !== 'group') ||
+      !destinationId
+    ) {
       setDestRootCollections([])
       return
     }
@@ -213,12 +236,8 @@ function ImpExpView({
       return
     }
 
-    if (draft.target === 'collection') {
-      return window.api.dataTransfer.onImportCollectionProgress(setValidateProgress)
-    }
-
     return window.api.dataTransfer.onImportProjectProgress(setValidateProgress)
-  }, [busy, draft.direction, draft.target])
+  }, [busy, draft.direction])
 
   const resetValidation = (patch: Partial<ImpExpDraft> = {}): void => {
     onDraftChange({
@@ -233,6 +252,7 @@ function ImpExpView({
   const handleDirection = (direction: ImpExpDraft['direction']): void => {
     resetValidation({
       direction,
+      target: direction === 'import' ? 'project' : draft.target,
       filePath: null,
       acceptMismatch: false,
       selectedRoots:
@@ -249,6 +269,8 @@ function ImpExpView({
       target,
       filePath: null,
       acceptMismatch: false,
+      collectionPath:
+        target === 'group' ? lastPathSegment(draft.collectionPath) : draft.collectionPath,
       selectedRoots:
         target === 'project' &&
         draft.direction === 'export' &&
@@ -260,20 +282,13 @@ function ImpExpView({
 
   const handleSelectFile = async (): Promise<void> => {
     const result =
-      draft.target === 'collection'
-        ? await window.api.dataTransfer.selectCollectionImportJson()
-        : await window.api.dataTransfer.selectProjectImportZip()
+      draft.direction === 'import'
+        ? await window.api.dataTransfer.selectOfficialDump()
+        : draft.target === 'collection'
+          ? await window.api.dataTransfer.selectCollectionImportJson()
+          : await window.api.dataTransfer.selectProjectImportZip()
 
     if (result.canceled || !result.filePath) {
-      return
-    }
-
-    if (draft.target === 'collection') {
-      const peek = await window.api.dataTransfer.peekCollectionImportJson(result.filePath)
-      resetValidation({ filePath: result.filePath })
-      if (!peek.ok) {
-        setFormError(peek.error)
-      }
       return
     }
 
@@ -299,71 +314,49 @@ function ImpExpView({
     return destinationId
   }
 
-  const validateCollection = async (): Promise<ImportCollectionValidation | null> => {
+  const validateOfficial = async (): Promise<boolean> => {
     if (!draft.filePath) {
-      setFormError(`${fileKindLabel(draft)} ファイルを選択してください`)
-      return null
+      setFormError(`${fileKindLabel(draft)} を選択してください`)
+      return false
     }
 
     const loadedProjectId = await ensureDestinationLoaded()
     if (!loadedProjectId) {
-      return null
+      return false
     }
 
-    const result = await window.api.dataTransfer.validateCollectionImport({
+    const result = await window.api.dataTransfer.validateOfficialImport({
       projectId: loadedProjectId,
-      filePath: draft.filePath,
-      includeSubcollections: draft.includeSubcollections
+      dumpPath: draft.filePath
     })
 
     if (!result.ok) {
       if (!result.canceled) {
         setFormError(result.error)
       }
-      return null
+      return false
     }
 
-    onDraftChange({ collectionValidation: result.data })
-    if (result.data.hasCollisions) {
-      setFormError(
-        `衝突があります（例: ${result.data.collisionSamples.join(', ')}）。実行するとその件はスキップします。`
-      )
-    }
-
-    return result.data
-  }
-
-  const validateProject = async (): Promise<ImportProjectValidation | null> => {
-    if (!draft.filePath) {
-      setFormError(`${fileKindLabel(draft)} ファイルを選択してください`)
-      return null
-    }
-
-    const loadedProjectId = await ensureDestinationLoaded()
-    if (!loadedProjectId) {
-      return null
-    }
-
-    const result = await window.api.dataTransfer.validateProjectImport({
-      projectId: loadedProjectId,
-      filePath: draft.filePath
-    })
-
-    if (!result.ok) {
-      if (!result.canceled) {
-        setFormError(result.error)
+    onDraftChange({
+      projectValidation: {
+        filePath: result.data.dumpPath,
+        documentCount: result.data.documentCount,
+        rootCollectionIds: [],
+        includeSubcollections: true,
+        sourceProjectId: result.data.sourceProjectId ?? 'official',
+        projectIdMismatch: false,
+        hasCollisions: result.data.hasCollisions,
+        collisionSamples: result.data.collisionSamples,
+        checkedCount: result.data.checkedCount
       }
-      return null
-    }
-
-    onDraftChange({ projectValidation: result.data })
+    })
     if (result.data.hasCollisions) {
       setFormError(
         `衝突があります（例: ${result.data.collisionSamples.join(', ')}）。実行するとその件はスキップします。`
       )
     }
 
-    return result.data
+    return true
   }
 
   const handleValidate = async (): Promise<void> => {
@@ -373,12 +366,7 @@ function ImpExpView({
     onDraftChange({ collectionValidation: null, projectValidation: null })
 
     try {
-      if (draft.target === 'collection') {
-        await validateCollection()
-        return
-      }
-
-      await validateProject()
+      await validateOfficial()
     } finally {
       setBusy(false)
     }
@@ -414,6 +402,30 @@ function ImpExpView({
         return
       }
 
+      if (draft.direction === 'export' && draft.target === 'group') {
+        const collectionId = lastPathSegment(draft.collectionPath)
+        if (!collectionId) {
+          setFormError('グループ名（コレクション ID）を指定してください')
+          return
+        }
+
+        const loadedProjectId = await ensureDestinationLoaded()
+        if (!loadedProjectId) {
+          return
+        }
+
+        const result = await window.api.scriptRunner.start({
+          kind: 'export_group',
+          projectId: loadedProjectId,
+          collectionId
+        })
+
+        if (!result.ok && !result.canceled) {
+          setFormError(result.error)
+        }
+        return
+      }
+
       if (draft.direction === 'export' && draft.target === 'project') {
         if (draft.selectedRoots.length === 0) {
           setFormError('エクスポートするルートコレクションを選んでください')
@@ -424,7 +436,7 @@ function ImpExpView({
           kind: 'export_project',
           projectId,
           rootCollectionIds: draft.selectedRoots,
-          includeSubcollections: draft.includeSubcollections
+          includeSubcollections: true
         })
 
         if (!result.ok && !result.canceled) {
@@ -434,16 +446,18 @@ function ImpExpView({
       }
 
       if (!draft.filePath) {
-        setFormError(`${fileKindLabel(draft)} ファイルを選択してください`)
+        setFormError(`${fileKindLabel(draft)} を選択してください`)
         return
       }
 
-      if (draft.target === 'collection') {
-        const loadedProjectId = await ensureDestinationLoaded()
-        if (!loadedProjectId) {
-          return
-        }
+      const loadedProjectId = await ensureDestinationLoaded()
+      if (!loadedProjectId) {
+        return
+      }
 
+      const destEntry =
+        entries.find((entry) => entry.id === loadedProjectId) ?? destination
+      if (destEntry?.authType !== 'emulator') {
         const latest = await window.api.workspace.getState()
         const blocked = latest.writeBlockedReasons[loadedProjectId]
         if (blocked) {
@@ -456,48 +470,12 @@ function ImpExpView({
           setFormError('このプロジェクトは read-only です')
           return
         }
-
-        const result = await window.api.scriptRunner.start({
-          kind: 'import_collection',
-          projectId: loadedProjectId,
-          filePath: draft.filePath,
-          includeSubcollections: draft.includeSubcollections
-        })
-
-        if (!result.ok && !result.canceled) {
-          setFormError(result.error)
-        }
-        return
-      }
-
-      if (projectValidation?.projectIdMismatch && !draft.acceptMismatch) {
-        setFormError('projectId の不一致を確認してください')
-        return
-      }
-
-      const loadedProjectId = await ensureDestinationLoaded()
-      if (!loadedProjectId) {
-        return
-      }
-
-      const latest = await window.api.workspace.getState()
-      const blocked = latest.writeBlockedReasons[loadedProjectId]
-      if (blocked) {
-        setWriteBlockedReasons(latest.writeBlockedReasons)
-        setFormError(blocked)
-        return
-      }
-
-      if (destinationReadOnly) {
-        setFormError('このプロジェクトは read-only です')
-        return
       }
 
       const result = await window.api.scriptRunner.start({
-        kind: 'import_project',
+        kind: 'import_official',
         projectId: loadedProjectId,
-        filePath: draft.filePath,
-        acceptProjectIdMismatch: draft.acceptMismatch
+        dumpPath: draft.filePath
       })
 
       if (!result.ok && !result.canceled) {
@@ -516,24 +494,21 @@ function ImpExpView({
     Boolean(draft.collectionPath.trim()) &&
     !busy &&
     !formDisabled
+  const canStartExportGroup =
+    draft.direction === 'export' &&
+    draft.target === 'group' &&
+    Boolean(draft.collectionPath.trim()) &&
+    !busy &&
+    !formDisabled
   const canStartExportProject =
     draft.direction === 'export' &&
     draft.target === 'project' &&
     draft.selectedRoots.length > 0 &&
     !busy &&
     !formDisabled
-  const canStartImportCollection =
+  const canStartImport =
     draft.direction === 'import' &&
-    draft.target === 'collection' &&
     Boolean(draft.filePath) &&
-    !destinationLocked &&
-    !busy &&
-    !formDisabled
-  const canStartImportProject =
-    draft.direction === 'import' &&
-    draft.target === 'project' &&
-    Boolean(draft.filePath) &&
-    !(projectValidation?.projectIdMismatch && !draft.acceptMismatch) &&
     !destinationLocked &&
     !busy &&
     !formDisabled
@@ -561,30 +536,41 @@ function ImpExpView({
             ]}
             onChange={handleDirection}
           />
-          <ToggleBar
-            ariaLabel="対象"
-            value={draft.target}
-            disabled={formDisabled}
-            options={[
-              { id: 'collection', label: 'Collection' },
-              { id: 'project', label: 'Project' }
-            ]}
-            onChange={handleTarget}
-          />
+          {draft.direction === 'export' ? (
+            <ToggleBar
+              ariaLabel="対象"
+              value={draft.target}
+              disabled={formDisabled}
+              options={[
+                { id: 'collection', label: 'Collection' },
+                { id: 'group', label: 'Group' },
+                { id: 'project', label: 'Project' }
+              ]}
+              onChange={handleTarget}
+            />
+          ) : null}
         </div>
 
         <p className="imp-exp-form__lead">
-          {draft.direction === 'import' && draft.target === 'collection'
-            ? '選ぶのはプロジェクトだけ。コレクションはファイルの path どおり。'
-            : draft.direction === 'import'
-              ? 'ファイルを選んで実行。検証は任意です。衝突したドキュメントはスキップして先に進みます。'
-              : '範囲を選んでから実行。'}
+          {draft.direction === 'import'
+            ? destination?.authType === 'emulator'
+              ? 'この Emulator に、ダンプのプロジェクトを新しい行として入れます。既存のプロジェクトには混ぜません。書く先はダンプが持っている path です。'
+              : '選んだクラウドプロジェクトへ、ダンプの path どおり書きます。衝突したドキュメントはスキップします。'
+            : draft.target === 'group'
+              ? '同じコレクション ID の全部（グループ）を公式 zip に出します。'
+              : draft.target === 'collection'
+                ? 'この path の範囲を公式 zip に出します。'
+                : '選んだルートを公式 zip に出します。'}
           ファイルは {fileKindLabel(draft)} です。
         </p>
 
         {showProjectSelect && (
           <label className="imp-exp-form__field">
-            {draft.target === 'collection' ? 'プロジェクト' : 'インポート先'}
+            {draft.direction === 'import'
+              ? destination?.authType === 'emulator'
+                ? 'Emulator（新規プロジェクト）'
+                : 'インポート先'
+              : 'プロジェクト'}
             <select
               className="bulk-actions__input"
               value={destinationId}
@@ -598,7 +584,7 @@ function ImpExpView({
             >
               {entries.map((entry) => (
                 <option key={entry.id} value={entry.id}>
-                  {projectOptionLabel(entry, writeBlockedReasons)}
+                  {projectOptionLabel(entry, writeBlockedReasons, draft.direction === 'import')}
                 </option>
               ))}
             </select>
@@ -616,6 +602,24 @@ function ImpExpView({
               aria-label="コレクション path"
               onChange={(value) => {
                 resetValidation({ collectionPath: value })
+              }}
+            />
+          </label>
+        )}
+
+        {draft.direction === 'export' && draft.target === 'group' && (
+          <label className="imp-exp-form__field">
+            グループ（コレクション ID）
+            <AutocompleteInput
+              value={draft.collectionPath}
+              items={groupItems}
+              disabled={formDisabled}
+              placeholder="posts"
+              aria-label="コレクション ID"
+              onChange={(value) => {
+                resetValidation({
+                  collectionPath: value.includes('/') ? lastPathSegment(value) : value
+                })
               }}
             />
           </label>
@@ -668,7 +672,7 @@ function ImpExpView({
           </div>
         )}
 
-        {!(draft.direction === 'import' && draft.target === 'project') && (
+        {draft.direction === 'export' && draft.target === 'collection' && (
           <label className="imp-exp-form__check">
             <input
               type="checkbox"
@@ -690,45 +694,25 @@ function ImpExpView({
               </Button>
               {draft.filePath && <span className="imp-exp-form__path">{draft.filePath}</span>}
             </div>
-            {destinationReadOnly ? (
+            {destination?.authType !== 'emulator' && destinationReadOnly ? (
               <p className="simple-main__error">
                 このプロジェクトは read-only です。検証はできますが、実行はできません。
               </p>
-            ) : destinationWriteBlockedReason ? (
+            ) : destination?.authType !== 'emulator' && destinationWriteBlockedReason ? (
               <p className="simple-main__error">{destinationWriteBlockedReason}</p>
             ) : null}
           </>
         )}
 
-        {collectionValidation && (
-          <p className="imp-exp-form__hint">
-            書込予定: {collectionValidation.writeCount} 件（id 指定{' '}
-            {collectionValidation.existingIdCount} / 自動 ID {collectionValidation.autoIdCount}）
-            {collectionValidation.skippedOutsideCount > 0
-              ? ` / 宛先外除外 ${collectionValidation.skippedOutsideCount}`
-              : ''}
-            {collectionValidation.hasCollisions ? ' / 衝突あり（実行時スキップ）' : ' / 検証 OK'}
-          </p>
-        )}
-
         {projectValidation && (
           <div className="imp-exp-form__hint-block">
             <p className="imp-exp-form__hint">
-              件数: {projectValidation.documentCount} ／ ソース: {projectValidation.sourceProjectId}
-              {projectValidation.includeSubcollections ? ' ／ サブコレ含む' : ''}
+              件数: {projectValidation.documentCount}
+              {projectValidation.sourceProjectId
+                ? ` ／ ダンプ: ${projectValidation.sourceProjectId}`
+                : ''}
               {projectValidation.hasCollisions ? ' ／ 衝突あり（実行時スキップ）' : ' ／ 検証 OK'}
             </p>
-            {projectValidation.projectIdMismatch && (
-              <label className="imp-exp-form__check">
-                <input
-                  type="checkbox"
-                  checked={draft.acceptMismatch}
-                  disabled={formDisabled}
-                  onChange={(event) => onDraftChange({ acceptMismatch: event.target.checked })}
-                />
-                projectId が異なります。この宛先へインポートすることを確認しました
-              </label>
-            )}
           </div>
         )}
 
@@ -754,10 +738,10 @@ function ImpExpView({
               draft.direction === 'export'
                 ? draft.target === 'collection'
                   ? !canStartExportCollection
-                  : !canStartExportProject
-                : draft.target === 'collection'
-                  ? !canStartImportCollection
-                  : !canStartImportProject
+                  : draft.target === 'group'
+                    ? !canStartExportGroup
+                    : !canStartExportProject
+                : !canStartImport
             }
           >
             {draft.direction === 'export' ? 'エクスポート' : 'インポート実行'}

@@ -17,6 +17,7 @@ export const en: Record<string, string> = {
   'menu.export': 'Export',
   'menu.connection': 'Connection',
   'menu.project': 'Project',
+  'menu.group': 'Group',
   'menu.collection': 'Collection',
   'menu.connect_list': 'Connect from list…',
   'menu.connect_json': 'Connect with JSON…',
@@ -123,17 +124,23 @@ export const en: Record<string, string> = {
   'emulator.select_known': 'Choose a projectId from the list',
   'emulator.import_lead': 'No collections. Import the JSON as-is.',
   'emulator.select_json': 'Select JSON',
-  'emulator.select_zip': 'Select ZIP',
+  'emulator.select_zip': 'Select folder / ZIP',
   'emulator.import': 'Connect',
   'emulator.skip': 'Skip import',
   'emulator.connect_import_lead':
-    'ZIP and projectId are both optional. You can connect with both empty. If you select a ZIP, it is written to the emulator and appears in the left tree.',
+    'Official dump and projectId are both optional. You can connect with both empty. If you select a dump, it is written to the emulator and appears in the left tree.',
   'emulator.import_project_title': 'Add a project to the emulator',
   'emulator.import_project_lead':
-    'Select a zip. It will appear as a new row in the left tree and be written to the workspace.',
+    'Select an official dump (folder or ZIP). It will appear as a new row in the left tree and be written to the workspace.',
   'emulator.import_collection_title': 'Add a collection to the emulator',
   'emulator.import_collection_lead':
     'Select a JSON. The destination is the emulator project selected in the left tree.',
+  'emulator.export_collection_lead':
+    'Export this path as an official dump ZIP.',
+  'emulator.export_group_lead':
+    'Export every document with this collection ID (group) as an official dump ZIP.',
+  'emulator.export_project_lead':
+    'Export the selected root collections as an official dump ZIP.',
   'emulator.destination': 'Destination',
   'emulator.no_destination': 'Select an emulator project in the left tree.',
   'emulator.delete_project_confirm':

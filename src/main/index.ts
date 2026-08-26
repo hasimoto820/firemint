@@ -5,6 +5,7 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { registerIpcHandlers } from './ipc/register_handlers'
 import { initializeWorkspace } from '@features/workspace/main/service'
+import { maybeRunOfficialDumpCli } from '@features/data_transfer/main/official/cli'
 import { getSettings } from '@shared/settings/main/service'
 import {
   titleBarOverlayOptions,
@@ -62,31 +63,33 @@ async function createWindow(): Promise<void> {
   }
 }
 
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
-app.whenReady().then(() => {
-  // Set app user model id for windows
-  electronApp.setAppUserModelId('com.firemint')
+void maybeRunOfficialDumpCli().then((exitCode) => {
+  if (exitCode !== null) {
+    app.exit(exitCode)
+    return
+  }
 
-  // Default open or close DevTools by F12 in development
-  // and ignore CommandOrControl + R in production.
-  // see https://github.com/alex8088/electron-toolkit/tree/master/packages/utils
-  app.on('browser-window-created', (_, window) => {
-    optimizer.watchWindowShortcuts(window)
-  })
-
-  void initializeWorkspace().then(() => {
-    registerIpcHandlers()
-    void createWindow()
-  })
-
-  app.on('activate', function () {
-    // On macOS it's common to re-create a window in the app when the
-    // dock icon is clicked and there are no other windows open.
-    if (BrowserWindow.getAllWindows().length === 0) void createWindow()
-  })
+  startApp()
 })
+
+function startApp(): void {
+  app.whenReady().then(() => {
+    electronApp.setAppUserModelId('com.firemint')
+
+    app.on('browser-window-created', (_, window) => {
+      optimizer.watchWindowShortcuts(window)
+    })
+
+    void initializeWorkspace().then(() => {
+      registerIpcHandlers()
+      void createWindow()
+    })
+
+    app.on('activate', function () {
+      if (BrowserWindow.getAllWindows().length === 0) void createWindow()
+    })
+  })
+}
 
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits

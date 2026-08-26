@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useOptionalAutocompleteApi } from '@features/autocomplete/renderer/hooks'
 import { matchesAutocompleteNeedle } from '@features/autocomplete/renderer/catalog'
 import type { AutocompleteItem } from '@features/autocomplete/shared/types'
+import { lastPathSegment } from '@features/data_transfer/shared/imp_exp'
 import { DEFAULT_EMULATOR_HOST } from '@features/connection/shared/emulator'
 import {
   emulatorPageIntent,
@@ -183,11 +184,32 @@ function EmulatorPage({
     return extras.length === 0 ? fromPool : [...fromPool, ...extras]
   }, [autocomplete, collectionPath, exportRoots, poolId])
 
+  const groupItems = useMemo(() => {
+    const seen = new Set<string>()
+    const items: AutocompleteItem[] = []
+    for (const item of collectionItems) {
+      const id = lastPathSegment(item.value)
+      if (!id || seen.has(id)) {
+        continue
+      }
+      seen.add(id)
+      items.push({ kind: 'collection_path', value: id })
+    }
+    return items
+  }, [collectionItems])
+
   const setDirection = (next: EmulatorPageDirection): void => {
-    onModeChange?.(emulatorPageModeFromIntent(next, target))
+    const nextTarget = next === 'import' && target === 'group' ? 'project' : target
+    onModeChange?.(emulatorPageModeFromIntent(next, nextTarget))
   }
 
   const setTarget = (next: EmulatorPageTarget): void => {
+    if (next === 'group') {
+      const id = lastPathSegment(collectionPath)
+      if (id && id !== collectionPath) {
+        setCollectionPath(id)
+      }
+    }
     onModeChange?.(emulatorPageModeFromIntent(direction, next))
   }
 
@@ -230,7 +252,7 @@ function EmulatorPage({
   const handleSelectZip = async (): Promise<void> => {
     setError(null)
     setSuccess(null)
-    const selected = await window.api.dataTransfer.selectProjectImportZip()
+    const selected = await window.api.dataTransfer.selectOfficialDump()
 
     if (selected.canceled || !selected.filePath) {
       return
@@ -337,16 +359,35 @@ function EmulatorPage({
         return
       }
 
+      if (target === 'group') {
+        const collectionId = lastPathSegment(collectionPath)
+        if (!collectionId) {
+          setError('グループ名（コレクション ID）を指定してください')
+          return
+        }
+
+        const result = await window.api.scriptRunner.start({
+          kind: 'export_group',
+          projectId: poolId,
+          collectionId
+        })
+
+        if (!result.ok && !result.canceled) {
+          setError(result.error)
+        }
+        return
+      }
+
       if (selectedRoots.length === 0) {
         setError('エクスポートするルートコレクションを選んでください')
         return
       }
 
-      const result = await window.api.scriptRunner.start({
+        const result = await window.api.scriptRunner.start({
         kind: 'export_project',
         projectId: poolId,
         rootCollectionIds: selectedRoots,
-        includeSubcollections
+        includeSubcollections: true
       })
 
       if (!result.ok && !result.canceled) {
@@ -364,7 +405,9 @@ function EmulatorPage({
         ? t('emulator.import_collection_lead')
         : mode === 'export-project'
           ? t('emulator.export_project_lead')
-          : t('emulator.export_collection_lead')
+          : mode === 'export-group'
+            ? t('emulator.export_group_lead')
+            : t('emulator.export_collection_lead')
 
   const destinationText =
     destinationLabel ?? destinationPoolId ?? t('emulator.no_destination')
@@ -372,6 +415,8 @@ function EmulatorPage({
   const allSelected = exportRoots.length > 0 && selectedCount === exportRoots.length
   const canStartExportCollection =
     Boolean(poolId) && Boolean(collectionPath.trim()) && !busy && !formDisabled
+  const canStartExportGroup =
+    Boolean(poolId) && Boolean(lastPathSegment(collectionPath)) && !busy && !formDisabled
   const canStartExportProject =
     Boolean(poolId) && selectedRoots.length > 0 && !busy && !formDisabled
   const togglesDisabled = busy || formDisabled
@@ -395,10 +440,18 @@ function EmulatorPage({
             ariaLabel="対象"
             value={target}
             disabled={togglesDisabled}
-            options={[
-              { id: 'collection', label: 'Collection' },
-              { id: 'project', label: 'Project' }
-            ]}
+            options={
+              direction === 'export'
+                ? [
+                    { id: 'collection', label: 'Collection' },
+                    { id: 'group', label: 'Group' },
+                    { id: 'project', label: 'Project' }
+                  ]
+                : [
+                    { id: 'collection', label: 'Collection' },
+                    { id: 'project', label: 'Project' }
+                  ]
+            }
             onChange={setTarget}
           />
         </div>
@@ -472,6 +525,27 @@ function EmulatorPage({
           </>
         )}
 
+        {mode === 'export-group' && (
+          <>
+            <p className="emulator-page__destination">
+              プロジェクト: {destinationText}
+            </p>
+            <label className="imp-exp-form__field">
+              グループ（コレクション ID）
+              <AutocompleteInput
+                value={collectionPath}
+                items={groupItems}
+                disabled={formDisabled || !poolId}
+                placeholder="posts"
+                aria-label="コレクション ID"
+                onChange={(value) => {
+                  setCollectionPath(value.includes('/') ? lastPathSegment(value) : value)
+                }}
+              />
+            </label>
+          </>
+        )}
+
         {mode === 'export-project' && (
           <>
             {!poolId && (
@@ -524,21 +598,27 @@ function EmulatorPage({
 
         {direction === 'export' && (
           <>
-            <label className="imp-exp-form__check">
-              <input
-                type="checkbox"
-                checked={includeSubcollections}
-                disabled={formDisabled}
-                onChange={(event) => setIncludeSubcollections(event.target.checked)}
-              />
-              サブコレクションを含む
-            </label>
+            {target === 'collection' && (
+              <label className="imp-exp-form__check">
+                <input
+                  type="checkbox"
+                  checked={includeSubcollections}
+                  disabled={formDisabled}
+                  onChange={(event) => setIncludeSubcollections(event.target.checked)}
+                />
+                サブコレクションを含む
+              </label>
+            )}
             <div className="imp-exp-form__actions">
               <Button
                 variant="primary"
                 onClick={() => void handleExport()}
                 disabled={
-                  target === 'collection' ? !canStartExportCollection : !canStartExportProject
+                  target === 'collection'
+                    ? !canStartExportCollection
+                    : target === 'group'
+                      ? !canStartExportGroup
+                      : !canStartExportProject
                 }
               >
                 エクスポート

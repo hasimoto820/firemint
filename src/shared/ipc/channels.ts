@@ -65,6 +65,8 @@ export const IPC_CHANNELS = {
   DATA_TRANSFER_VALIDATE_PROJECT_IMPORT: 'data_transfer:validate_project_import',
   DATA_TRANSFER_IMPORT_PROJECT: 'data_transfer:import_project',
   DATA_TRANSFER_IMPORT_PROJECT_PROGRESS: 'data_transfer:import_project_progress',
+  DATA_TRANSFER_SELECT_OFFICIAL_DUMP: 'data_transfer:select_official_dump',
+  DATA_TRANSFER_VALIDATE_OFFICIAL_IMPORT: 'data_transfer:validate_official_import',
   TRANSPORT_VALIDATE: 'transport:validate',
   TRANSPORT_RUN: 'transport:run',
   TRANSPORT_PROGRESS: 'transport:progress',

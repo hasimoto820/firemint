@@ -4,24 +4,21 @@ import { logError, logInfo } from '@shared/logging/logger'
 import { formatUnavailableFirestoreMessage } from '@shared/firestore/native_check'
 import { isCanceledError } from '@shared/safety/canceled'
 import type {
-  ExportCollectionProgress,
-  ExportProjectProgress,
   ImportCollectionProgress,
   ImportProjectProgress
 } from '@features/data_transfer/shared/types'
+import type { OfficialExportProgress } from '@features/data_transfer/shared/official'
 import type { TransportProgress } from '@features/transport/shared/types'
 import {
-  collectionExportDefaultFileName,
-  promptIncludeSubcollections,
-  selectCollectionExportJsonPath,
-  writeCollectionJsonToFile
+  promptIncludeSubcollections
 } from '@features/data_transfer/main/service'
 import { importCollectionJson } from '@features/data_transfer/main/import_service'
-import {
-  chooseProjectExportZipPath,
-  exportProject
-} from '@features/data_transfer/main/project_export_service'
 import { importProject } from '@features/data_transfer/main/project_import_service'
+import { importOfficialDump } from '@features/data_transfer/main/official/write_dump'
+import {
+  chooseOfficialExportZipPath,
+  exportOfficialDump
+} from '@features/data_transfer/main/official/export_dump'
 import { transportDocuments } from '@features/transport/main/service'
 import type {
   ScriptJobLogLine,
@@ -47,12 +44,16 @@ function jobTitle(input: StartScriptJobInput): string {
   switch (input.kind) {
     case 'export_collection':
       return `Export · Collection · ${input.collectionPath}`
+    case 'export_group':
+      return `Export · Group · ${input.collectionId}`
     case 'import_collection':
       return 'Import · Collection'
     case 'export_project':
       return `Export · Project · ${input.projectId}`
     case 'import_project':
       return `Import · Project · ${input.projectId}`
+    case 'import_official':
+      return `Import · Official · ${input.projectId}`
     case 'transport':
       return `Transport · ${input.target} · ${input.sourceProjectId} → ${input.destinationProjectId}`
   }
@@ -113,24 +114,9 @@ function applyProgress(
   })
 }
 
-function onCollectionExportProgress(progress: ExportCollectionProgress): void {
-  const detail =
-    progress.phase === 'writing'
-      ? `書き出し中 ${progress.documentCount} 件`
-      : progress.phase === 'done'
-        ? `完了 ${progress.documentCount} 件`
-        : `${progress.documentCount} 件 / ${progress.currentCollectionPath ?? '—'}`
-  applyProgress(progress.percent, detail)
-}
-
-function onProjectExportProgress(progress: ExportProjectProgress): void {
-  const detail =
-    progress.phase === 'zipping'
-      ? `ZIP 作成中…（${progress.documentCount} 件）`
-      : progress.phase === 'done'
-        ? `完了 ${progress.documentCount} 件`
-        : `${progress.documentCount} 件 / ${progress.currentCollectionPath ?? '—'}`
-  applyProgress(progress.percent, detail)
+function onOfficialExportProgress(progress: OfficialExportProgress): void {
+  const suffix = progress.detail ? ` / ${progress.detail}` : ''
+  applyProgress(progress.percent, `${progress.phase} ${progress.processedCount}${suffix}`)
 }
 
 function onTransportProgress(progress: TransportProgress): void {
@@ -163,10 +149,15 @@ async function runJob(
       if (!filePath) {
         throw new Error('保存先がありません')
       }
-      const result = await writeCollectionJsonToFile(
-        input,
-        filePath,
-        onCollectionExportProgress,
+      const result = await exportOfficialDump(
+        {
+          projectId: input.projectId,
+          kind: 'collection',
+          collectionPath: input.collectionPath,
+          includeSubcollections: input.includeSubcollections,
+          filePath
+        },
+        onOfficialExportProgress,
         signal
       )
       if (!result.ok) {
@@ -195,11 +186,41 @@ async function runJob(
       }
       return
     }
+    case 'export_group': {
+      if (!filePath) {
+        throw new Error('保存先がありません')
+      }
+      const result = await exportOfficialDump(
+        {
+          projectId: input.projectId,
+          kind: 'group',
+          collectionId: input.collectionId,
+          filePath
+        },
+        onOfficialExportProgress,
+        signal
+      )
+      if (!result.ok) {
+        throw Object.assign(new Error(result.error), { canceled: result.canceled })
+      }
+      patchSnapshot({
+        resultSummary: `${result.data.documentCount} 件を ${result.data.filePath} に保存しました`
+      })
+      return
+    }
     case 'export_project': {
-      const result = await exportProject(
-        { ...input, filePath: filePath ?? input.filePath },
-        null,
-        onProjectExportProgress,
+      if (!filePath && !input.filePath) {
+        throw new Error('保存先がありません')
+      }
+      const result = await exportOfficialDump(
+        {
+          projectId: input.projectId,
+          kind: 'project',
+          rootCollectionIds: input.rootCollectionIds,
+          includeSubcollections: input.includeSubcollections,
+          filePath: filePath ?? input.filePath
+        },
+        onOfficialExportProgress,
         signal
       )
       if (!result.ok) {
@@ -221,6 +242,26 @@ async function runJob(
           result.data.skippedCount > 0 ? ` / スキップ ${result.data.skippedCount} 件` : ''
         }`
       })
+      if (result.data.collisionSamples.length > 0) {
+        appendLog('info', `スキップ例: ${result.data.collisionSamples.join(', ')}`)
+      }
+      return
+    }
+    case 'import_official': {
+      const result = await importOfficialDump(input, onImportProgress, signal)
+      if (!result.ok) {
+        throw Object.assign(new Error(result.error), { canceled: result.canceled })
+      }
+      patchSnapshot({
+        writtenCount: result.data.writtenCount,
+        resultSummary: `${result.data.writtenCount} 件を ${result.data.writtenProjectId} にインポートしました${
+          result.data.skippedCount > 0 ? ` / スキップ ${result.data.skippedCount} 件` : ''
+        }`
+      })
+      appendLog(
+        'info',
+        `プロジェクト ${result.data.sourceProjectId ?? '-'} → ${result.data.writtenProjectId}`
+      )
       if (result.data.collisionSamples.length > 0) {
         appendLog('info', `スキップ例: ${result.data.collisionSamples.join(', ')}`)
       }
@@ -325,17 +366,34 @@ export async function startScriptJob(
       resolvedInput = { ...input, includeSubcollections }
     }
 
-    filePath = await selectCollectionExportJsonPath(
-      window,
-      collectionExportDefaultFileName(input.collectionPath, includeSubcollections)
-    )
+    filePath = await chooseOfficialExportZipPath(window, {
+      projectId: input.projectId,
+      kind: 'collection',
+      collectionPath: input.collectionPath,
+      includeSubcollections
+    })
+    if (!filePath) {
+      return { ok: false, error: '保存をキャンセルしました', canceled: true }
+    }
+  }
+
+  if (input.kind === 'export_group' && !input.filePath) {
+    filePath = await chooseOfficialExportZipPath(window, {
+      projectId: input.projectId,
+      kind: 'group',
+      collectionId: input.collectionId
+    })
     if (!filePath) {
       return { ok: false, error: '保存をキャンセルしました', canceled: true }
     }
   }
 
   if (input.kind === 'export_project' && !input.filePath) {
-    filePath = await chooseProjectExportZipPath(window, input.projectId)
+    filePath = await chooseOfficialExportZipPath(window, {
+      projectId: input.projectId,
+      kind: 'project',
+      rootCollectionIds: input.rootCollectionIds
+    })
     if (!filePath) {
       return { ok: false, error: '保存をキャンセルしました', canceled: true }
     }

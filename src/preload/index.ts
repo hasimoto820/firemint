@@ -158,7 +158,11 @@ const api: IpcApi = {
       return () => {
         ipcRenderer.removeListener(IPC_CHANNELS.DATA_TRANSFER_IMPORT_PROJECT_PROGRESS, handler)
       }
-    }
+    },
+    selectOfficialDump: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.DATA_TRANSFER_SELECT_OFFICIAL_DUMP),
+    validateOfficialImport: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.DATA_TRANSFER_VALIDATE_OFFICIAL_IMPORT, input)
   },
   transport: {
     validate: (input) => ipcRenderer.invoke(IPC_CHANNELS.TRANSPORT_VALIDATE, input),

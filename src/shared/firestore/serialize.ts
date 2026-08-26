@@ -28,6 +28,13 @@ export function serializeFirestoreValue(value: unknown): unknown {
     }
   }
 
+  if (Buffer.isBuffer(value) || value instanceof Uint8Array) {
+    return {
+      __firemint_type: 'bytes',
+      base64: Buffer.from(value).toString('base64')
+    }
+  }
+
   if (Array.isArray(value)) {
     return value.map(serializeFirestoreValue)
   }
@@ -73,6 +80,10 @@ export function deserializeFirestoreValue(value: unknown, projectId?: string): u
 
     if (typeMarker === 'reference' && typeof record.path === 'string') {
       return getFirestore(projectId).doc(record.path)
+    }
+
+    if (typeMarker === 'bytes' && typeof record.base64 === 'string') {
+      return Buffer.from(record.base64, 'base64')
     }
 
     const result: Record<string, unknown> = {}

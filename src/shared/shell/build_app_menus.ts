@@ -90,6 +90,7 @@ export type AppMenuHandlers = {
   onEmulatorImportProject?: () => void
   onEmulatorImportCollection?: () => void
   onEmulatorExportProject?: () => void
+  onEmulatorExportGroup?: () => void
   onEmulatorExportCollection?: () => void
   canEmulatorImportProject?: boolean
   canEmulatorImportCollection?: boolean
@@ -122,6 +123,10 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
       }
       if (intent.direction === 'export' && intent.target === 'project') {
         handlers.onEmulatorExportProject?.()
+        return
+      }
+      if (intent.direction === 'export' && intent.target === 'group') {
+        handlers.onEmulatorExportGroup?.()
         return
       }
       handlers.onEmulatorExportCollection?.()
@@ -174,6 +179,16 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
             ? !(handlers.canEmulatorExport ?? false)
             : !handlers.connected,
           onClick: () => openFocusedImpExp({ direction: 'export', target: 'project' })
+        },
+        {
+          type: 'item',
+          id: 'file-export-group',
+          label: t('menu.group'),
+          indent: true,
+          disabled: emulatorSource
+            ? !(handlers.canEmulatorExport ?? false)
+            : !handlers.connected,
+          onClick: () => openFocusedImpExp({ direction: 'export', target: 'group' })
         },
         {
           type: 'item',

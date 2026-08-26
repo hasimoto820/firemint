@@ -342,6 +342,7 @@ function FirestorePageInner({
     if (
       impExpJob.kind !== 'import_collection' &&
       impExpJob.kind !== 'import_project' &&
+      impExpJob.kind !== 'import_official' &&
       impExpJob.kind !== 'transport'
     ) {
       return
@@ -352,10 +353,11 @@ function FirestorePageInner({
     }
 
     handledImportJobIdRef.current = impExpJob.id
+    void onWorkspaceChanged()
     void loadRootCollections()
     setTreeReloadToken((token) => token + 1)
     setCollectionDataReloadToken((token) => token + 1)
-  }, [impExpJob, loadRootCollections])
+  }, [impExpJob, loadRootCollections, onWorkspaceChanged])
 
   const updateTab = useCallback((tabId: string, patch: Partial<WorkspaceTab>): void => {
     setTabs((current) => current.map((tab) => (tab.id === tabId ? { ...tab, ...patch } : tab)))

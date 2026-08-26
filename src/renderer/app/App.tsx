@@ -173,6 +173,10 @@ function App(): React.JSX.Element {
     shellCommands?.openEmulatorImpExp('export-project')
   }, [shellCommands])
 
+  const handleEmulatorExportGroup = useCallback((): void => {
+    shellCommands?.openEmulatorImpExp('export-group')
+  }, [shellCommands])
+
   const handleEmulatorExportCollection = useCallback((): void => {
     shellCommands?.openEmulatorImpExp('export-collection')
   }, [shellCommands])
@@ -219,6 +223,7 @@ function App(): React.JSX.Element {
         onEmulatorImportProject: handleEmulatorImportProject,
         onEmulatorImportCollection: handleEmulatorImportCollection,
         onEmulatorExportProject: handleEmulatorExportProject,
+        onEmulatorExportGroup: handleEmulatorExportGroup,
         onEmulatorExportCollection: handleEmulatorExportCollection,
         canEmulatorImportProject,
         canEmulatorImportCollection,
@@ -272,6 +277,7 @@ function App(): React.JSX.Element {
       handleEmulatorImportProject,
       handleEmulatorImportCollection,
       handleEmulatorExportProject,
+      handleEmulatorExportGroup,
       handleEmulatorExportCollection,
       canEmulatorImportProject,
       canEmulatorImportCollection,

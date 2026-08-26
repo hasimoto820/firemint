@@ -1,7 +1,7 @@
 export type EmulatorWizardStep = 'connect' | 'import'
 
 export type EmulatorPageDirection = 'import' | 'export'
-export type EmulatorPageTarget = 'project' | 'collection'
+export type EmulatorPageTarget = 'project' | 'group' | 'collection'
 export type EmulatorPageMode = `${EmulatorPageDirection}-${EmulatorPageTarget}`
 
 export function emulatorPageIntent(mode: EmulatorPageMode): {

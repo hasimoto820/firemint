@@ -24,6 +24,7 @@
     "build:linux": "electron-vite build && electron-builder --linux",
     "seed": "node scripts/seed.mjs",
     "count": "node scripts/count.mjs",
+    "read-dump": "electron-vite dev -- --read-dump --self-check",
     "emulators": "node scripts/emulators.mjs"
   },
   "dependencies": {

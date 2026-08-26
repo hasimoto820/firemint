@@ -83,6 +83,10 @@ import type {
   ImportResult,
   PeekCollectionImportResult
 } from '@features/data_transfer/shared/types'
+import type {
+  OfficialImportInput,
+  OfficialImportValidationResult
+} from '@features/data_transfer/shared/official'
 
 import type {
   CancelScriptJobResult,
@@ -260,6 +264,10 @@ export type DataTransferIpcApi = {
   onImportProjectProgress: (
     listener: (progress: ImportProjectProgress) => void
   ) => () => void
+  selectOfficialDump: () => Promise<{ canceled: boolean; filePath: string | null }>
+  validateOfficialImport: (
+    input: OfficialImportInput
+  ) => Promise<OfficialImportValidationResult>
 }
 
 export type TransportIpcApi = {

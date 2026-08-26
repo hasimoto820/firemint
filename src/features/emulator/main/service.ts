@@ -7,10 +7,8 @@ import {
   parseEmulatorHost
 } from '@features/connection/shared/emulator'
 import { importDocumentsJson } from '@features/data_transfer/main/import_service'
-import {
-  importProject,
-  peekProjectImportZip
-} from '@features/data_transfer/main/project_import_service'
+import { importOfficialDump } from '@features/data_transfer/main/official/write_dump'
+import { readOfficialDump } from '@features/data_transfer/main/official/read_dump'
 import type { ImportResult } from '@features/data_transfer/shared/types'
 import { getWorkspaceEntry, removeEntry } from '@features/workspace/main/service'
 import { logError, logInfo } from '@shared/logging/logger'
@@ -215,43 +213,46 @@ export async function importEmulatorProjectZip(
   input: ImportEmulatorProjectZipInput
 ): Promise<ImportEmulatorProjectZipResult> {
   const startedAt = Date.now()
-  logInfo('emulator', `importProjectZip start host=${input.host} file=${input.filePath}`)
+  logInfo('emulator', `importOfficialDump start host=${input.host} file=${input.filePath}`)
 
-  const peek = await peekProjectImportZip(input.filePath)
+  const loaded = await readOfficialDump(input.filePath)
+  if (!loaded.ok) {
+    return loaded
+  }
 
-  if (!peek.ok) {
-    return peek
+  const sourceProjectId = loaded.data.sourceProjectId
+  if (!sourceProjectId) {
+    return { ok: false, error: '公式ダンプから projectId が取れません。Emulator にプロジェクトとして入れられません。' }
   }
 
   const connected = await connectWithEmulator({
     host: input.host,
-    projectId: peek.projectId
+    projectId: sourceProjectId
   })
 
   if (!connected.ok) {
     return { ok: false, error: connected.error }
   }
 
-  const imported = await importProject({
+  const imported = await importOfficialDump({
     projectId: connected.projectId,
-    filePath: input.filePath,
-    acceptProjectIdMismatch: true
+    dumpPath: input.filePath
   })
 
   if (!imported.ok) {
-    logError('emulator', `importProjectZip write failed in ${Date.now() - startedAt}ms`)
+    logError('emulator', `importOfficialDump write failed in ${Date.now() - startedAt}ms`)
     return { ok: false, error: imported.error }
   }
 
   logInfo(
     'emulator',
-    `importProjectZip success in ${Date.now() - startedAt}ms pool_id=${connected.projectId} source=${peek.projectId} written=${imported.data.writtenCount}`
+    `importOfficialDump success in ${Date.now() - startedAt}ms pool_id=${imported.data.writtenProjectId} source=${sourceProjectId} written=${imported.data.writtenCount}`
   )
 
   return {
     ok: true,
-    projectId: connected.projectId,
-    sourceProjectId: peek.projectId,
+    projectId: imported.data.writtenProjectId,
+    sourceProjectId,
     writtenCount: imported.data.writtenCount
   }
 }

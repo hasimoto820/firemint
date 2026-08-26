@@ -103,7 +103,7 @@ function EmulatorConnectDialog({
 
   const handleSelectZip = async (): Promise<void> => {
     setError(null)
-    const selected = await window.api.dataTransfer.selectProjectImportZip()
+    const selected = await window.api.dataTransfer.selectOfficialDump()
 
     if (selected.canceled || !selected.filePath) {
       return
