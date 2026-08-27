@@ -24,6 +24,13 @@ Page → 必ず features/*/renderer/ui/
 迷ったら → 2 feature から使う？ Yes → shared / No → feature
 
 
+＊　ヘッダーメニューの直下のエリアの扱い
+    画面は大きな塊（エリア）に分ける。ショートカットはエリアへ着地する。
+    CRUD はキーにしない。着地後の Tab はエリア内だけ（一周）。
+    詳細: 001_056_shortcut.txt
+
+
+
 
 
 
@@ -34,9 +41,23 @@ Page → 必ず features/*/renderer/ui/
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
 
-collection名, Imp/Exp                       コレクションタブ
+collection名, Imp/Exp                       ページタブ
 simple/query                                モードタブ
-current collection/collection group         グループタブ
+
+
+左ツリー
+　・プロジェクトエリア
+　・コレクションエリア
+　・authエリア
+右ペイン
+　・ページタブ
+　・モードタブ
+　・ヘッダーエリア          列設定・フィルタ・ページャ
+　・結果エリア              テーブル + ドキュメント JSON
+　・設定エリア              ショートカット上の帯。モードタブ + ヘッダーエリア
+
+
+
 
 
 
