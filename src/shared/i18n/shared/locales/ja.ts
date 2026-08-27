@@ -70,6 +70,10 @@ export const ja: MessageCatalog = {
   'settings.theme': 'テーマ',
   'settings.theme.dark': 'ダーク',
   'settings.theme.light': 'ライト',
+  'settings.auto_discover': '起動時に Emulator を探す',
+  'settings.logs': 'ログ',
+  'settings.logs_hint': 'アプリのログフォルダをエクスプローラーで開きます。',
+  'settings.open_logs_folder': 'ログフォルダを開く',
 
   'connection.lead': 'Firestore に接続',
   'connection.mode_list': 'リスト',

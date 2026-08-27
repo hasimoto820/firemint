@@ -10,6 +10,7 @@ import {
   THEMES,
   type Theme
 } from '@shared/settings/shared/types'
+import Button from '@shared/ui/Button'
 
 /**
  * 別ウィンドウ用の Settings。言語とテーマと起動時 Discover。
@@ -19,6 +20,8 @@ function SettingsApp(): React.JSX.Element {
   const [autoDiscoverEmulator, setAutoDiscoverEmulatorState] = useState(
     DEFAULT_SETTINGS.autoDiscoverEmulator
   )
+  const [logsPath, setLogsPath] = useState<string | null>(null)
+  const [logsError, setLogsError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -26,6 +29,12 @@ function SettingsApp(): React.JSX.Element {
     void window.api.settings.get().then((settings) => {
       if (!cancelled) {
         setAutoDiscoverEmulatorState(settings.autoDiscoverEmulator)
+      }
+    })
+
+    void window.api.settings.getLogsPath().then((path) => {
+      if (!cancelled) {
+        setLogsPath(path)
       }
     })
 
@@ -38,6 +47,17 @@ function SettingsApp(): React.JSX.Element {
       unsubscribe()
     }
   }, [])
+
+  const handleOpenLogsFolder = (): void => {
+    setLogsError(null)
+    void window.api.settings.openLogsFolder().then((result) => {
+      if (!result.ok) {
+        setLogsError(result.error)
+        return
+      }
+      setLogsPath(result.path)
+    })
+  }
 
   if (!ready) {
     return (
@@ -106,6 +126,14 @@ function SettingsApp(): React.JSX.Element {
             <span>{t('settings.auto_discover')}</span>
           </label>
         </div>
+      </section>
+
+      <section className="settings-window__section">
+        <h2 className="settings-window__section-title">{t('settings.logs')}</h2>
+        <p className="settings-window__hint">{t('settings.logs_hint')}</p>
+        {logsPath && <p className="settings-window__path">{logsPath}</p>}
+        <Button onClick={handleOpenLogsFolder}>{t('settings.open_logs_folder')}</Button>
+        {logsError && <p className="settings-window__path">{logsError}</p>}
       </section>
     </div>
   )

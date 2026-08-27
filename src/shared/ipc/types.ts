@@ -298,6 +298,8 @@ export type SettingsIpcApi = {
   setTheme: (theme: Theme) => Promise<AppSettings>
   setAutoDiscoverEmulator: (enabled: boolean) => Promise<AppSettings>
   openWindow: () => Promise<null>
+  getLogsPath: () => Promise<string>
+  openLogsFolder: () => Promise<{ ok: true; path: string } | { ok: false; error: string }>
   onChanged: (listener: (settings: AppSettings) => void) => () => void
 }
 

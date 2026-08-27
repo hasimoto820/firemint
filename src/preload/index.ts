@@ -190,6 +190,8 @@ const api: IpcApi = {
     setAutoDiscoverEmulator: (enabled) =>
       ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_SET_AUTO_DISCOVER_EMULATOR, enabled),
     openWindow: () => ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_OPEN_WINDOW),
+    getLogsPath: () => ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_GET_LOGS_PATH),
+    openLogsFolder: () => ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_OPEN_LOGS_FOLDER),
     onChanged: (listener) => {
       const handler = (_event: IpcRendererEvent, settings: AppSettings): void => {
         listener(settings)

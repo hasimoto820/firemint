@@ -16,6 +16,22 @@ function settingsUrl(): string {
   return `file://${join(__dirname, '../renderer/index.html')}#/settings`
 }
 
+/** Alt+Tab / タスクバーで別アプリに見えないよう、メインの子にする。 */
+function resolveParentWindow(): BrowserWindow | undefined {
+  const focused = BrowserWindow.getFocusedWindow()
+  if (focused && !focused.isDestroyed() && focused !== settingsWindow) {
+    return focused
+  }
+
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (!window.isDestroyed() && window !== settingsWindow) {
+      return window
+    }
+  }
+
+  return undefined
+}
+
 export function openSettingsWindow(): void {
   if (settingsWindow && !settingsWindow.isDestroyed()) {
     settingsWindow.focus()
@@ -30,17 +46,22 @@ export function openSettingsWindow(): void {
       return
     }
 
+    const parent = resolveParentWindow()
+
     settingsWindow = new BrowserWindow({
       width: 440,
-      height: 480,
+      height: 560,
       minWidth: 360,
-      minHeight: 320,
+      minHeight: 400,
       resizable: true,
       minimizable: false,
       maximizable: false,
       show: false,
       autoHideMenuBar: true,
-      title: 'Settings',
+      title: 'FireMint',
+      parent,
+      modal: false,
+      skipTaskbar: true,
       backgroundColor: windowBackgroundColor(settings.theme),
       webPreferences: {
         preload: join(__dirname, '../preload/index.js'),

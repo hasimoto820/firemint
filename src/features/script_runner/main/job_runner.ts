@@ -1,5 +1,6 @@
 import { BrowserWindow } from 'electron'
 import { IPC_CHANNELS } from '@shared/ipc/channels'
+import { logJob } from '@shared/logging/job_logger'
 import { logError, logInfo } from '@shared/logging/logger'
 import { formatUnavailableFirestoreMessage } from '@shared/firestore/native_check'
 import { isCanceledError } from '@shared/safety/canceled'
@@ -25,10 +26,14 @@ import type {
 type ActiveJob = {
   abort: AbortController
   snapshot: ScriptJobSnapshot
+  lastLoggedPhase: string | null
+  lastLoggedPercent: number
 }
 
 let active: ActiveJob | null = null
 let jobSeq = 0
+
+const UI_LOG_LIMIT = 400
 
 function createJobId(): string {
   jobSeq += 1
@@ -75,8 +80,9 @@ function appendLog(level: ScriptJobLogLine['level'], message: string): void {
   }
   active.snapshot = {
     ...active.snapshot,
-    logs: [...active.snapshot.logs, line].slice(-200)
+    logs: [...active.snapshot.logs, line].slice(-UI_LOG_LIMIT)
   }
+  logJob(level === 'error' ? 'error' : 'info', message, { jobId: active.snapshot.id })
 }
 
 function patchSnapshot(patch: Partial<ScriptJobSnapshot>): void {
@@ -105,29 +111,67 @@ function applyProgress(
   })
 }
 
+/** 進捗を画面詳細とログの両方へ。フェーズ切替 or 約10%ごと。 */
+function logProgressLine(
+  phase: string,
+  percent: number,
+  detail: string,
+  writtenCount?: number | null
+): void {
+  if (!active) {
+    return
+  }
+
+  const phaseChanged = active.lastLoggedPhase !== phase
+  const percentJump = percent - active.lastLoggedPercent >= 10
+  const forceEnd = percent >= 100
+
+  if (!phaseChanged && !percentJump && !forceEnd && active.lastLoggedPhase != null) {
+    applyProgress(percent, detail, writtenCount)
+    return
+  }
+
+  active.lastLoggedPhase = phase
+  active.lastLoggedPercent = percent
+  applyProgress(percent, detail, writtenCount)
+  appendLog('info', detail)
+  broadcast()
+}
+
 function onOfficialExportProgress(progress: OfficialExportProgress): void {
   const suffix = progress.detail ? ` / ${progress.detail}` : ''
-  applyProgress(progress.percent, `${progress.phase} ${progress.processedCount}${suffix}`)
+  const detail = `${progress.phase} ${progress.processedCount} 件${suffix}`
+  logProgressLine(progress.phase, progress.percent, detail)
 }
 
 function onTransportProgress(progress: TransportProgress): void {
   const detail = progress.detail
     ? `${progress.phase} ${progress.processedCount} 件 / 書込 ${progress.writtenCount} / スキップ ${progress.skippedCount} / ${progress.detail}`
     : `${progress.phase} ${progress.processedCount} 件 / 書込 ${progress.writtenCount} / スキップ ${progress.skippedCount}`
-  applyProgress(progress.percent, detail, progress.writtenCount)
+  logProgressLine(progress.phase, progress.percent, detail, progress.writtenCount)
 }
 
-function onImportProgress(
-  progress: ImportProjectProgress
-): void {
+function onImportProgress(progress: ImportProjectProgress): void {
   const written =
     progress.phase === 'writing' || progress.phase === 'done'
       ? progress.processedCount
       : undefined
+  const total = progress.totalCount > 0 ? `/${progress.totalCount}` : ''
   const detail = progress.detail
-    ? `${progress.phase} ${progress.processedCount}/${progress.totalCount} / ${progress.detail}`
-    : `${progress.phase} ${progress.processedCount}/${progress.totalCount}`
-  applyProgress(progress.percent, detail, written)
+    ? `${progress.phase} ${progress.processedCount}${total} / ${progress.detail}`
+    : `${progress.phase} ${progress.processedCount}${total}`
+  logProgressLine(progress.phase, progress.percent, detail, written)
+}
+
+function appendCollisionSamples(samples: string[], reason: string): void {
+  if (samples.length === 0) {
+    return
+  }
+
+  appendLog('info', `${reason}: ${samples.length} 件（例）`)
+  for (const path of samples) {
+    appendLog('info', `  skip ${path}`)
+  }
 }
 
 async function runJob(
@@ -211,17 +255,13 @@ async function runJob(
       }
       patchSnapshot({
         writtenCount: result.data.writtenCount,
-        resultSummary: `${result.data.writtenCount} 件を ${result.data.writtenProjectId} にインポートしました${
-          result.data.skippedCount > 0 ? ` / スキップ ${result.data.skippedCount} 件` : ''
-        }`
+        resultSummary: `成功 ${result.data.writtenCount} / スキップ ${result.data.skippedCount} → ${result.data.writtenProjectId}`
       })
       appendLog(
         'info',
         `プロジェクト ${result.data.sourceProjectId ?? '-'} → ${result.data.writtenProjectId}`
       )
-      if (result.data.collisionSamples.length > 0) {
-        appendLog('info', `スキップ例: ${result.data.collisionSamples.join(', ')}`)
-      }
+      appendCollisionSamples(result.data.collisionSamples, '既存のためスキップ')
       return
     }
     case 'transport': {
@@ -229,18 +269,11 @@ async function runJob(
       if (!result.ok) {
         throw Object.assign(new Error(result.error), { canceled: result.canceled })
       }
-      const skipNote =
-        result.data.skippedCount > 0 ? ` / スキップ ${result.data.skippedCount} 件` : ''
       patchSnapshot({
         writtenCount: result.data.writtenCount,
-        resultSummary: `${result.data.writtenCount} 件をコピーしました${skipNote}`
+        resultSummary: `成功 ${result.data.writtenCount} / スキップ ${result.data.skippedCount} / 対象 ${result.data.documentCount}`
       })
-      if (result.data.collisionSamples.length > 0) {
-        appendLog(
-          'info',
-          `スキップ例: ${result.data.collisionSamples.join(', ')}`
-        )
-      }
+      appendCollisionSamples(result.data.collisionSamples, '既存のためスキップ')
       return
     }
   }
@@ -272,8 +305,10 @@ function finishJob(status: ScriptJobSnapshot['status'], error: string | null): v
       appendLog('error', error)
     }
   } else if (active.snapshot.resultSummary) {
-    appendLog('info', active.snapshot.resultSummary)
+    appendLog('info', `完了: ${active.snapshot.resultSummary}`)
   }
+
+  appendLog('info', `---- job end status=${status} id=${active.snapshot.id} ----`)
 
   patchSnapshot({
     status,
@@ -373,7 +408,13 @@ export async function startScriptJob(
     resultSummary: null,
     writtenCount: null
   }
-  active = { abort, snapshot }
+  active = {
+    abort,
+    snapshot,
+    lastLoggedPhase: null,
+    lastLoggedPercent: -1
+  }
+  appendLog('info', `---- job start id=${snapshot.id} ----`)
   appendLog('info', `${snapshot.title} を開始しました`)
   broadcast()
   logInfo('script_runner', `start kind=${resolvedInput.kind} id=${snapshot.id}`)

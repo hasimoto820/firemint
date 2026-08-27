@@ -84,7 +84,7 @@ export async function saveGoogleRefreshToken(email: string, refreshToken: string
   }
 
   await saveStore(store)
-  logInfo('connection:google', `refresh token saved account=${key}`)
+  logInfo('connection:google', 'refresh token saved')
   return key
 }
 

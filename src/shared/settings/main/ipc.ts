@@ -1,5 +1,7 @@
-import { ipcMain } from 'electron'
+import { ipcMain, shell } from 'electron'
+import { mkdirSync } from 'fs'
 import { IPC_CHANNELS } from '@shared/ipc/channels'
+import { getLogsDir } from '@shared/logging/file_sink'
 import { logInfo } from '@shared/logging/logger'
 import type { Locale } from '@shared/i18n/shared/types'
 import { isLocale } from '@shared/i18n/shared/types'
@@ -55,5 +57,35 @@ export function registerSettingsHandlers(): void {
     logInfo('ipc:settings', 'openWindow invoked')
     openSettingsWindow()
     return null
+  })
+
+  ipcMain.handle(IPC_CHANNELS.SETTINGS_GET_LOGS_PATH, async () => {
+    const path = getLogsDir()
+    try {
+      mkdirSync(path, { recursive: true })
+    } catch {
+      // still return the expected path
+    }
+    return path
+  })
+
+  ipcMain.handle(IPC_CHANNELS.SETTINGS_OPEN_LOGS_FOLDER, async () => {
+    logInfo('ipc:settings', 'openLogsFolder invoked')
+    const path = getLogsDir()
+    try {
+      mkdirSync(path, { recursive: true })
+    } catch (error) {
+      return {
+        ok: false as const,
+        error: error instanceof Error ? error.message : String(error)
+      }
+    }
+
+    const openError = await shell.openPath(path)
+    if (openError) {
+      return { ok: false as const, error: openError }
+    }
+
+    return { ok: true as const, path }
   })
 }

@@ -11,6 +11,14 @@ import {
   titleBarOverlayOptions,
   windowBackgroundColor
 } from '@shared/settings/main/window_chrome'
+import { initFileLogging } from '@shared/logging/file_sink'
+import { logInfo } from '@shared/logging/logger'
+
+const APP_DISPLAY_NAME = 'FireMint'
+
+function configureAppIdentity(): void {
+  app.setName(APP_DISPLAY_NAME)
+}
 
 async function createWindow(): Promise<void> {
   const isMac = process.platform === 'darwin'
@@ -54,14 +62,14 @@ async function createWindow(): Promise<void> {
     return { action: 'deny' }
   })
 
-  // HMR for renderer base on electron-vite cli.
-  // Load the remote URL for development or the local html file for production.
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
 }
+
+configureAppIdentity()
 
 void maybeRunOfficialDumpCli().then((exitCode) => {
   if (exitCode !== null) {
@@ -73,8 +81,14 @@ void maybeRunOfficialDumpCli().then((exitCode) => {
 })
 
 function startApp(): void {
+  configureAppIdentity()
+
   app.whenReady().then(() => {
-    electronApp.setAppUserModelId('com.firemint')
+    configureAppIdentity()
+    electronApp.setAppUserModelId('com.firemint.app')
+
+    initFileLogging()
+    logInfo('app', `started name=${app.getName()} version=${app.getVersion()}`)
 
     app.on('browser-window-created', (_, window) => {
       optimizer.watchWindowShortcuts(window)
@@ -91,14 +105,8 @@ function startApp(): void {
   })
 }
 
-// Quit when all windows are closed, except on macOS. There, it's common
-// for applications and their menu bar to stay active until the user quits
-// explicitly with Cmd + Q.
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()
   }
 })
-
-// In this file you can include the rest of your app's specific main process
-// code. You can also put them in separate files and require them here.

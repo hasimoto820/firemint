@@ -68,6 +68,10 @@ export const en: Record<string, string> = {
   'settings.theme': 'Theme',
   'settings.theme.dark': 'Dark',
   'settings.theme.light': 'Light',
+  'settings.auto_discover': 'Look for Emulator on startup',
+  'settings.logs': 'Logs',
+  'settings.logs_hint': 'Open the app log folder in File Explorer.',
+  'settings.open_logs_folder': 'Open log folder',
 
   'connection.lead': 'Connect to Firestore',
   'connection.mode_list': 'List',

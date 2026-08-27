@@ -86,7 +86,7 @@ export async function saveGoogleAccountProfile(
   await saveStore(store)
   logInfo(
     'connection:google',
-    `profile saved account=${key} projects=${Object.keys(profile.projects).length}`
+    `profile saved projects=${Object.keys(profile.projects).length}`
   )
 }
 

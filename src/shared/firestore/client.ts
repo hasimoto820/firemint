@@ -100,7 +100,7 @@ export async function connectFirestoreWithGoogle(input: {
     throw new Error('projectId を指定してください')
   }
 
-  logInfo('firestore', `connect with google account project_id=${projectId} email=${input.accountEmail}`)
+  logInfo('firestore', `connect with google account project_id=${projectId}`)
 
   await deleteExistingApp(projectId)
 
