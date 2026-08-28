@@ -473,6 +473,7 @@ function CollectionTree({
           <button
             type="button"
             className="collection-tree__toggle"
+            tabIndex={-1}
             onClick={() => void handleToggle(node)}
             disabled={disabled || isLoading}
             aria-label={isExpanded ? '折りたたむ' : '展開する'}
@@ -482,7 +483,29 @@ function CollectionTree({
           <button
             type="button"
             className="collection-tree__label"
+            tabIndex={node.kind === 'collection' ? undefined : -1}
+            data-tree-active={isActive && node.kind === 'collection' ? 'true' : undefined}
             onClick={() => handleSelect(node)}
+            onKeyDown={(event) => {
+              if (node.kind !== 'collection') {
+                return
+              }
+
+              if (event.key === 'ArrowRight') {
+                event.preventDefault()
+                if (!isExpanded) {
+                  void handleToggle(node)
+                }
+                return
+              }
+
+              if (event.key === 'ArrowLeft') {
+                event.preventDefault()
+                if (isExpanded) {
+                  void handleToggle(node)
+                }
+              }
+            }}
             onContextMenu={
               node.kind === 'collection'
                 ? (event) => handleCollectionContextMenu(event, node.path)
@@ -506,6 +529,7 @@ function CollectionTree({
                   <button
                     type="button"
                     className="collection-tree__load-more"
+                    tabIndex={-1}
                     onClick={() => void loadMoreDocuments(node.path)}
                     disabled={disabled || isLoading}
                   >

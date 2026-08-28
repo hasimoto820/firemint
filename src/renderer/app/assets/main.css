@@ -2070,11 +2070,17 @@ code {
   align-items: center;
   gap: 4px;
   min-height: 28px;
+  border: 1px solid transparent;
   border-radius: 6px;
 }
 
 .collection-tree__row--active {
   background: rgba(105, 136, 230, 0.2);
+}
+
+.collection-tree__row:focus-within {
+  border-color: var(--ev-c-project-focus-border);
+  background: var(--ev-c-project-focus);
 }
 
 .collection-tree__toggle,

@@ -181,7 +181,21 @@ function WorkspacePane({
   return (
     <div className="workspace-pane">
       <div className="workspace-pane__modebar" data-area="settings" data-pane={pane} tabIndex={-1}>
-        <nav className="app-nav">
+        <nav
+          className="app-nav"
+          onKeyDown={(event) => {
+            if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') {
+              return
+            }
+
+            event.preventDefault()
+            const next = tab.view === 'simple' ? 'query' : 'simple'
+            onChangeView(next)
+            const buttons = event.currentTarget.querySelectorAll('button')
+            const target = next === 'simple' ? buttons[0] : buttons[1]
+            window.setTimeout(() => target?.focus(), 0)
+          }}
+        >
           <button
             type="button"
             className={

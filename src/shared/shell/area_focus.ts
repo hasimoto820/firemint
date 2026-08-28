@@ -24,7 +24,7 @@ export type AreaFocusHost = {
 }
 
 const FOCUSABLE =
-  'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+  'button:not([disabled]):not([tabindex="-1"]), [href]:not([tabindex="-1"]), input:not([disabled]):not([tabindex="-1"]), select:not([disabled]):not([tabindex="-1"]), textarea:not([disabled]):not([tabindex="-1"]), [tabindex]:not([tabindex="-1"])'
 
 let host: AreaFocusHost | null = null
 
@@ -47,6 +47,11 @@ function areaSelector(area: AreaId, pane?: WorkspacePaneId): string {
 function firstFocusable(root: Element): HTMLElement | null {
   if (!(root instanceof HTMLElement)) {
     return null
+  }
+
+  const current = root.querySelector('[data-tree-active="true"]')
+  if (current instanceof HTMLElement) {
+    return current
   }
 
   if (root.matches(FOCUSABLE)) {
@@ -114,7 +119,7 @@ function collectFocusables(roots: Element[]): HTMLElement[] {
     }
 
     for (const node of root.querySelectorAll(FOCUSABLE)) {
-      if (!(node instanceof HTMLElement) || seen.has(node) || !isVisible(node)) {
+      if (!(node instanceof HTMLElement) || seen.has(node) || node.tabIndex < 0 || !isVisible(node)) {
         continue
       }
 
