@@ -63,7 +63,7 @@ function AppMenuBar({ menus }: AppMenuBarProps): React.JSX.Element {
   }
 
   return (
-    <nav ref={barRef} className="app-menu-bar" aria-label="Application menu">
+    <nav ref={barRef} className="app-menu-bar" aria-label="Application menu" data-area="menu">
       {menus.map((section) => {
         const isOpen = openMenuId === section.id
 

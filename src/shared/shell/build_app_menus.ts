@@ -3,6 +3,7 @@ import type { DiffIntent } from '@features/diff/shared/diff'
 import type { TransportIntent } from '@features/transport/shared/transport'
 import type { AppView } from '@shared/shell/AppNav'
 import type { TranslateFn } from '@shared/i18n/shared/types'
+import { shortcutLabel } from '@shared/settings/shared/shortcuts'
 import type { AppMenuSection } from './app_menu'
 
 export const FIREMINT_DOCS_URL = 'https://electron-vite.org'
@@ -339,7 +340,6 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
           type: 'item',
           id: 'edit-new',
           label: t('menu.new'),
-          shortcut: 'Ctrl+N',
           indent: true,
           disabled: !context?.canCreate,
           onClick: context?.onCreate
@@ -348,7 +348,6 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
           type: 'item',
           id: 'edit-save',
           label: t('common.save'),
-          shortcut: 'Ctrl+S',
           indent: true,
           disabled: !context?.canSave,
           onClick: context?.onSave
@@ -365,7 +364,6 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
           type: 'item',
           id: 'edit-delete',
           label: t('common.delete'),
-          shortcut: 'Del',
           indent: true,
           disabled: !context?.canDelete,
           onClick: context?.onDelete
@@ -442,7 +440,7 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
           type: 'item',
           id: 'view-command-palette',
           label: 'Command Palette…',
-          shortcut: 'Ctrl+P',
+          shortcut: shortcutLabel('p'),
           disabled: !handlers.connected,
           onClick: shell?.openCommandPalette
         },
@@ -475,7 +473,7 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
           type: 'item',
           id: 'tab-close',
           label: t('menu.close_tab'),
-          shortcut: 'Ctrl+W',
+          shortcut: shortcutLabel('w'),
           disabled: !shell?.canCloseTab,
           onClick: shell?.closeActiveTab
         },

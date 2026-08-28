@@ -12,6 +12,7 @@ import { isSubcollectionPath } from '@features/explorer/shared/tree'
 import { runDuplicateCollection } from '@features/explorer/renderer/duplicateCollection'
 import { useI18n } from '@shared/i18n/renderer/I18nProvider'
 import { useRegisterAppMenu } from '@shared/shell/AppMenuContext'
+import type { WorkspacePaneId } from '@shared/shell/workspace_tab'
 import { confirmAction } from '@shared/ui/confirmAction'
 import DocumentJsonPanel from '@shared/ui/DocumentJsonPanel'
 import DocumentTable from '@shared/ui/DocumentTable'
@@ -21,6 +22,7 @@ import TableBulkSplit from '@shared/ui/TableBulkSplit'
 import { collectDataColumns } from '@shared/ui/document_table_utils'
 
 type SimpleViewProps = {
+  pane: WorkspacePaneId
   status: ConnectionStatus
   activeCollectionPath: string | null
   selectedDocumentPath: string | null
@@ -52,6 +54,7 @@ type SimpleViewProps = {
  * が保持し、props で受け取る。
  */
 function SimpleView({
+  pane,
   status,
   activeCollectionPath,
   selectedDocumentPath,
@@ -771,7 +774,7 @@ function SimpleView({
         minSecond={120}
         ariaLabel="JSON パネルの高さ"
         first={
-          <div className="simple-main__workspace">
+          <div className="simple-main__workspace" data-area="settings" data-pane={pane} tabIndex={-1}>
             <TableBulkSplit
               table={
             <DocumentTable
@@ -820,7 +823,7 @@ function SimpleView({
           </div>
         }
         second={
-          <div className="simple-main__json">
+          <div className="simple-main__json" data-area="results" data-pane={pane} tabIndex={-1}>
             <DocumentJsonPanel
               projectId={projectId}
               documentPath={selectedDocumentPath}

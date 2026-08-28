@@ -15,7 +15,7 @@ function AuthNavSection({
   const { t } = useI18n()
 
   return (
-    <div className="auth-nav">
+    <div className="auth-nav" data-area="auth" tabIndex={-1}>
       <button
         type="button"
         className={active ? 'auth-nav__button auth-nav__button--active' : 'auth-nav__button'}

@@ -397,7 +397,11 @@ function WorkspaceProjectList({
           minFirst={72}
           minSecond={120}
           ariaLabel="プロジェクト一覧の高さ"
-          first={entryList}
+          first={
+            <div data-area="projects" tabIndex={-1}>
+              {entryList}
+            </div>
+          }
           second={<div className="project-list__children">{focusedChildren}</div>}
         />
       ) : (

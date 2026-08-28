@@ -13,7 +13,7 @@ import {
   type SavedQuery
 } from '@features/query/shared/types'
 import { useI18n } from '@shared/i18n/renderer/I18nProvider'
-import type { WorkspaceTabQueryDraftPatch } from '@shared/shell/workspace_tab'
+import type { WorkspacePaneId, WorkspaceTabQueryDraftPatch } from '@shared/shell/workspace_tab'
 import DocumentJsonPanel from '@shared/ui/DocumentJsonPanel'
 import DocumentTable from '@shared/ui/DocumentTable'
 import BulkActionsPanel from '@shared/ui/BulkActionsPanel'
@@ -25,6 +25,7 @@ import QueryEditor from './QueryEditor'
 import SavedQueriesBar from './SavedQueriesBar'
 
 type QueryViewProps = {
+  pane: WorkspacePaneId
   status: ConnectionStatus
   /** 左ツリーで選択中のコレクション path（初期コードの seed に使う） */
   activeCollectionPath?: string | null
@@ -53,6 +54,7 @@ const EMPTY_RESULTS_PATCH: WorkspaceTabQueryDraftPatch = {
  * エディタ下書きと直近 Run 結果は WorkspaceTab 側に保持する（モード切替で消えない）。
  */
 function QueryView({
+  pane,
   status,
   activeCollectionPath = null,
   querySource,
@@ -547,29 +549,33 @@ function QueryView({
         minSecond={160}
         ariaLabel="クエリエディタの高さ"
         first={
-          <QueryEditor
-            projectId={projectId}
-            source={source}
-            loading={loading}
-            groupTab={groupTab}
-            onChange={(next) => onQueryDraftChange({ querySource: next })}
-            onSelectGroupTab={handleSelectGroupTab}
-            onRun={() => void handleRun()}
-          />
+          <div data-area="settings" data-pane={pane} tabIndex={-1}>
+            <QueryEditor
+              projectId={projectId}
+              source={source}
+              loading={loading}
+              groupTab={groupTab}
+              onChange={(next) => onQueryDraftChange({ querySource: next })}
+              onSelectGroupTab={handleSelectGroupTab}
+              onRun={() => void handleRun()}
+            />
+          </div>
         }
         second={
           <div className="query-main__after-editor">
-            <SavedQueriesBar
-              queries={savedQueries}
-              selectedId={querySelectedSavedId}
-              name={querySavedName}
-              loading={loading}
-              onSelect={handleSelectSaved}
-              onNameChange={(name) => onQueryDraftChange({ querySavedName: name })}
-              onLoad={handleLoadSaved}
-              onSave={() => void handleSaveSaved()}
-              onDelete={() => void handleDeleteSaved()}
-            />
+            <div data-area="settings" data-pane={pane} tabIndex={-1}>
+              <SavedQueriesBar
+                queries={savedQueries}
+                selectedId={querySelectedSavedId}
+                name={querySavedName}
+                loading={loading}
+                onSelect={handleSelectSaved}
+                onNameChange={(name) => onQueryDraftChange({ querySavedName: name })}
+                onLoad={handleLoadSaved}
+                onSave={() => void handleSaveSaved()}
+                onDelete={() => void handleDeleteSaved()}
+              />
+            </div>
             {error && <p className="query-main__error">{error}</p>}
             {statusMessage && <p className="query-main__status">{statusMessage}</p>}
             {loading && <p className="query-main__loading">実行中...</p>}
@@ -591,7 +597,7 @@ function QueryView({
                 minSecond={100}
                 ariaLabel="JSON パネルの高さ"
                 first={
-                  <div className="query-main__workspace">
+                  <div className="query-main__workspace" data-area="settings" data-pane={pane} tabIndex={-1}>
                     <div className="query-main__result-label">{queryResultCount} docs</div>
                     <TableBulkSplit
                       table={
@@ -627,7 +633,7 @@ function QueryView({
                   </div>
                 }
                 second={
-                  <div className="query-main__json">
+                  <div className="query-main__json" data-area="results" data-pane={pane} tabIndex={-1}>
                     <DocumentJsonPanel
                       projectId={projectId}
                       documentPath={queryResultSelectedPath}

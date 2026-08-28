@@ -91,6 +91,7 @@ import {
   type TabGroupColor,
   type WorkspaceTabGroup
 } from '@shared/shell/tab_group'
+import { registerAreaFocusHost } from '@shared/shell/area_focus'
 
 export type ShellCommands = {
   openCommandPalette: () => void
@@ -1268,26 +1269,23 @@ function FirestorePageInner({
   }, [focusedActiveId, focusedPane])
 
   useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent): void => {
-      if ((event.key === 'p' || event.key === 'P') && (event.ctrlKey || event.metaKey)) {
-        event.preventDefault()
-        setPaletteOpen(true)
-        return
-      }
-
-      if ((event.key === 'w' || event.key === 'W') && (event.ctrlKey || event.metaKey)) {
-        if (!focusedActiveId) {
-          return
+    registerAreaFocusHost({
+      splitEnabled,
+      focusedPane,
+      setFocusedPane,
+      showFirestore: () => setMainSection('firestore'),
+      showAuth: () => setMainSection('auth'),
+      openPalette: () => setPaletteOpen(true),
+      closeActiveTab: () => {
+        if (focusedActiveId) {
+          handleCloseTab(focusedActiveId)
         }
+      },
+      hasPageTabs: (pane) => tabsInPane(tabs, pane).length > 0
+    })
 
-        event.preventDefault()
-        handleCloseTab(focusedActiveId)
-      }
-    }
-
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [focusedActiveId, handleCloseTab])
+    return () => registerAreaFocusHost(null)
+  }, [focusedActiveId, focusedPane, handleCloseTab, splitEnabled, tabs])
 
   const shellCommands = useMemo<ShellCommands>(
     () => ({
@@ -1551,26 +1549,28 @@ function FirestorePageInner({
       }
       onMouseDown={() => setFocusedPane(pane)}
     >
-      <TabBar
-        tabs={paneTabs}
-        groups={tabGroups.filter((group) => group.pane === pane)}
-        activeTabId={activeId}
-        ariaLabel={pane === 'primary' ? '左ペインのタブ' : '右ペインのタブ'}
-        impExpBusy={impExpJob?.status === 'running'}
-        projectLabelFor={projectLabelFor}
-        showProjectLabel={showProjectLabel}
-        onActivate={(tabId) => activateInPane(tabId, pane)}
-        onClose={handleCloseTab}
-        onDrop={(source, dest) => handleTabDrop(pane, source, dest)}
-        onCreateGroup={(tabId) => handleCreateGroup(pane, tabId)}
-        onJoinGroup={(tabId, groupId) => handleJoinGroup(pane, tabId, groupId)}
-        onLeaveGroup={(tabId) => handleLeaveGroup(pane, tabId)}
-        onCloseGroup={(groupId) => void handleCloseGroup(groupId)}
-        onUngroup={handleUngroup}
-        onRenameGroup={handleRenameGroup}
-        onSetGroupColor={handleSetGroupColor}
-        onToggleGroupCollapsed={handleToggleGroupCollapsed}
-      />
+      <div data-area="page_tabs" data-pane={pane} tabIndex={-1}>
+        <TabBar
+          tabs={paneTabs}
+          groups={tabGroups.filter((group) => group.pane === pane)}
+          activeTabId={activeId}
+          ariaLabel={pane === 'primary' ? '左ペインのタブ' : '右ペインのタブ'}
+          impExpBusy={impExpJob?.status === 'running'}
+          projectLabelFor={projectLabelFor}
+          showProjectLabel={showProjectLabel}
+          onActivate={(tabId) => activateInPane(tabId, pane)}
+          onClose={handleCloseTab}
+          onDrop={(source, dest) => handleTabDrop(pane, source, dest)}
+          onCreateGroup={(tabId) => handleCreateGroup(pane, tabId)}
+          onJoinGroup={(tabId, groupId) => handleJoinGroup(pane, tabId, groupId)}
+          onLeaveGroup={(tabId) => handleLeaveGroup(pane, tabId)}
+          onCloseGroup={(groupId) => void handleCloseGroup(groupId)}
+          onUngroup={handleUngroup}
+          onRenameGroup={handleRenameGroup}
+          onSetGroupColor={handleSetGroupColor}
+          onToggleGroupCollapsed={handleToggleGroupCollapsed}
+        />
+      </div>
 
       {active ? (
         <WorkspacePane
@@ -1580,6 +1580,7 @@ function FirestorePageInner({
               : connectionStatusForTab(status, active, workspaceEntries, writeBlockedReasons)
           }
           tab={active}
+          pane={pane}
           menuEnabled={
             focusedPane === pane && isCollectionTab(active) && active.view === 'simple'
           }

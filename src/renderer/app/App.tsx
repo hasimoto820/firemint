@@ -15,10 +15,12 @@ import {
   type AppMenuContextActions
 } from '@shared/shell/build_app_menus'
 import { useI18n } from '@shared/i18n/renderer/I18nProvider'
+import { useShortcutDispatcher } from '@shared/shell/shortcut_dispatcher'
 import { confirmAction } from '@shared/ui/confirmAction'
 
 function App(): React.JSX.Element {
   const { t, ready } = useI18n()
+  useShortcutDispatcher()
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus | null | undefined>(
     undefined
   )

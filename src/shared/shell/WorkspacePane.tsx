@@ -20,6 +20,7 @@ import {
   isEmulatorImpExpTab,
   isImpExpTab,
   isTransportTab,
+  type WorkspacePaneId,
   type WorkspaceTab,
   type WorkspaceTabQueryDraftPatch
 } from '@shared/shell/workspace_tab'
@@ -27,6 +28,7 @@ import {
 type WorkspacePaneProps = {
   status: ConnectionStatus
   tab: WorkspaceTab
+  pane: WorkspacePaneId
   menuEnabled: boolean
   impExpJob: ScriptJobSnapshot | null
   impExpDraft: ImpExpDraft
@@ -72,6 +74,7 @@ type WorkspacePaneProps = {
 function WorkspacePane({
   status,
   tab,
+  pane,
   menuEnabled,
   impExpJob,
   impExpDraft,
@@ -177,7 +180,7 @@ function WorkspacePane({
 
   return (
     <div className="workspace-pane">
-      <div className="workspace-pane__modebar">
+      <div className="workspace-pane__modebar" data-area="settings" data-pane={pane} tabIndex={-1}>
         <nav className="app-nav">
           <button
             type="button"
@@ -200,6 +203,7 @@ function WorkspacePane({
 
       {tab.view === 'query' ? (
         <QueryView
+          pane={pane}
           status={status}
           activeCollectionPath={tab.collectionPath}
           querySource={tab.querySource}
@@ -215,6 +219,7 @@ function WorkspacePane({
         />
       ) : (
         <SimpleView
+          pane={pane}
           status={status}
           activeCollectionPath={tab.collectionPath}
           selectedDocumentPath={tab.selectedDocumentPath}

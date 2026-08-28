@@ -532,7 +532,7 @@ function CollectionTree({
   }))
 
   return (
-    <div className="collection-tree">
+    <div className="collection-tree" data-area="collections" tabIndex={-1}>
       <h2 className="collection-tree__title">{title}</h2>
       {unavailableReason ? (
         <p className="collection-tree__error">{unavailableReason}</p>
