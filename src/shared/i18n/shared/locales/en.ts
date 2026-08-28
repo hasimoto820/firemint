@@ -17,6 +17,7 @@ export const en: Record<string, string> = {
   'menu.export': 'Export',
   'menu.connection': 'Connection',
   'menu.project': 'Project',
+  'menu.project_collection': 'Project/Collection',
   'menu.group': 'Group',
   'menu.collection': 'Collection',
   'menu.diff': 'Diff',

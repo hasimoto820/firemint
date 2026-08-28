@@ -19,6 +19,7 @@ export const zhHant: MessageCatalog = {
   'menu.export': '匯出',
   'menu.connection': '連線',
   'menu.project': '專案',
+  'menu.project_collection': '專案/集合',
   'menu.group': '群組',
   'menu.collection': '集合',
   'menu.diff': 'Diff',

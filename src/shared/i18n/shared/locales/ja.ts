@@ -19,6 +19,7 @@ export const ja: MessageCatalog = {
   'menu.export': 'エクスポート',
   'menu.connection': '接続',
   'menu.project': 'プロジェクト',
+  'menu.project_collection': 'プロジェクト/コレクション',
   'menu.group': 'グループ',
   'menu.collection': 'コレクション',
   'menu.diff': 'Diff',

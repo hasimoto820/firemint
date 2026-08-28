@@ -19,6 +19,7 @@ export const zhHans: MessageCatalog = {
   'menu.export': '导出',
   'menu.connection': '连接',
   'menu.project': '项目',
+  'menu.project_collection': '项目/集合',
   'menu.group': '组',
   'menu.collection': '集合',
   'menu.diff': 'Diff',

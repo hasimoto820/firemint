@@ -147,7 +147,7 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
         {
           type: 'item',
           id: 'file-import-project',
-          label: t('menu.project'),
+          label: t('menu.project_collection'),
           indent: true,
           disabled: emulatorSource
             ? !(handlers.canEmulatorImportProject ?? false)
