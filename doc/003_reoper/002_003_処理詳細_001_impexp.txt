@@ -24,8 +24,8 @@ import / export
 ＊　インポート / エクスポートは、モバイル版（002_007 / 002_005）と同じ動きにする。
     「まだ無いもの」「動きがモバイル版と違うもの」は、すべてモバイル版に合わせる。
 
-＊　整数と小数（1 と 1.0）は区別する。区別できないまま進めない。
-    → 「要検証：整数と小数の区別」
+＊　整数と小数（1 と 1.0）は区別する。
+    → 「整数と小数の区別」
 
 ＊　デスクトップ版だけにある機能は残す。
     → 「デスクトップ版だけにあるもの」
@@ -140,11 +140,12 @@ import / export
 ================================================================================
 
 
-＊　書き込みは BulkWriter を使う
+＊　書き込みは v1 クライアントの batchWrite を使う
     batch は全部成功か全部失敗なので、1 件が断られるとバッチ全体が失敗する。
-    BulkWriter は 1 件ずつ成否が返る。
-    追記    BulkWriter.create。ALREADY_EXISTS は飛ばした件数。それ以外の失敗は書けなかった件数
-    上書き  BulkWriter.set（merge なし）
+    batchWrite は 1 件ずつ成否が返る。値は型を明示して書く（「整数と小数の区別」）。
+    追記    currentDocument: { exists: false } を付けて update。
+            code=6（ALREADY_EXISTS）は飛ばした件数。それ以外の失敗は書けなかった件数
+    上書き  currentDocument を付けずに update（ドキュメントを丸ごと置き換える）
 
 ＊　同じパスの 2 回目以降
     書いたパスを覚えておき、2 回目以降を見分ける。持つのはパスだけで、中身は持たない。
@@ -185,35 +186,58 @@ import / export
 
 
 ================================================================================
-要検証：整数と小数の区別
+整数と小数の区別
 ================================================================================
 
 
 ＊　モバイル版の仕様
     30 は整数、1.0 は小数。見た目から型を推測しない（002_007）。
+    2^53 を超える整数も、丸めずにそのまま扱う。
 
-＊　デスクトップ版でそのままでは守れないところ
-    firebase-admin（@google-cloud/firestore 7.11.6）の制約。
-
+＊　通常の API（firebase-admin、@google-cloud/firestore 7.11.6）の制約
     書く時    JS の数値は、整数で表せる値なら整数（integerValue）として送られる
               （serializer.js の Number.isSafeInteger）。
               小数の 1.0 を書くと、整数の 1 になる。通常の API で 1.0 を小数のまま書く方法は無い。
-    読む時    useBigInt を使っていないので、整数の 1 と小数の 1.0 が、どちらも JS の 1 になる。
+    読む時    useBigInt なしでは、整数の 1 と小数の 1.0 が、どちらも JS の 1 になる。
               2^53 を超える整数は丸まる。
-    JSON      JSON.parse では 1 と 1.0 の区別が消える。
+    JSON      JSON.parse / JSON.stringify では 1 と 1.0 の区別が消える。
 
     今の公式ダンプのインポートも同じで、小数の 1.0 は整数になって書かれている。
 
-    モバイル版は、Firestore の値を型つきのまま（integerValue / doubleValue）読み書きしているので、
-    この問題が無い。
+＊　読む
+    useBigInt: true の Firestore の接続で読む。整数は BigInt、小数は number で返る。
+    マップ・配列の中も同じ。
+    インポート / エクスポート専用の接続にする。アプリ全体の接続（クエリ・エディタ等）は変えない。
 
-＊　対策の候補（未検証）
-    読む時    useBigInt: true にする。整数は BigInt、小数は number で返る。
-              Firestore の接続はアプリ全体で共通なので、クエリ・エディタ等にも影響する。
-    書く時    @google-cloud/firestore の低レベルのクライアント（v1）で、doubleValue を明示して書く。
-              インポートの書き込みは作り直しになる。
-    JSON      JSON.parse の reviver で元の文字列を受け取る機能を使い、1 と 1.0 を見分ける。
-              Electron 33 の V8 で使えるかを確かめる。
+＊　書く
+    v1 クライアント（@google-cloud/firestore の v1.FirestoreClient）の batchWrite で、
+    型を明示して書く。
+      整数    { integerValue: "9007199254740993" }（文字列で渡す）
+      小数    { doubleValue: 1 }
+      マップ・配列の中も、同じように型を明示する。
+
+＊　JSON
+    読む    JSON.parse の reviver の 3 つ目の引数（context.source）で、元の文字列を受け取る。
+            "1" は整数、"1.0" / "1e3" 等は小数。整数は元の文字列から BigInt にする。
+    書く    JSON.rawJSON で、小数の 1.0 は "1.0"、BigInt は桁をそのまま書く。
+
+＊　確かめたこと（Emulator、scripts/exp_number_type.mjs）
+    v1 で書く      doubleValue 1 は小数 1.0 のまま残る。integerValue "9007199254740993" は桁どおり残る。
+                   マップ・配列の中も型が残る。NaN / 無限大も残る。
+    通常の API で書く  number 1 は整数、1.5 は小数、BigInt は整数になる。
+    useBigInt で読む   整数は BigInt、小数は number。マップ・配列の中も同じ。
+    batchWrite      1 件ずつ成否が返る。
+                    既にあるドキュメントへの追記は code=6（ALREADY_EXISTS）。
+                    無いドキュメントへの追記と、上書きは code=0。
+                    Emulator では、batchWrite に管理者のヘッダー（Authorization: Bearer owner）が要る。
+    JSON（Electron 33.4.11、V8 13.0）
+                    reviver の context.source で "1" と "1.0" を見分けられる。
+                    "9007199254740993" も元の文字列で受け取れる。
+                    JSON.rawJSON("1.0") は 1.0 と書き出される。
+
+＊　まだ確かめていないこと
+    本番の Firestore での動き。
+    v1 クライアントを、サービスアカウントの JSON / Google ログイン（OAuth）の認証で繋ぐこと。
 
 
 
