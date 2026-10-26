@@ -1,0 +1,555 @@
+
+Account Flow
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+
+
+
+
+
+
+
+================================================================================
+要点
+================================================================================
+
+• FireMintの利用者は、Firebase Authenticationで識別する。
+• 初回起動時はGoogleログインを必須とせず、匿名認証で開始する。
+• AndroidではAndroid IDを取得し、Trial履歴の識別に使用する（端末初期化等でのリセットは許容し、追加の指紋認証は行わない）。
+• 匿名認証で作成されたFirebase Auth UIDをローカル（SQLite）に保持し、通常のアプリ再起動では作り直さない。
+• Firestoreのusers/{uid}は、Firebase AuthenticationのUIDと対応する。
+• usersは端末上のFireMintユーザー単位で管理する。firstUseDate（Trial起点）はuser単位の権利。
+• accountsはFireMintの契約単位で管理する。ownerUidを持ち、owner判定はこの1フィールドで行う。
+• accounts/{accountId}/members/{uid}で、その契約に所属するGoogleアカウントを管理する。
+• 1つのFireMint契約に最大2個のGoogleアカウント（owner含む）を紐付ける。
+• member（サブ垢）の追加・削除はowner本人のみが行える。member自身には変更権限を与えない。
+• subscriptionsは契約の課金情報を管理する。課金権はaccount単位、Trial権はuser単位。
+• Androidの課金はGoogle Play、デスクトップの課金はStripeを使用する。
+• 課金経路の違いに関係なく、FireMint側でentitlement（利用権）を一元管理する。
+• Androidの解約はGoogle Play側の管理画面に依存し、FireMintはその導線を持たない。
+• Googleアカウントで認証した場合、匿名ユーザーのuser/{uid}をそのまま引き継ぐ（firstUseDateは書き換えない）。
+• Androidとデスクトップは、それぞれ別のFirebase Auth UID / usersとして存在し得る。
+• 同じGoogleアカウントで同じFireMint Accountに所属することで、Trialとは別に課金による利用権を共有する。
+• サインアップ／サインインの導線は分けない。Google認証1本で、裏側でemailを元に新規／既存を判定する。
+• 本プロダクトは個人（または少人数での共同）利用を想定し、譲渡や大人数共有は想定しない。
+
+
+
+
+================================================================================
+フロー　　■ 初回起動：Android
+================================================================================
+
+パターンＡ（初回）
+アプリ起動
+↓
+sqlite上にFirebase Auth UIDがあるか確認
+↓
+無い（初回）
+↓
+Android IDを取得
+↓
+firestore/users/deviceId をチェック
+↓
+無い（初回）
+↓
+匿名認証を実行し、Firebase Auth UIDを取得
+↓
+Firestoreにusers/{uid}を作成
+├─ deviceId = androidId
+├─ platform = android
+└─ firstUseDate = 現在日時
+↓
+firstUseDateをsqliteにも保持
+↓
+60日間のTrial開始（このuid単位の権利）
+↓
+FireMint利用開始
+
+
+
+
+
+
+パターンＢ（アプリ再インストール）
+アプリ起動
+↓
+sqlite上にFirebase Auth UIDがあるか確認
+↓
+無い（初回）
+↓
+Android IDを取得
+↓
+firestore/users/deviceId をチェック
+↓
+有る（アプリ再インストール）
+↓
+【匿名のままのユーザーだけ】が復元の対象（基本ルール5）。
+Googleにログイン済みのユーザーは、ここでは復元しない。
+↓
+users/{uid}を取得し、sqlite作成。
+↓
+通常起動のフローへと移る
+
+※初回起動の処理（匿名認証・recoverUid）は、アプリの起動時に行う（基本ルール0）。
+　アカウント画面を開いた時ではない。
+※復元した後、用済みになる一時的な匿名ユーザーは、サーバー(recoverUid)が削除する。
+
+
+＊１　Firebase Authセッションの特記事項有
+
+
+
+
+
+
+
+
+================================================================================
+フロー　　■ 通常起動：Android
+================================================================================
+
+アプリ起動
+↓
+sqlite上のFirebase Auth UIDを確認
+↓
+あり
+↓
+firestore/users/{uid}を取得
+↓
+users/{uid}.accountId を確認
+　（accountId の正はサーバー(Firestore)。ローカルSQLiteのキャッシュと食い違えば、
+　　サーバーの値でキャッシュを更新する）
+├─ accountId 無し → Trialのみで利用可否判定（firstUseDate + 60日）
+└─ accountId 有り → 最新のsubscription（expiryTime降順で1件）を確認
+↓
+利用状態を判定（後述「利用状態の判定」フロー）
+↓
+未契約（subscribed でない）かつ accountId 有りの場合は、
+Google Play側に既存の購入が無いかを自動で確認する（後述「購入の復元」）
+↓
+FireMint利用継続
+
+※ローカルキャッシュだけを信用しない理由:
+　Googleログインで契約(account)が作られた直後にキャッシュを更新し忘れると、
+　画面を開き直した時に「契約が無い」表示になる不具合が実際に起きたため。
+
+
+
+
+
+
+
+================================================================================
+フロー　　■ 匿名ユーザー → Google認証（サインアップ／サインイン統一）
+================================================================================
+
+匿名ユーザーでFireMintを利用中
+↓
+Googleアカウントでログイン操作
+↓
+Firebase AuthenticationにGoogle認証情報を紐付け
+↓
+Firebase Auth UIDは既存の匿名UIDを引き継ぐ（firstUseDateは変更しない）
+↓
+取得したemailで、既存accountのmembersに招待歴が無いか確認
+├─ accounts/*/members/{email} が存在する
+│     ↓
+│  該当accountに合流
+│     ↓
+│  users/{uid}.accountId を該当accountIdに更新
+│     ↓
+│  members/{email} を members/{uid} に更新（emailフィールドは保持）
+│
+└─ 存在しない
+      ↓
+   このuidはまだどのaccountにも属さない状態のまま
+   （後述「FireMint Account作成」へ移る）
+
+
+
+
+
+
+
+================================================================================
+フロー　　■ FireMint Account作成
+================================================================================
+
+ユーザーがAccountを作成（Google認証の時点で発生）
+↓
+accounts/{accountId} を作成
+├─ createdAt
+├─ ownerUid = 作成者のuid
+└─ status
+↓
+accounts/{accountId}/members/{uid} を作成
+├─ email
+└─ addedAt
+↓
+users/{uid}.accountId を作成したaccountIdに更新
+↓
+このAccountが契約・利用権（subscription）の単位となる
+↓
+Trial（60日）はこれまで通りuser単位で継続。account作成自体はTrial日数に影響しない
+
+
+
+
+
+
+
+================================================================================
+フロー　　■ 2つ目のGoogleアカウントを追加（owner操作）
+================================================================================
+
+owner（ownerUidを持つ本人）が追加を実行
+↓
+owner以外からの追加操作は拒否
+↓
+追加対象のemailを入力
+↓
+FireMint側クラウドDBで、そのemailが
+既に別のaccountのmembersに存在しないか確認
+├─ 存在する → エラー（既に別Accountに所属済み）
+└─ 存在しない
+      ↓
+   accounts/{accountId}/members/{email} を仮登録
+   ├─ email
+   └─ addedAt
+      ↓
+   （そのGoogleアカウントが後日ログインした時点で、
+     上記「匿名ユーザー→Google認証」フローにより
+     members/{email} が members/{uid} に更新される）
+
+・ユーザーがサブ垢の移動を望むなら、Eメールバリデーション処理を挟む。
+
+
+
+
+
+
+
+
+================================================================================
+フロー　　■ Androidで課金
+================================================================================
+
+ユーザーがAndroidから購入（Google Play Billing Library / Kotlin）
+↓
+Google Play側で購入完了 → purchaseToken を取得
+↓
+Cloud Functions(Node.js/TypeScript) へ purchaseToken を送信
+↓
+サーバー側で Android Publisher API を使い購入を検証
+↓
+サーバー側で acknowledge（購入から3日以内。行わないと自動返金される）
+↓
+検証OKなら subscriptions/{subscriptionId} を作成
+├─ accountId = users/{uid}.accountId
+├─ provider = Google Play
+├─ purchaseToken
+├─ expiryTime            ← 現在の請求期間の終了日時（事実）
+├─ lastNotificationType  ← 直近の通知種別（事実の記録）
+└─ updatedAt
+↓
+このaccountIdに紐付く全member（全uid）のentitlementが、
+読み取り時の判定ロジック（最新subscriptionのexpiryTime確認）により更新される
+↓
+Android / デスクトップの双方で利用可能
+↓
+※解約はGoogle Play側の管理画面から行う（FireMintは解約導線を持たない）
+↓
+※以後の状態変化（解約・支払い失敗・猶予期間等）は
+　Google Play Real-time Developer Notifications(RTDN) をCloud Functionsで受信し、
+　同じ subscriptions ドキュメントを更新する
+
+※購入トークン(purchaseToken)と subscriptions の対応:
+　1つの定期購入は、更新を何回繰り返しても purchaseToken は同じ1つのまま。
+　毎月の自動更新では、同じドキュメントの expiryTime が延びていくだけで、
+　件数は増えない。新しい purchaseToken（＝新しいドキュメント）ができるのは、
+　「解約 → 期限切れ → 再契約」をした時。
+　判定は expiryTime 降順の先頭1件だけを見るので、古い期限切れの記録が残っていても問題ない。
+
+※RTDNが検証より先に届くことがある（実測で約0.2秒）。
+　その場合、初回の SUBSCRIPTION_PURCHASED は「未知のトークン」として無視されるが、
+　初回は verifyAndroidPurchase 側が expiryTime を保存するので実害は無い。
+
+
+================================================================================
+フロー　　■ 購入の復元（既存の購入をFireMintへ反映し直す）
+================================================================================
+
+「購入する」を押した時 / アカウント画面を開いた時（未契約かつ accountId 有りの場合）
+↓
+Google Play側の既存の購入を問い合わせる（queryPurchasesAsync）
+↓
+購入が有る？
+├─ 有る → その purchaseToken を Cloud Functions(verifyAndroidPurchase) に送って再検証
+│         （購入トークンをドキュメントIDにして上書き保存し、acknowledgeは未済の時だけ行うので、
+│           何度呼んでも安全）
+│         ↓
+│      検証結果の expiryTime が未来？
+│      ├─ YES → 復元成功。新規購入はしない
+│      └─ NO  → 期限切れ。通常の新規購入に進む
+└─ 無い → 通常の新規購入に進む
+
+この復元が必要な理由:
+　Google Play側の購入は成功したのに、FireMint側の検証が失敗した場合
+　（APIの未有効化、通信断など）、Playは「すでに購入済み」と返すため、
+　復元の経路が無いと、購入ボタンを押しても先へ進めなくなる。
+　再インストール・端末変更の場合も同じ経路で救える。
+
+注意（時間制限）:
+　購入から3日以内に acknowledge されないと、Googleが自動で返金・取り消しする
+　（SUBSCRIPTION_REVOKED / EXPIRED が届く）。検証が失敗したままにしない。
+
+
+
+
+
+
+
+================================================================================
+フロー　　■ デスクトップで課金
+================================================================================
+
+ユーザーがデスクトップから購入（Stripe）
+↓
+Stripe Checkout / Customer Portal で購入完了
+↓
+Webhook等でFireMint側へ課金状態を反映
+↓
+subscriptions/{subscriptionId} を作成
+├─ accountId = users/{uid}.accountId
+├─ provider = Stripe
+├─ status = active
+└─ ...
+↓
+このaccountIdに紐付く全member（全uid）のentitlementが更新される
+↓
+Android / デスクトップの双方で利用可能
+↓
+※解約はFireMint側で用意するStripe管理画面から行う（操作権限は別途要検討）
+
+
+
+
+
+
+
+================================================================================
+フロー　　■ 利用状態の判定
+================================================================================
+
+users/{uid} を取得
+↓
+accountId を持つ？
+├─ NO  → Trialのみで判定
+│         firstUseDate + 60日以内？
+│         ├─ YES → trial → 利用可能
+│         └─ NO  → expired → 利用不可
+│
+└─ YES → accounts/{accountId} に紐づく active subscription がある？
+          ├─ YES → subscribed → 利用可能
+          └─ NO  → このuid自身の firstUseDate + 60日以内？
+                    ├─ YES → trial → 利用可能
+                    └─ NO  → expired → 利用不可
+
+※ Trial判定は常にuid（端末）単位。account作成やmember追加によって
+　 他端末のTrial残日数と統合・書き換えを行うことはない。
+　 課金（subscribed）判定のみaccount単位で共有される。
+
+
+
+
+================================================================================
+フロー　　■ 退会（アカウント削除）
+================================================================================
+
+owner が「退会」を選択
+↓
+確認ダイアログ（二重確認。猶予期間は設けず、確定後は即削除）
+↓
+確定
+↓
+Cloud Functions を呼び出し、accountId を渡す
+↓
+accounts/{accountId} に紐づく subscriptions から
+provider = Google Play の最新 purchaseToken を取得
+↓
+purchaseToken が存在する？
+├─ YES → Android Publisher API で
+│         purchases.subscriptions.cancel を実行
+│         （今後の自動更新を停止。当該期間分の利用・返金は対象外）
+│         ↓
+│      成功を確認
+└─ NO  → （Google Play購入なし。デスクトップ/Stripeのみ、
+          または未課金の場合はこのステップをスキップ）
+↓
+Google Play側の解約に成功、または対象なしを確認できた後にのみ、
+FireMint側データを削除
+├─ accounts/{accountId} を削除
+├─ accounts/{accountId}/members 配下を全て削除
+├─ subscriptions（このaccountIdに紐づく全件）を削除
+└─ users/{uid}（このaccountIdに紐づく全uid）を削除、
+   または accountId フィールドのみクリア
+
+↓
+削除完了
+↓
+以後、これらのuidでアプリを開いた場合は「初回起動」相当のフローに戻る
+
+※ purchaseToken を先に取得・解約してから FireMint側データを削除する順序を厳守する。
+　 逆順にすると purchaseToken を失い、Google Play側を解約できなくなる。
+※ Stripe（デスクトップ）側の解約も、同じ退会フローの中で合わせて実行する
+　（詳細な実装方法はデスクトップ側で決定）。
+
+
+
+
+================================================================================
+フロー　　■ メンバー脱退（owner操作）
+================================================================================
+
+owner が member 一覧から対象を選択（owner自身は対象外。owner自身が抜ける場合は「退会」フロー）
+↓
+owner以外からの操作は拒否
+↓
+確認ダイアログ
+↓
+確定
+↓
+accounts/{accountId}/members/{uid} を削除
+↓
+users/{uid}.accountId をクリア
+↓
+対象memberの端末は、以後「accountId無し」として扱われる
+↓
+次回起動時、Trialのみで利用可否判定
+（firstUseDate + 60日以内なら利用可、超過していれば利用不可）
+↓
+脱退したGoogleアカウントは、別のFireMint Accountへ新規に
+所属する、または新たにAccountを作成することが可能になる
+
+※ 課金（subscription）はaccount単位で管理されているため、
+　 脱退した member 自身がその課金を維持することはない。
+　 owner側のaccountに紐づくsubscriptionはそのまま残り、
+　 owner・残りのmemberはこれまで通り利用可能。
+※ 脱退させられた member 自身が過去に purchaser として
+　 Google Play/Stripeで課金していた場合、その課金の扱い
+　（自動解約するか、そのまま残すか）は未確定。
+　 個人利用想定のため優先度は低いが、要検討事項として残す。
+
+
+
+
+================================================================================
+フロー　　■ データ削除要請
+================================================================================
+
+ユーザーが「自分の個人データを削除してほしい」と申請
+↓
+申請者は誰か？
+│
+├─ owner（accountを持っている）
+│     ↓
+│  「退会（アカウント削除）」フローと同一。そちらを実行する。
+│  （account全体・全member・subscriptions・全uidが即削除される）
+│
+├─ member（owner以外。accountに所属中）
+│     ↓
+│  本人確認（Google認証済みのuidであることの確認のみ。追加の本人確認は行わない）
+│     ↓
+│  確認ダイアログ（即削除。猶予期間なし）
+│     ↓
+│  確定
+│     ↓
+│  accounts/{accountId}/members/{uid} を削除（自分自身のエントリのみ）
+│     ↓
+│  users/{uid} を削除
+│     ↓
+│  account本体・owner・他member・subscriptionsには影響しない
+│
+└─ accountに未所属（匿名 または Trial中のみ）
+      ↓
+   本人確認（Google認証済みのuidであることの確認のみ）
+      ↓
+   確認ダイアログ（即削除。猶予期間なし）
+      ↓
+   確定
+      ↓
+   users/{uid} を削除（他に削除対象のデータなし）
+
+
+※「member自身にはメンバー構成を変更する権限を与えない」という通常運用の制約は、
+　 自分自身のデータ削除要請（法令に基づく権利行使）には適用しない。
+　 これは owner の承認なしに member 自身が実行できる、唯一の例外操作とする。
+※ 削除は即時・不可逆。退会と同様、猶予期間は設けない。
+※ ローカル（端末側 SQLite）のデータも、削除要請の実行と合わせて端末側で消去する。
+
+
+
+
+
+
+
+================================================================================
+データの関係
+================================================================================
+
+Firebase Authentication
+│
+│ UID
+↓
+Firestore
+users/{uid}
+├─ firstUseDate（Trial起点／user単位）
+│
+│ accountId
+↓
+accounts/{accountId}
+├─ ownerUid
+├─ members/{uid}
+│
+└─ ...
+
+subscriptions/{subscriptionId}
+│
+└─ accountId → accounts/{accountId}
+
+Android ID
+│
+└─ users/{uid} のAndroid端末・Trial履歴識別に使用（リセットは許容）
+
+
+
+
+
+
+
+================================================================================
+注記
+================================================================================
+
+＊１	「初回起動：Android パターンB（アプリ再インストール）」で、
+	firestore/users/deviceId から既存の uid を見つけた後、
+	その uid として再ログインする手段がクライアントSDK単体では無い。
+	匿名認証(Anonymous Auth)は資格情報を持たないため、
+	ローカルのFirebase Authセッションを失うと、
+	クライアント側から同じ uid を指定して再認証することはできない。
+	↓
+	対応案：Cloud Functions等のバックエンドで、
+	deviceId から該当 uid を検索し、custom token を発行する。
+	クライアントはその custom token でサインインすることで、
+	既存の uid（＝既存の users/{uid}, firstUseDate）を復元する。
+	↓
+	この custom token 発行エンドポイントが、実装上の前提として必要になる。
+	（実装済み: functions/src/account/recoverUid.ts）
+
+＊２	Android ID は「署名鍵ごと」に別の値になる（Android 8以降の仕様）。
+	デバッグ版 / 自前署名のリリース版 / Playストア版（Play App Signing）は、
+	同じ端末でも別の端末として扱われ、recoverUid で過去のユーザーに戻れない。
+	開発中に署名を切り替えると匿名ユーザーが増えるのはこのため（実運用でPlayストア版を
+	使い続ける限りは起きにくい）。テスト中に増えた匿名ユーザーは削除して問題ない。

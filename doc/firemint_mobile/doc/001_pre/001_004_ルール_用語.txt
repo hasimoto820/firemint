@@ -1,0 +1,226 @@
+
+FireMint_M ルール / 用語
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+
+
+================================================================================
+ルール
+================================================================================
+
+
+＊　ハイフン禁止。アンスコで統一。
+
+＊　Firestore 接続ルール（必須）
+    - RN から公式 SDK / REST を直叩きしない
+    - 必ず features/*/native の口（Kotlin Turbo Module）経由
+    - Kotlin の実ファイルは android/。初期化は android/shared のみ
+    - クラウドへは Google 認証。ファイルは公式ダンプ（接続ではない）
+
+＊　UI部品化
+Page → 必ず features/*/ui/
+feature専用部品 → features/*/ui/components/
+共通部品（2 feature 以上で再利用）→ shared/ui/
+RNプリミティブ（View / Text / Pressable）は必要なものだけ薄く包む
+迷ったら → 2 feature から使う？ Yes → shared / No → feature
+
+
+＊　共通化
+shared/ui/ = 汎用UI
+features/*/ui/ = その機能のUI
+ただし、shared/ui/を太らせ過ぎないように注意
+
+＊　環境
+    人の PC に合わせない。バージョンはリポジトリが正。
+    Node  … .nvmrc（22）
+    Java  … .java-version（17）
+    Gradle … android を作ったら gradlew をコミット
+    SDK の場所、署名ファイル、.env は git に入れない（.gitignore 済み）
+    メイン環境以外の PC は、SDK の場所を環境変数 ANDROID_HOME で持つ（「環境間　固有ファイル」）
+
+＊　Google 認証（FireMint の OAuth がある Cloud プロジェクト  firemint-m）
+    Audience は In production（Publish app）。Test users は使わない。
+    スコープは Datastore のみ。
+    一般公開の赤い画面を消す審査は 001_007。
+    ユーザー操作はサインインと Firestore の許可だけ。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+================================================================================
+用語
+================================================================================
+
+
+
+
+ダンプ / 公式ダンプ / OfficialDump
+    コレクション、プロジェクトをファイル化した物。
+    公式コンソールと互換性有。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+================================================================================
+環境間　固有ファイル
+================================================================================
+
+  git に入れない。増えたらここと .gitignore を同じコミットで足す。
+
+  2種類ある。
+    メイン環境から貰う物 … ビルド用の3ファイル。メイン環境の物が正。
+                            貰ったまま置く。中身は変えない。メイン環境へ戻さない
+    PC ごとの物          … その PC で一度だけ用意する
+
+
+  メイン環境から貰う物（ビルド用の3ファイル）
+
+＊　android/local.properties
+    sdk.dir（メイン環境の SDK の場所）と、署名の設定
+    RELEASE_STORE_FILE / RELEASE_STORE_PASSWORD / RELEASE_KEY_ALIAS / RELEASE_KEY_PASSWORD
+    sdk.dir は、メイン環境の場所のままでよい。他の PC では、下の ANDROID_HOME が使われる
+
+＊　android/app/release.keystore
+    本番用の署名鍵
+
+＊　config/google_oauth.json
+    web_client_id
+
+
+  PC ごとの物
+
+＊　環境変数 ANDROID_HOME（メイン環境以外の PC）
+    その PC の Android SDK の場所。PC ごとに一度だけ設定する
+    例（Windows。設定後、ターミナルを開き直す）:
+      setx ANDROID_HOME "C:\Users\<ユーザー名>\AppData\Local\Android\Sdk"
+    local.properties の sdk.dir の場所が、その PC に無い時、Gradle は ANDROID_HOME を使う。
+    ビルドの最初に、次の警告が出るが、そのまま通る:
+      WARNING: The following problems were found when resolving the SDK location:
+      Where: sdk.dir property in local.properties file. Problem: Directory does not exist
+    ANDROID_HOME が無いと、「SDK location not found」で落ちる
+
+＊　android/gradle/wrapper/gradle-wrapper.properties
+    npm run android が絶対パスで生成する
+
+＊　android/gradle/wrapper/gradle-*-bin.zip
+    Gradle 本体。fetch_gradle が置く
+
+＊　.env
+    今は案内だけ。実ファイルは作っても入れない
+
+＊　tools/hosting_deploy/
+    この Windows だけ。firebase-tools と win-ca。Hosting の deploy 用。別環境は不要。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+================================================================================
+環境間　差異吸収
+================================================================================
+
+  gitignore の編集はリポジトリが正。別環境で同じ編集はしない。
+  pull すれば入る。
+
+  各 PC で作る物は「環境間　固有ファイル」。ここには書かない。
+
+  別環境の初回:
+    1  pull
+    2  npm install
+    3  環境変数 ANDROID_HOME を設定する（その PC で一度だけ）
+    4  ビルド用の3ファイルを、メイン環境から貰って置く（中身は変えない）
+    5  npm start
+    6  別ターミナルで npm run android
+         （properties が生成される。実機なら adb reverse tcp:8081 tcp:8081）
+
+  Hosting の deploy:
+    別環境 … npx firebase-tools deploy --only hosting --project firemint-e801f
+    この Windows … tools/hosting_deploy（Node --use-system-ca。Windows の証明書を見る）
+  アカウントは carepanda886。User support email も carepanda886 のまま（pandaas にしない）。
+
+  共有する（コミットする）:
+    .gitignore
+    metro.config.js（Windows で android/build を監視しない）
+    scripts/fetch_gradle.js
+    gradle-wrapper.properties.example
+
+
+
+
+
+
+
+
+================================================================================
+端末起動
+================================================================================
+
+
+＊　LAN接続中のみ使用可能
+
+> npm run android
+
+
+＊　端末内で永続的に使用可能
+
+cd android
+.\gradlew.bat assembleRelease
+adb install -r app\build\outputs\apk\release\app-release.apk
+
+
+＊　Google Playにアップ用のaabファイル作成
+cd F:\HandyPC\sys\handypc\android
+.\gradlew.bat bundleRelease
+
+
+
+
+
+
+
+＊　firebase functions
+
+
+firebase login --reauth
+
+$env:FUNCTIONS_DISCOVERY_TIMEOUT=60   
+$env:NODE_EXTRA_CA_CERTS="C:\ProgramData\Norton\Antivirus\wscert.pem"; $env:NODE_USE_SYSTEM_CA="1"
+
+firebase deploy --only functions
+
+

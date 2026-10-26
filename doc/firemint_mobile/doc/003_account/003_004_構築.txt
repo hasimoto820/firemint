@@ -1,0 +1,234 @@
+
+Account 構築
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+
+
+
+================================================================================
+方針
+================================================================================
+
+•	001_003_ディレクトリ構成.txt の既存方針（feature-based外側、layer-based内側）に合わせる。
+•	account は「FireMint操作ユーザー」の識別・契約・課金を扱う独立 feature とする。
+	connection（"FireStore操作ユーザー"用、接続先Firestoreへの認証）とは別物。
+•	003_003_misc.txt の「Client直接 / Cloud Functions経由」一覧が、
+	そのまま functions/ 以下の関数分割に対応する。
+•	現状 functions/ ディレクトリ・firestore.rules は未設置。今回新設する。
+•	Cloud Functions のリージョンは、Firestore(asia-northeast1 / Tokyo)に合わせて
+	asia-northeast1 に統一する（functions/src/index.ts の setGlobalOptions で指定）。
+
+•	仕様レビュー（003_006_todo.txt）が一段落した時点で、実装を丸ごと作り直すべきか検討した。
+	結論: 作り直さない。見つかったズレはtodoでパッチする（決定）。
+	根拠:
+	  ・一番間違えやすい部分（匿名→Google昇格・合流でのcustom token受け渡し、createAccount/
+	    joinAccountのトランザクション整合、uid中心の設計、entitlementを保存せず都度計算する
+	    構造）は、既に仕様と一致しており、実機でも動作確認済み（003_003_misc.txt「実機テストの
+	    確認状況」）。ここを作り直すのは、既に解決済みの細かい罠（Android IDの署名鍵依存、
+	    RTDNが検証より先に届く0.2秒のレース、acknowledgeの3日制限など）を踏み直すリスクの
+	    方が大きい。
+	  ・実際に見つかったズレは局所的な数件（1関数につき数行〜1画面の追加）で、「設計が
+	    間違っていた」のではなく「後から決まった仕様に、まだ追従していないだけ」だった。
+	  ・共通処理（requireOwnerAccount等）もそのまま使い回せる。将来のチーム化を見越した
+	    users/accounts/members/subscriptionsの分離、ownerUid1フィールドでのowner判定という
+	    構造自体は、既に「このままでいい」と結論が出ている（チーム化する場合も、直すのは
+	    構造ではなくルールの方）。
+	見つかった食い違い（配線中の追加発覚も含め計8件）は、003_007_todo_done.txtに記録済み。
+	この検討にあたり、auth.ts・billing.ts・deleteAccount系・Android Kotlin側・
+	firestore.rulesも確認した。firestore.rulesは仕様どおり（書き込み全面拒否、
+	読み取りはmemberのみ）。android/.../AccountModule.kt の validateSession は、
+	オフラインと無効の区別を既に実装済みだった（reload()の通信エラーはtrueを返し、
+	無効と決めつけない。003_002_flow.txt「起動時の判定順」①の決定と一致。ドキュメントより
+	コードの方が先行していた）。
+
+
+
+
+================================================================================
+src/features/account/
+================================================================================
+
+  src/features/account/
+    ui/                     … ログイン導線、メンバー管理画面、データ削除の画面
+    native/                 … Turbo Module の口
+                               - Firebase Auth 呼び出し（匿名 / Google）
+                               - Google Play Billing Library 呼び出し
+                               - Cloud Functions（callable）呼び出し
+    shared/                 … 型定義（User / Account / Member / Subscription）
+
+
+
+
+================================================================================
+android/account/
+================================================================================
+
+  android/account/          … features/account/native の実装
+    - Firebase Anonymous Auth / Google Sign-In
+    - Google Play Billing Library（購入フロー、purchaseToken取得）
+    - SQLite（uid / accountId / この端末の firstUseDate のローカルキャッシュ）
+    - Cloud Functions（HTTPS Callable）呼び出しのラッパー
+
+  android/shared/ の Firestore 初期化はここでも共用する。
+
+
+
+
+================================================================================
+functions/（新設）
+================================================================================
+
+  Node.js / TypeScript。003_003_misc.txt の一覧表に対応する形で分割する。
+
+  functions/
+    src/
+      account/
+        createAccount.ts        … account作成（Google認証時、自動）＋自分をmembersに追加
+        joinAccount.ts          … emailで招待歴を照合し、既存accountへ合流
+        addMember.ts            … 2つ目のGoogleアカウント追加（owner操作。members/{email}への仮登録のみ。
+                                    他account所属チェックはしない。実際の判定はjoinAccount側で本人が行う）
+        removeMember.ts         … メンバー脱退（owner操作）
+        deleteAccount.ts        … データ削除（owner。Google Play解約 → FireMint側データ削除、の順序制御）
+        deleteMyData.ts         … データ削除（member自身 / 未所属。自分のuser/membersのみ削除）
+        registerDevice.ts       … 端末の登録（devices の作成、users/{uid} の作成、端末の一覧への追加、
+                                    古い匿名ユーザーの削除。003_011_device.txt）
+        devices.ts              … 端末のIDのハッシュ、期限、一覧の共通処理
+
+      billing/
+        verifyAndroidPurchase.ts … 購入検証＋acknowledge（Android Publisher API）
+        androidRtdnWebhook.ts    … Google Play Real-time Developer Notifications 受信
+
+    ＊Stripe関連（デスクトップ課金）は、このリポジトリ(firemint_m)には含めない。
+      別リポジトリ（デスクトップ側）で構築する。ただし accounts/subscriptions への
+      書き込み対象は同じFirestoreプロジェクトになるため、provider="Stripe"の
+      subscriptionsドキュメントの形（003_001_plan.txt参照）だけは両リポジトリで合わせる。
+
+
+
+
+================================================================================
+Firestore まわり（新設）
+================================================================================
+
+  firestore.rules            … 003_003_misc.txtの一覧を反映
+                                 - users/{uid}         : 読み取りは本人のみ。書き込みは【email/nameの
+                                                          プロフィール更新】のみ本人可（003_003）。
+                                                          email は、IDトークンの email と同じ値に限る。
+                                                          作成・削除・accountIdの変更は、Cloud Functions
+                                                          （Admin SDK）だけができる
+                                                          （registerDevice / createAccount / joinAccount /
+                                                          removeMember / deleteAccount / deleteMyData 等）。
+                                 - users/{uid}/devices : 読み書き不可（Functionsのみ）
+                                 - devices             : 読み書き不可（Functionsのみ）
+                                 - accounts/{accountId} : members に自分のuidがあれば read
+                                 - accounts/{accountId}/members : 同上、read のみ
+                                 - subscriptions        : 所属accountのもののみ read。write は不可（Functionsのみ）
+                                 - 上記以外の書き込みは全て deny（Cloud Functions は Admin SDK 経由なのでルールの対象外）
+
+  firestore.indexes.json     … collectionGroup("members") の email フィールドに
+                                 collection group スコープのインデックスを追加
+                                 collectionGroup("devices") の deviceIdHash フィールドにも同様
+                                 （端末から、全 user の一覧を横断して探す）
+                                 devices.expireAt の TTL
+
+  firebase.json               … functions ブロックと firestore ブロック（rules/indexesのパス）を追加
+
+
+
+
+================================================================================
+実装順序の目安
+================================================================================
+
+1.	firestore.rules / firestore.indexes.json の土台を作る
+2.	functions/src/account/createAccount.ts, registerDevice.ts（起動・認証まわりが先に無いと何も進まない。
+	当初は recoverUid.ts だった。003_011_device.txt で廃止し、registerDevice.ts に置き換えた）
+3.	src/features/account/native（Firebase Auth呼び出し）と SQLite キャッシュ
+4.	joinAccount.ts, addMember.ts, removeMember.ts（メンバー管理）
+5.	billing/verifyAndroidPurchase.ts, androidRtdnWebhook.ts（課金）
+6.	deleteAccount.ts, deleteMyData.ts（データ削除。最後でよい）
+
+→ 1〜6 すべて実装・デプロイ済み。実機（Playストア Internal testing）で、
+　匿名認証 → Googleログイン → account作成 → 購入 → 契約中表示 → 自動更新(RTDN) まで確認済み。
+
+
+
+
+================================================================================
+Google ログイン / OAuth の構成（重要。混ぜないこと）
+================================================================================
+
+プロジェクトは2つ。役割を分ける。
+
+  firemint-m   (750211540930)  … Googleの審査（datastore等のsensitiveスコープ）を通した元締め。
+                                 OAuthクライアント（Android用・Web用）はここに置く。
+  firemint-e801f (647968484767) … Firebase（Auth / Firestore / Functions / Hosting）。
+                                 OAuthクライアントは Web（自動作成）1つだけ。Androidは置かない。
+
+制約（実際にぶつかった）:
+  「パッケージ名 + 署名SHA-1」の Android OAuth クライアントは、世界で1つのプロジェクトにしか作れない。
+  かつ、Credential Manager の Googleログインは「Androidクライアント」と「使うWebクライアントID」が
+  同じプロジェクトに無いと [28444] Developer console is not set up correctly になる。
+  → 両機能（connection / account）とも firemint-m の Web クライアントID を使う。
+
+  Androidクライアント（firemint-m に作成済み）:
+    FireMint_M     … デバッグ署名
+    FireMint upload … 自前リリース署名（SHA-1 F2:5A:BE:A8:...:D2:BD）
+    FireMint Play  … Play App Signing（SHA-1 6A:19:B0:1A:...:8B:37）
+
+  Firebase Auth（firemint-e801f）の Google プロバイダに、
+  firemint-m の Web クライアントID（750211540930-fovai8js...）を
+  「外部プロジェクトのクライアントIDのセーフリスト」として登録する。
+  これで、firemint-m のIDで取ったGoogleのIDトークンを Firebase が受け付ける。
+
+  やらないこと:
+    firemint-e801f 側に Android OAuth クライアントを作る（自動作成される。
+    Firebase に SHA-1 を登録すると作られてしまうので、登録しない。登録済みなら
+    Firebase 側のSHA削除 + Cloud Console のクライアント削除が必要）
+    審査を firemint-e801f から出す（002_006_002 と同じ方針）
+
+  署名証明書の見つけ方（Play App Signing の SHA-1）:
+    Play Console上で探すより、Playストア経由で入れた実機のAPKから取る方が確実。
+      adb pull で base.apk を取り出し、
+      apksigner verify --print-certs --max-sdk-version 36 <apk>
+    （--max-sdk-version 36 は、新しい量子耐性署名ブロックを読めないJDK対策）
+
+
+================================================================================
+手動セットアップ（Play Console / GCP / Firebase）の現状
+================================================================================
+
+Play Console:
+  ✅ サブスクリプション商品  firemint_pro_monthly（コードの BillingConfig.kt と一致させる）
+  ✅ base plan  monthly（自動更新・月次・¥500 / $5）を Active にする
+       ＊ base plan が無い商品は購入できない。保存し忘れに注意。
+  ✅ サービスアカウント 647968484767-compute@developer.gserviceaccount.com を
+       「ユーザーと権限」に招待し、最小権限で付与（Adminは付けない）:
+         View app information / View financial data / Manage orders and subscriptions
+  ✅ RTDN: トピック projects/firemint-e801f/topics/play-rtdn
+       通知内容は「Subscriptions and voided purchases only」
+  ✅ ライセンステスター: Internal testing のテスターと同じ Google アカウントを登録
+       （登録しないと、テスト購入でも本当に課金される）
+  ✅ ストア掲載情報 / プライバシーポリシー / アカウント削除URL / データセーフティ / 各種申告
+       プライバシー: https://firemint-e801f.web.app/privacy.html
+       削除案内:     https://firemint-e801f.web.app/delete_account.html
+
+GCP (firemint-e801f):
+  ✅ Google Play Android Developer API を有効化（未有効だと verifyAndroidPurchase が
+       403 accessNotConfigured → 画面には INTERNAL と出る）
+  ✅ Pub/Sub トピック play-rtdn に google-play-developer-notifications@system.gserviceaccount.com を
+       Pub/Sub パブリッシャーとして付与（トピック自体は関数のデプロイで自動作成される）
+
+Firebase (firemint-e801f):
+  ✅ Authentication: 匿名 / Google を有効化（匿名の「自動クリーンアップ」は ON にしない。
+       60日トライアルの匿名ユーザーが30日で消えてしまう）
+  ✅ Firestore(asia-northeast1), Functions(asia-northeast1)
+
+ビルド / 署名:
+  ・リリース署名キーストア android/app/release.keystore（gitignore対象）。
+    パスワードは android/local.properties（gitignore対象）。紛失するとPlayストアで
+    アプリを更新できなくなるので、別の安全な場所にもバックアップすること。
+  ・versionCode は Playにアップロードするたびに上げる（同じ番号は再利用できない）。
+  ・自前署名のAPKは、Playストア版の上に adb install で上書きできない（署名が違う）。
+    課金のテストは、必ず Playストア（Internal testing）経由でインストールして行う。

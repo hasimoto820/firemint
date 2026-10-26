@@ -1,0 +1,84 @@
+rules_version = '2';
+
+// 003_account/003_003_misc.txt の一覧に対応する。
+// 書き込みは Cloud Functions（Admin SDK。ルールの対象外）のみで行う想定のため、
+// クライアントSDKからの write は原則すべて拒否し、read のみ必要な範囲で許可する。
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // accountId 配下の members/{signedIn のuid} が存在するか＝そのaccountの所属者か
+    function isMember(accountId) {
+      return signedIn() &&
+        exists(/databases/$(database)/documents/accounts/$(accountId)/members/$(request.auth.uid));
+    }
+
+    // ログイン情報（IDトークン）の email。匿名ユーザーなど、email が無ければ空文字
+    function tokenEmail() {
+      return 'email' in request.auth.token ? request.auth.token.email : '';
+    }
+
+    // users/{uid}
+    //   read   : 本人のみ
+    //   create : 不可（端末を登録するCloud Functions（registerDevice）が作る）
+    //   update : 本人のみ。更新できるのは email と name だけ（accountId・platform は変更不可、
+    //            項目の追加も不可）。email は、IDトークンの email と同じ値に限る
+    //            （accountの合流/脱退はCloud Functions経由）
+    //   delete : 不可（退会/データ削除はCloud Functions経由）
+    match /users/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+
+      allow create: if false;
+
+      allow update: if signedIn() && request.auth.uid == uid
+                    && request.resource.data.diff(resource.data).affectedKeys()
+                       .hasOnly(['email', 'name'])
+                    && request.resource.data.email == tokenEmail();
+
+      allow delete: if false;
+
+      // users/{uid}/devices/{deviceIdHash}
+      //   その人が使っている端末の一覧（003_011_device.txt）
+      //   read / write: 不可。全てCloud Functions経由
+      match /devices/{deviceIdHash} {
+        allow read, write: if false;
+      }
+    }
+
+    // accounts/{accountId}
+    //   read : 所属memberのみ（#12）
+    //   write: 不可。作成/更新/削除は全てCloud Functions経由（#5, #10）
+    match /accounts/{accountId} {
+      allow read: if isMember(accountId);
+      allow write: if false;
+
+      // accounts/{accountId}/members/{uid}
+      //   read : 所属memberのみ（#13）
+      //   write: 不可。追加/削除は全てCloud Functions経由（#5, #6, #7）
+      match /members/{memberId} {
+        allow read: if isMember(accountId);
+        allow write: if false;
+      }
+    }
+
+    // subscriptions/{subscriptionId}
+    //   read : 所属accountのmemberのみ（#14）
+    //   write: 不可。購入検証・RTDN反映は全てCloud Functions経由（#8, #9）
+    match /subscriptions/{subscriptionId} {
+      allow read: if isMember(resource.data.accountId);
+      allow write: if false;
+    }
+
+    // devices/{deviceIdHash}
+    //   端末。トライアルの起点（firstUseDate）を持つ（003_011_device.txt。#4, #17）
+    //   read / write: 不可。全てCloud Functions経由。
+    //   アプリから書けると、日付を新しくしてトライアルを戻せる
+    match /devices/{deviceIdHash} {
+      allow read, write: if false;
+    }
+  }
+}

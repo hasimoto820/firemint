@@ -1,0 +1,153 @@
+
+FireMint_M ディレクトリ構成
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+
+
+================================================================================
+方針
+================================================================================
+
+  - 外側: Feature-based（feature を最上位の仕切りにする）
+  - 内側: Layer-based（各 feature の中で ui / native / shared に分ける）
+      ui/      … RN（画面・hooks・コンポーネント）
+      native/  … Kotlin Turbo Module の口（サインイン、Firestore）
+      shared/  … 型・定数（RN / Kotlin 両側で使う）
+  - 論理は features/<name>/native/。Kotlin の実ファイルは android/。
+  - 横断 concern（共通 UI・ログ・i18n 等）は features/ ではなく shared/ へ
+  - フォルダ名は snake_case（001_004）
+  - 箱は 001_002 モバイルの塊。必要になるまで feature を増やさない
+
+
+================================================================================
+トップ構成
+================================================================================
+
+  src/
+    app/                   … App.tsx、ルーティング、シェル組み立て
+                               Home / Splash / Settings（基盤のページ。feature にしない）
+    features/              … 機能単位（垂直分割）
+    shared/                … 複数 feature から使う横断モジュール
+
+  android/                 … Kotlin 本体（features/*/native の実装）
+    shared/                … Firestore 初期化、ログ、共通ユーティリティ
+
+
+================================================================================
+features/ 一覧
+================================================================================
+
+  001_002 モバイルの章立て。フォルダ名はデスクトップと同じところは揃える。
+
+  #   feature 名        001_002
+  ─   ──────────────    ──────────────────────────────────────
+  1   connection        接続（Google 認証）
+  2   workspace         ワークスペース
+  3   explorer          閲覧・編集
+  4   query             クエリ（JS エディタ、条件検索、Collection Group）
+      snippet           スニペット（テキストライブラリ。query から分離。プロジェクト非紐づけ）
+  5   data_transfer     入出力（公式ダンプ）
+  6   auth_users        Auth ユーザー
+
+  001_002 の「スクリプト」は箱にしない。
+    JS 実行     → query
+    進捗        → data_transfer（ダンプの裏実行）
+
+  001_002 の「安全」「基盤」は feature にしない。
+    安全        → shared/safety
+    タブ        → shared/shell（画面 UI は未定。枠の置き場だけ）
+    多言語      → shared/i18n
+    テーマ      → shared/settings
+
+
+================================================================================
+各 feature の内部構成
+================================================================================
+
+  features/<feature_name>/
+    ui/                    … RN
+    native/                … Turbo Module の口
+    shared/                … その feature 専用の型・定数
+
+  例:
+
+    features/query/
+      ui/
+      native/
+      shared/
+
+
+================================================================================
+features/ ツリー
+================================================================================
+
+  src/
+    features/
+      connection/
+        ui/  native/  shared/
+      workspace/
+        ui/  native/  shared/
+      explorer/
+        ui/  native/  shared/
+      query/
+        ui/  native/  shared/
+      snippet/
+        ui/  native/  shared/
+      data_transfer/
+        ui/  native/  shared/
+      auth_users/
+        ui/  native/  shared/
+
+
+================================================================================
+shared/（feature にしない横断）
+================================================================================
+
+  src/
+    shared/
+      ui/                    … 共通 UI
+                                 Latch.tsx … 区切り線からぶら下げる開閉のつまみ
+      safety/                … 本番警告、破壊的操作の確認、書き込みブロック
+      shell/                 … タブ枠（002_004_001。tabs / chrome / TabList）
+                                 chrome.tsx … ScreenFrame（画面の枠。ヘッダーとメインを分ける）
+                                   ヘッダー … ＜ タイトル　＋ タブ。固定。スクロールしない
+                                   メイン   … 各画面の中身。ここだけスクロール
+                                   タイトル … いまのページの対象だけ（パスの末尾、または画面名）
+                                   フルパス … 区切り線のつまみで、ヘッダーの2行目に開く
+                                 全画面が ScreenFrame で包む。SafeAreaView を直接使わない
+      i18n/                  … 多言語
+      settings/              … テーマ（color1 / color2）。言語は後
+                                 theme.tsx … 型・パレット・面の規則・ThemeRoot
+                                 native.ts … RN → Kotlin（読む / 書く）
+
+  android/
+    shared/                  … Firestore 初期化（ここだけ）、ログ
+    connection/              … Google サインイン、つなぐ実行
+    workspace/               … 名簿（SQLite）
+    explorer/
+    query/                   … JS の Run から呼ばれる Firestore
+    snippet/                 … スニペット SQLite（論理の箱。中身は app/src）
+    settings/                … 設定 SQLite（論理の箱。中身は app/src）
+    data_transfer/           … 公式ダンプのファイル I/O
+    auth_users/
+
+
+================================================================================
+feature 間の責務
+================================================================================
+
+  connection       … Google 認証でクラウドへつなぐ
+                     認証画面（ConnectionScreen）は firestoreアカウントの確認・切り替え・サインアウトだけ。
+                     プロジェクト一覧は置かない。
+                     同じパネル（FirestoreAccountPanel）を、プロジェクト一覧の上にも置く（使い勝手を優先）
+  workspace        … 繋いだ先の名簿（複数、ラベル、read-only）
+  explorer         … コレクションを開いて見る・1件編集
+  query            … JS エディタ / 条件検索
+  snippet          … テキストの保存と貼り付け。Run しない
+  settings         … feature にしない。画面は app/SettingsScreen。トークンは shared/settings
+  data_transfer    … 公式ダンプの出し入れと進捗
+  auth_users       … 対象プロジェクトの Auth ユーザー
+
+  公式ダンプは接続ではない。開く・入れるのは data_transfer。
+  Firestore の実処理は android/。RN からは native の口だけ。

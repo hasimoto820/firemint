@@ -1,0 +1,347 @@
+
+Account
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+■ アカウント
+■ 課金
+これらは絡み合っている為、切り離せない。
+
+
+
+
+
+
+
+================================================================================
+概要
+================================================================================
+
+•	FireMint のログインには Google アカウントを利用する。
+•	Android の課金は Google Play。
+•	デスクトップの課金は Stripe / クレジットカード。
+•	価格は月額 500 円・$5/monthを想定。
+•	1 つの FireMint 契約に最大 2 個の Google アカウントを紐付ける想定。
+•	無料トライアルは 60 日間。
+•	ローカル保存は、sqliteを使用。
+
+•	FireMint は「Firebase Auth + FireMint 所有 Firestore + Google Play / Stripe + 端末sqlite」という4層構成で整理できる。
+•	Firebase Auth は本人確認、FireMint 所有 Firestore はアカウントと利用権、Google Play / Stripe は課金元、端末sqliteは端末上の保持を担当する。
+•	初回起動では匿名認証を使って60日トライアルを開始し、後から Google アカウントを紐付ける。課金経路に関係なく、FireMint 側で一つの契約・利用権として扱う。
+
+
+
+
+
+================================================================================
+基本ルール
+================================================================================
+
+以下を基本ルールとして固定する。迷ったらここに戻る。
+
+用語:
+  uid          … Firebase Authentication のサーバーが発行するユーザーの番号。端末由来ではない。
+  deviceId     … Android(OS)が作る端末の識別子（ANDROID_ID）。
+  匿名ユーザー … Googleなどにまだ紐づいていないユーザー。
+
+ルール:
+  0  匿名ユーザーは、アプリの【初回起動時】に作る。
+  1  匿名ユーザーは、端末(インストール)ごとに作る。
+  2  Googleログインすると、匿名ユーザーは【同じuidのまま】Googleユーザーに昇格する。
+  3  ただし、そのGoogleアカウントが既に別のuidに紐づいている場合（再インストール後、2台目の
+     端末など）は、昇格ではなく【合流】する。
+       ・既存のGoogleユーザーのuidに切り替える
+       ・その端末の一時的な匿名ユーザーは、切り替える前にサーバーで削除する
+       ・端末のキャッシュは、サーバーの値で作り直す
+     （FirebaseAuthの仕様上、同じGoogleアカウントが複数のuidになることはできない）
+  4  Googleユーザーになったら、uid = Googleアカウント。契約(account)・メンバー(members)は、
+     この単位で持つ。
+  5  トライアルの起点(firstUseDate)は、端末(devices)が持つ。一度決まったら変わらない。
+     トライアルは端末ごと。同じGoogleアカウントでも、端末ごとに残り日数が違う。
+     ログイン・合流・脱退・再インストール・データ削除では、リセットしない。
+     端末の初期化・署名鍵の違い（Android IDが変わる場合）は、リセットされる（割り切り）。
+     詳細は 003_011_device.txt。
+  6  「自分は誰か(uid)」の正は Firebase Auth。端末のSQLiteのキャッシュは、Firebase Authの
+     uid と一致する時だけ信用し、食い違えば捨てる。
+
+端末の中のuid:
+  ① Firebase Auth の内部ストレージ（SDKが管理）… いまログインしているuidの正
+  ② SQLite cached_user（こちらのコード）… ①の写しと、契約の目印。①と食い違ったら捨てる
+  どちらも、アンインストール / データ消去で消える。
+
+再インストールした時:
+  匿名のままの人   … 新しい匿名uidで始まる。前の匿名ユーザーは、端末を登録する時に削除される
+  Googleログイン済 … 新しい匿名として始まる → Googleでログイン → ルール3で元のuidに合流
+                     （契約・メンバーが戻る。購入は「購入の復元」で再検証される）
+  どちらも、トライアルは端末の日付(devices)のまま続く。
+
+開発中のゴミ:
+  Playの「リリース前レポート」のロボットが、アップロードのたびに匿名ユーザー・テスト用Google
+  アカウント・account を作る。実運用の数には含めない。定期的に整理する。
+
+
+
+
+
+================================================================================
+詳細
+================================================================================
+
+•	サブスクリプションがキャンセルされた場合、currentPeriodEnd までは利用可能とする。
+•	Google Play と Stripe の両方で購入した場合　→　プラン：購入済　の扱いとなる為、基本有り得ない。
+
+•	初回利用時に Google ログインを強制しない。
+•	ANDROID_ID を取得し、サーバーでハッシュ（SHA-256）にして、devices のドキュメントIDに使う。
+•	ANDROID_ID は端末初期化等でリセットされ得るが、追加の指紋認証は費用対効果が低いため対応しない。
+•	ANDROID_ID は署名鍵ごとに別の値になる（デバッグ版 / 自前署名 / Playストア版は別端末扱い。トライアルも別）。詳細は 003_002_flow の注記＊２。
+•	Googleログインの OAuth クライアントは firemint-m に集約し、Firebase(firemint-e801f)側にはセーフリスト登録で対応する。詳細は 003_004_構築「Google ログイン / OAuth の構成」。
+•	トライアルは、その端末で初めて起動した時（devices/{deviceIdHash}.firstUseDate）に始まる（基本ルール5）。
+•	「いまログインしているuid」の正は Firebase Auth（SDKが端末内に保持する）。通常のアプリ再起動では、そのセッションをそのまま使い、新しい匿名ユーザーを作成しない。
+    端末のSQLiteには、uid / accountId / firstUseDate（この端末の日付）の写し（キャッシュ）を置くが、uid の判定には使わない（基本ルール6）。
+    起動時の判定の順序は、003_002_flow「起動時の判定順」に定める。
+•	Google Play と Stripe の違いを、アプリの利用可否ロジックから切り離す。
+•	FireMint のログイン用 Google アカウントと、外部 Firestore のアクセス用 Google アカウントを明確に分離する。
+•	2アカウント対応は second_* 固定フィールドではなく members サブコレクションで表現する。
+•	セキュリティ強化や不正利用対策は、基本仕様を固めた後の追加レイヤーとして考える。
+•	クラウドは、firebase auth, firestore。　ローカルはsqliteを使用。
+
+•	サブ垢設定後、別端末でGoogleログインを行う事になるが、自分のemail宛の招待
+	（accounts/{accountId}/members/{email}）が無いかを、ログイン時・毎回の起動時に
+	joinAccountでチェックする（詳細は 003_002_flow「匿名ユーザー→Google認証」参照）。
+
+• member(サブ垢)の追加・削除操作は owner のみ許可する。member(サブコレクションメンバー) 自身にはメンバー構成を変更する権限を与えない。
+
+
+
+
+
+
+
+
+================================================================================
+用語
+================================================================================
+
+
+FireMint では「Google アカウント」という言葉が2つの意味を持つため、ここを明確に分離する。
+
+
+FireMint操作ユーザー : FireMint アカウントへのログインに使う。契約管理に関係する。
+FireStore操作ユーザー : ユーザーが操作対象の外部 Firestore プロジェクトへアクセスするために使う。Firestore のアクセス権限に関係する。
+
+
+
+Android端末識別ID
+Android ID : これが一番自然
+ANDROID_ID : API・コード上の名称
+SSAID (Scoped Settings Android ID) : 技術文書で使われる呼び方
+
+deviceId : 上記 Android ID の値。アプリが、サーバーの関数へ渡す時の名前。
+           デスクトップは、Android ID に相当する別の値が入る。
+           Android ID は「端末 × アプリの署名鍵 × Androidユーザー」ごとの番号。
+           デバッグ版 / 自前署名 / Playストア版は、同じ端末でも別の値になる。
+           端末を見分けるための値で、本人確認には使えない。
+deviceIdHash : deviceId の SHA-256。サーバーが計算し、devices のドキュメントIDに使う。
+               生の deviceId は、サーバーには保存しない。
+
+
+uid → Firebase Authentication の【サーバーが発行する】ユーザーの番号。端末由来ではない（android_id ではない）。
+      匿名の間は「端末(インストール)ごと」、Googleログイン後は「Googleアカウントごと」（基本ルール参照）。
+
+users → uid ごとのユーザー情報（Firestore の users/{uid}）。email / name / platform / accountId を持つ。
+        Firebase Auth 上のユーザー（管理画面の「Authentication」に出るもの）とは別物。uid で対応する。
+        下に、その人が使っている端末の一覧（users/{uid}/devices）を持つ。
+devices → 端末ごとの情報（Firestore の devices/{deviceIdHash}）。トライアルの起点(firstUseDate)を持つ。
+accounts → FireMint契約単位
+subscriptions → 契約の課金情報
+
+member → 便宜的な呼び名。member 専用のトップレベルのコレクション（テーブル）は無い。
+         契約(accounts/{accountId})の下の members サブコレクション（accounts/{accountId}/members/{uid}）に、
+         その契約に所属する Google アカウント(uid)を1件ずつ持つ（email / addedAt）。
+         owner も member の1人として含める。owner かどうかは accounts.ownerUid との一致で判定する。
+         1つの契約に、member は最大2件（owner を含む）。
+         まだログインしていない人を招待した場合は、uid の代わりに email をドキュメントIDにして仮登録し、
+         その人が初めてログインした時に uid のドキュメントへ置き換える。
+         招待の状態は status フィールドを持たず、ドキュメントの有無とID（email か uid か）だけで表す（決定）。
+           招待中　… members/{email} が存在する
+           参加済み… members/{email} が members/{uid} に置き換わっている
+           未招待／辞退… ドキュメントが存在しない（辞退時は削除する。履歴は残さない）
+
+
+
+
+
+
+
+
+
+================================================================================
+データ構造の方向性
+================================================================================
+
+現時点では、ユーザー情報と契約情報を分離する方向が適切。
+さらに、2つ目の Google アカウントを second_email / second_uid のような固定フィールドで持つのではなく、メンバーのサブコレクションにする。
+
+
+| ID                    | 何のために使うか                                                                 |
+| --------------------- | -------------------------------------------------------------------------------- |
+| **uid**               | ユーザーの識別。契約(accountId)・members は uid 単位                              |
+| **deviceId(Android ID)** | 端末の識別。Trial起点(firstUseDate)は端末単位（devices）                        |
+
+
+users/{uid}
+    ├─ email
+    ├─ name
+    ├─ platform(android / desktop)
+    └─ accountId           ← 現在紐付いているaccount
+
+users/{uid}/devices/{deviceIdHash}   ← この人が使っている端末の一覧
+    ├─ deviceIdHash
+    └─ addedAt
+
+devices/{deviceIdHash}
+    ├─ firstUseDate        ← Trial起点。端末単位。一度決まったら変わらない
+    └─ expireAt            ← データ削除から1年後。ふだんは無い（Firestore の TTL）
+    ※ 読み書きはサーバー（Cloud Functions）だけ。
+
+accounts/{accountId}
+    ├─ createdAt
+    └─ ownerUid            ← owner判定はこの1フィールドで行う
+
+accounts/{accountId}/members/{uid}
+    ├─ email               ← 未ログインのGoogleアカウントを招待する際の照合キー
+    └─ addedAt
+
+subscriptions/{subscriptionId}
+    ├─ accountId
+    ├─ provider（Google Play / Stripe）
+    ├─ purchaseToken
+    ├─ productId
+    ├─ expiryTime
+    ├─ lastNotificationType
+    ├─ createdAt
+    └─ updatedAt
+
+
+
+＊users/{uid}　これは、firebase Auth UIDに相当
+firebase/auth/uid == firestore/users/{uid}
+
+
+
+
+
+
+
+
+
+================================================================================
+メンバー構造
+================================================================================
+
+最大2個の Google アカウントを1つの FireMint 契約に紐付ける要件に対して、以下のような考え方を採用する。
+•	FireMint アカウント = 契約・利用権の単位
+•	member = FireMint にログインする Google アカウントの単位
+•	1つの FireMint アカウントに member を最大2件まで登録
+•	owner / member のように役割を持たせる余地を残す
+•	account は、Googleログインした直後に、自動で作成する（ユーザー操作ではない）。匿名ユーザーには作らない。
+	Googleログイン済みで accountId が空の人（外された人、招待を断った人）も、起動時に招待の確認の後、
+	まだ空なら自動で作成する。account は、Googleユーザーが必ず1つ持つ。
+•	サブ垢の招待・変更・削除のルール:
+	 - 招待（owner操作）は、members/{email} に仮登録するだけ。そのemailが他のaccountに所属しているか等の確認はしない。
+	   ただし、相手が課金中の時だけは、招待の時点で止める（「招待は受け付けられませんでした。」と出す。
+	   理由は伝えない。相手の課金状況を、メールアドレスを入れるだけで知れてしまうため）。
+	 - 自分のaccountが課金中の間は、招待を受けられない（確認も出さず、招待は削除する。「参加しない」と同じ）。
+	 - 課金中でなければ、招待された人は、Googleログイン時、またはログイン済みならアプリ起動時に、
+	   どんな場合も「参加しますか？」と確認される。
+	     参加する … 「参加する」を押して初めて、本人が元から持っていた自分のaccountを（サブ垢がいれば、その members も）削除し、users/{uid}.accountId を、招待元のaccountに付け替える。
+	     参加しない … 招待（members/{email}）を削除する。もう一度招待するなら、ownerが再登録する。
+	 - サブ垢の変更（入れ替え）は、古いmemberを外して、新しいemailを仮登録する。
+	 - owner が触るのは、自分のaccount配下の members と、その member の users/{uid}.accountId だけ
+	     （外す時に accountId をクリアするのが、他人の users を書き換える唯一の例外）。
+•	２つ目のアカウントの保持について、クラウド上では、サブコレクションとする。
+•	owner 自身も members サブコレクションに自分の uid でエントリを持つ。
+    owner/member の区別は accounts.ownerUid との一致判定で行い、members はそのaccountに紐づく全Googleアカウント(owner含む、最大2件)の一覧とする。
+
+
+
+
+
+
+
+================================================================================
+利用状態の基本ロジック
+================================================================================
+
+trialEndDate を必ず保存する必要はなく、firstUseDate + 60日で算出できる。基本的な判定イメージは以下。
+firstUseDate は、いま使っている端末（devices）の値。
+•	active subscription がある → subscribed として利用可能
+•	subscription がなく、現在日時 < firstUseDate + 60日 → trial として利用可能
+•	subscription がなく、現在日時 >= firstUseDate + 60日 → expired として利用不可
+
+•	subscription 側も trial と同じ考え方を採用する。「今有効かどうか」を表すフラグ(status)を
+	subscription ドキュメントに保存して都度書き換えるのではなく、Google Play / Stripe とやり取りした
+	事実（expiryTime、直近の通知種別など）だけを保存し、「今有効か」は読み取り時に都度計算する。
+	subscriptions/{subscriptionId}
+	    ├─ accountId
+	    ├─ provider
+	    ├─ purchaseToken 等の生データ
+	    ├─ expiryTime            ← 現在の請求期間の終了日時（事実）
+	    ├─ lastNotificationType  ← 直近の通知種別（PURCHASED/CANCELED/IN_GRACE_PERIOD等、事実の記録）
+	    └─ updatedAt
+
+	判定ロジック（都度計算）:
+	accountId に紐づく subscriptions を expiryTime 降順で取得 → 最新の1件を見る
+	→ expiryTime > 現在日時 なら有効
+	→ そうでなければ lastNotificationType が猶予期間系かどうかで有効/無効を判定
+
+	これにより、複数の subscription 履歴（更新・再契約）が積み上がっても、
+	最新の expiryTime を見るだけで判定できる。
+
+•	CANCELED（取消）と REVOKED（剥奪）／voided purchase（返金・チャージバック）は別物として扱う（決定）。
+	Google Playの通知には、性質が違う2種類がある。
+	  ・SUBSCRIPTION_CANCELED（取消）… 次回の自動更新を止める予約。今の期間の権利はそのまま。
+	                                    expiryTime はまだ未来。ユーザーは期限まで使える。
+	     →　expiryTime は変更しない（lastNotificationType だけ記録）。期限が来た時に、通常の判定で自然に無効になる。
+	  ・SUBSCRIPTION_REVOKED／voided purchase（返金・チャージバック）… 期限前に、いま使う権利を奪う通知。
+	                                    全額返金でも一部返金でも、FireMint側の対応は同じ。
+	     →　expiryTime を【現在時刻】に更新する（事実の記録として「その時点で終わった」とする。日割り計算はしない。全額/一部を問わず即時無効）。
+	  ・ON_HOLD / EXPIRED も、expiryTime が過去になっていることを確認する。
+
+•	Googleログインの合流で、discardAnonymous 成功後にログインが失敗した場合は割り切る（決定）。
+	合流は「discardAnonymous で匿名を削除 → Googleでログインし直し」の順（基本ルール3）。
+	この順序は必要（切り替えた後は、元の匿名として関数を呼べない）が、削除の後にログインが失敗すると、
+	端末はセッション無しになる。
+	次の起動時の動き: validateSession でセッション無効と判定 → 新しい匿名ユーザーを作成 →
+	端末を登録する（トライアルは、端末の日付のまま続く）。
+	ユーザーが改めてGoogleログインをやり直せば、ルール3の合流で、既存のuidに着地する。
+	対策の実装はしない。
+
+
+
+
+================================================================================
+etc
+================================================================================
+
+•	匿名ユーザーの端末Aと端末Bが、それぞれ別 UID で先にトライアルを開始した後、同じ Google アカウントへ紐付ける場合。
+        →　uid は既存のGoogleユーザーに合流する（ルール3）。トライアルは、端末Aと端末Bで別々のまま（ルール5）。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

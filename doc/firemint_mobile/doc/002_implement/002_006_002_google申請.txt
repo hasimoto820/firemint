@@ -1,0 +1,198 @@
+
+5  auth_users Google申請
+
+
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+
+
+関連:
+  001_007 google審査（datastore。済み）
+  002_006_001 auth_users
+
+
+================================================================================
+これは何か
+================================================================================
+
+  001_007 の datastore 審査とは別に、同じ firemint-m の同意画面に
+  identitytoolkit スコープを追加で申請する手続き。
+
+  新しいアプリの審査ではない。同じ OAuth 同意画面に、スコープを 1 つ足して
+  再提出する。datastore が通っていることは変わらない（外さない、消さない）。
+
+  identitytoolkit は non-sensitive と確認できた（Data Access 画面で確認済み。
+  carepanda886 / firemint-m）。sensitive でも restricted でもない。
+  Google の審査ルール上、non-sensitive スコープ単体には「使う理由の文章」も
+  「デモ動画」も本来は必須ではない（sensitive / restricted スコープにだけ
+  課される要件）。年次のセキュリティ監査も不要。
+
+  ただし datastore が既に sensitive なので、アプリ全体としては引き続き
+  審査対象。identitytoolkit を追加した状態で Submit し直す必要があるかは、
+  Data Access 画面の「Your app requires verification」表示を見て判断する。
+
+  通すと:
+    Auth ユーザー機能を一般公開できる。
+
+  通さなくても:
+    datastore 側は今まで通り使える（Auth ユーザーだけが未公開のまま）。
+
+  審査ではないもの:
+    001_007 の datastore 分はもう済んでいる。ここで触らない。
+
+
+================================================================================
+二つのプロジェクトを混ぜない
+================================================================================
+
+  001_007 と同じ。
+
+  firemint_m のログイン（審査を出す場所）:
+    Google Cloud プロジェクト  firemint-m
+    画面  https://console.cloud.google.com/auth/audience?project=firemint-m
+
+  ホームとプライバシーのページ:
+    Firebase プロジェクト  firemint-e801f
+    ホーム        https://firemint-e801f.web.app/
+    プライバシー  https://firemint-e801f.web.app/privacy.html
+
+
+================================================================================
+取る権限（追加分。datastore は残す）
+================================================================================
+
+  Auth ユーザーの一覧・取得・更新・削除
+    https://www.googleapis.com/auth/identitytoolkit
+
+  → non-sensitive と確認済み（2026-09-11、Data Access 画面）。
+    年次セキュリティ監査は不要。
+
+  対象プロジェクトの Identity Toolkit API 自動有効化
+    https://www.googleapis.com/auth/service.management
+
+  → cloud-platform は取らない（002_006_001 で検討し、見送った）。
+    代わりに Service Usage API の services.enable が cloud-platform と
+    service.management のどちらでも動くことを公式 Discovery Document で確認した
+    （serviceusage.googleapis.com の $discovery/rest?version=v1 を直接取得して確認、
+    2026-09-11）。service.management は「Google API のサービス設定を管理する」
+    専用スコープで、Firestore・Cloud Storage・Compute 等のデータには一切触れない。
+    プロジェクトの API 有効/無効の切替以外はできない。
+    sensitive/restricted のラベルは Data Access 画面で追加時に要確認。
+
+  Cloud 全体、プロジェクト一覧、は今回も取らない。cloud-platform は取らない
+  （やらない、に明記の通り）。
+
+
+================================================================================
+出す前に揃えるもの
+================================================================================
+
+  済んでいる想定（001_007 から）:
+    Audience が In production
+    Branding にアプリ名 FireMint、問い合わせメール
+    ホームとプライバシーの URL、許可ドメイン firemint-e801f.web.app
+    ロゴ
+
+  出すときに揃える:
+    1  スコープに datastore + identitytoolkit + service.management の
+       3 つだけが入っている（cloud-platform は入れない）
+    2  プライバシーの文面を書き直す。
+       今の文面「指定した Firestore だけ」は Auth ユーザーを含んでいない。
+       「Auth ユーザー（対象プロジェクトのアプリのエンドユーザー）の一覧・
+       編集・削除もできる」旨を足す。
+    3  実機のデモ動画・スコープの理由（下）
+       identitytoolkit は non-sensitive なので本来は必須ではない。
+       ただし datastore 分の審査で既に両方揃えている（001_007）ので、
+       Data Access / Prepare for verification の画面が identitytoolkit 分の
+       追記を求めてきたら、そのときだけ更新する。求めてこなければ、
+       スコープ追加＋Update だけで完了する可能性がある（実際の画面で判断）。
+
+
+================================================================================
+デモ動画
+================================================================================
+
+  001_007 の動画に、続けて Auth ユーザーの操作を追加する
+  （新しい動画を撮り直すか、001_007 のものに追記するかは収録時に決める）。
+
+  映す順（追加分）:
+    1  同意画面。datastore に加えて identitytoolkit / service.management も見えること
+    2  許可する
+    3  Identity Toolkit API が未有効化のプロジェクトで Auth ユーザー一覧を開く
+       → 「有効化する」ボタンでその場で有効化できること
+    4  プロジェクトを開いて、Auth ユーザー一覧に入る
+    5  ユーザーを1件開いて編集する（保存まで）
+    6  削除の確認ダイアログが出ること（実際に消すかは任意）
+
+
+================================================================================
+スコープの理由（提出欄に書く文のたたき）
+================================================================================
+
+  FireMint also manages Firebase Authentication users of the project the
+  signed-in user already administers. Using
+  https://www.googleapis.com/auth/identitytoolkit, the app lists, views,
+  updates, and deletes end-user accounts (email, display name, phone
+  number, password, disabled state, custom claims) of that project only.
+  It does not manage the signed-in user's own Google account and does not
+  request cloud-platform.
+
+  The app also uses
+  https://www.googleapis.com/auth/service.management solely to enable the
+  Identity Toolkit API on the project the user specifies, when that API has
+  not been enabled yet. It does not read or modify any other API
+  configuration and does not access Firestore, Cloud Storage, or any other
+  Google Cloud data with this scope.
+
+
+================================================================================
+出し方
+================================================================================
+
+  プロジェクト firemint-m で作業する。001_007 と同じ場所。
+
+  1  https://console.cloud.google.com/auth/audience?project=firemint-m
+     Audience は In production のまま変えない。
+
+  2  左の Data Access / スコープ
+     identitytoolkit と service.management を追加。
+     それぞれラベル（sensitive/restricted）を確認して記録する。
+
+  3  プライバシーページ（firemint-e801f.web.app/privacy.html）を先に更新・公開
+     してから審査に進む（審査時点の文面と食い違わないように）。
+
+  4  「審査の準備 / Prepare for verification」
+     スコープの理由を貼る。動画の URL を貼る（既存と入れ替えるか、追記するか）。
+
+  5  Submit for verification
+
+  返事は、プロジェクトのオーナー／編集者のメールに来る。
+  carepanda886@gmail.com が届くこと。
+
+
+================================================================================
+出したあと
+================================================================================
+
+  通るまで:
+    Auth ユーザー機能は自分（テスター）だけが使える状態にする
+    （公開範囲を絞る、または機能自体を隠す。要検討）。
+
+  通ったら:
+    Auth ユーザー機能を一般公開してよい。
+
+  差戻しが来たら:
+    001_007 と同じ傾向 + 「なぜ Auth 管理が要るのか」の説明不足が増える見込み。
+    「対象プロジェクトのアプリのエンドユーザー管理であり、IAM ではない」ことを
+    理由文に明記する。
+
+
+================================================================================
+やらない
+================================================================================
+
+  datastore のスコープを外す・変える
+  cloud-platform を取る
+  サービスアカウント JSON を端末に置く（identitytoolkit も OAuth 経由のみ）
+  審査を firemint-e801f や mintfarm から出す

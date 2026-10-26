@@ -1,0 +1,182 @@
+
+Account Misc
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+
+
+
+================================================================================
+Firestoreの読み書き：アプリが直接やる操作 / サーバー(Cloud Functions)に任せる操作
+================================================================================
+
+firestore.rules（Firestore の許可ルール）の設計の前提になっている。
+
+分ける理由（セキュリティ）:
+　アプリから直接書かせると、アプリを改造した人が、他人のデータや契約状態を書き換えられる。
+　そのため、他人のデータが絡む・検証が要る・整合性が要る書き込みは、サーバーに寄せる。
+
+方式:
+　Client直接        … アプリが、Firestore に直接読み書きする（許可は firestore.rules が判断する）
+　Cloud Functions経由 … アプリは関数を呼ぶだけ。書き込みは、サーバー（Admin SDK。rules の対象外）がやる
+
+基本方針:
+•	アプリが直接書けるのは、自分の users/{uid} の【プロフィール更新】（email / name）だけ。
+•	accounts / members / subscriptions への書き込みは、rules で全面的に禁止し、すべて Cloud Functions 経由。
+•	users/{uid} の作成と削除は、rules で禁止（作成は端末を登録する関数、削除はデータ削除の関数だけが行う）。
+•	読み取りは、自分に関係するものだけ許可（自分の users、所属する account / members / subscriptions）。
+•	Firebase Auth のユーザーの【削除】は、サーバー（Admin SDK）だけができる。
+•	devices（端末。トライアルの起点を持つ）と users/{uid}/devices（その人が使っている端末の一覧）は、
+	アプリからは読み取りも書き込みも rules で全面的に禁止。読み書きは Cloud Functions だけ（003_011_device.txt）。
+
+決定: 自分の users/{uid} の email / name の更新は、本人に直接書かせる（関数経由にすると、料金と待ち時間がかかる）。
+　例外なく守るもの（rules で固定）: ・更新できるのは email と name だけ。accountId・platform は変更できず、
+　　　　　　　　　　　　　　　　　　　新しい項目の追加もできない
+　　　　　　　　　　　　　　　　　　・email は、ログイン情報（IDトークン）の email と同じ値しか書けない。
+　　　　　　　　　　　　　　　　　　　匿名ユーザーは空文字だけ
+　※ users/{uid} の email / name は本人が直接書くため、サーバー側は、他人に見せる値・判定に使う値を、ここから
+　　 無条件には信用しない。招待の確認ダイアログに出す owner の email は、users ではなく
+　　 Firebase Auth のユーザー情報から取る（joinAccount）。
+
+※ users/{uid} の uid は、Firebase Auth が発行した番号。ドキュメント自体は、サーバー（端末を登録する関数）が、
+　 その番号をIDにして作る（Firebase Auth は Firestore に書かない）。
+
+| #  | 操作（呼ぶ関数）                                                                                      | 対象                                          | 方式              | 理由                                                                                   |
+|----|------------------------------------------------------------------------------------------------------|----------------------------------------------|-------------------|----------------------------------------------------------------------------------------|
+| 1  | users/{uid} の作成（端末の登録 registerDevice の中で）                                                 | 自分のuid                                     | Cloud Functions   | 起動時にサーバーへ聞くのを1回にまとめ、作る場所を1つにする                             |
+| 2  | users/{uid} の読み取り                                                                                | 自分のuid                                     | Client直接        | 本人だけ、rules が許可                                                                 |
+| 3  | users/{uid} の email / name の更新（Googleログイン後。updateUserProfile）                              | 自分のuid                                     | Client直接        | 本人だけ。更新できるのは email と name だけ（rules）                                   |
+| 4  | 端末の登録（registerDevice）: devices の作成・期限の解除、users/{uid}/devices への追加、firstUseDate の返却 | devices/{deviceIdHash}、自分のuid             | Cloud Functions   | devices をアプリから書けると、日付を新しくしてトライアルを戻せる。端末のIDをハッシュにするのもサーバー |
+| 5  | 用済みの匿名ユーザーの削除: Googleログインの合流時（discardAnonymous）、端末の登録時（registerDevice の中。同じ端末に残っている古い匿名ユーザー） | 匿名uid（Auth + users + users/{uid}/devices） | Cloud Functions   | Auth ユーザーの削除は、サーバーだけ。匿名で、accountId が無い場合に限って削除する |
+| 6  | Googleログイン時、email で招待歴を照合し、ユーザーが「参加する」を選んだら契約へ合流。「参加しない」なら招待を削除（joinAccount 等） | 他accountのmembers | Cloud Functions | collectionGroup での横断検索（アプリは他人のaccountを直接読めない。サーバーが見つけて、招待の有無だけを返す）。他人の所属状況が漏れるとプライバシー問題 |
+| 7  | account の作成 ＋ 自分を members に追加（createAccount）                                               | 新規account                                   | Cloud Functions   | account と members の2ドキュメントを、トランザクションで整合させて作る                 |
+| 8  | 2つ目のアカウントの追加（owner操作。addMember）                                                         | 自分のaccountのmembers（仮登録）               | Cloud Functions   | owner 権限のチェック ＋ 上限2件のチェックを、読み取りと書き込みをまたぐ競合（2端末からの同時登録）が起きないよう、db.runTransaction()でアトミックに行う（他accountの所属チェックはしない。相手が課金中の時だけ、理由を伝えずに拒否する。相手の account / subscriptions は、アプリからは読めない） |
+| 9  | メンバー脱退（owner操作 / 自己脱退。removeMember）                                                     | members削除 ＋ そのmemberの users.accountId クリア | Cloud Functions | 対象が呼び出し元自身ならowner権限チェックをスキップ、それ以外はowner権限のチェックが必須 ＋ 2ドキュメントの整合更新。他人の users を書き換える唯一の例外（自己脱退の場合は自分のusersのみで、この例外には該当しない） |
+| 10 | 課金の検証・acknowledge・subscriptions の作成（verifyAndroidPurchase）                                 | subscriptions                                 | Cloud Functions   | アプリの申告を信頼できない。購入の検証は、サーバーで Google Play に問い合わせる         |
+| 11 | RTDN 受信による subscriptions の更新（androidRtdnWebhook）                                             | subscriptions                                 | Cloud Functions   | Google からのサーバー間通知。アプリは関与しない                                        |
+| 12 | データ削除（owner。deleteAccount）                                                                        | account全体・members・subscriptions、owner本人の users・users/{uid}/devices・Authユーザー（他memberはaccountIdクリアのみ） | Cloud Functions  | Google Play の解約 → Firestore の削除 → Auth の削除、の順序制御が必須                  |
+| 13 | データ削除（member 自身 / 未所属。deleteMyData）                                                      | 自分の members / users / users/{uid}/devices / Authユーザー | Cloud Functions   | 本人確認・監査の観点。ownerの場合は、#12と同じ処理になる                              |
+| 14 | accounts/{accountId} の読み取り                                                                       | 自分の所属account                              | Client直接        | rules が「自分の uid が members に存在するか」を検証。※許可のみ。現状、アプリは使っていない |
+| 15 | members 一覧の読み取り                                                                                | 自分の所属accountのみ                           | Client直接        | 同上。他account は読めない。※許可のみ。現状、アプリは使っていない                      |
+| 16 | subscriptions の読み取り（利用可否の判定用。fetchLatestSubscription）                                   | 自分の所属accountのみ                          | Client直接        | 読み取り専用。書き込みは全て Cloud Functions なので、改ざんされない                    |
+| 17 | 端末の期限（データ削除の中で）: 他の Google アカウントが使っていない端末に expireAt を入れる       | devices/{deviceIdHash}、users/*/devices（横断検索） | Cloud Functions | 他の人の一覧は、アプリからは読めない                                                   |
+
+
+
+
+
+
+
+================================================================================
+情報の保持場所の対応表（uid / deviceId / token など、どこに何を持つか）
+================================================================================
+
+コードの実際の動きに合わせた対応表。迷ったらここを見る。
+
+　・「発行者」… その情報を作る（発行する）のは誰か。
+　　　外部のサービス（Firebase Auth / Google / Google Play / Android(OS)）と、
+　　　FireMint自身（アプリ / Cloud Functions）を区別して書く
+　・「正」… 情報が食い違った時に、信じる場所（元の情報）
+　・各列のセル … その場所に持つ、具体的な名前。「写し」は、正から作った複製。「—」は持たない
+　・「Firebase Auth」の列 … サーバーと、端末のFirebase Auth SDK内部の保存領域の両方を指す
+　・「端末sqlite」の列 … 端末のSQLite（firemint_account.db など）
+
+
+
+
+| 項目                                    | 発行者                                                    | 正                                              | Firebase Auth                                         | Firestore                                                               | 端末sqlite                                     | Google Play                                  |
+|-----------------------------------------|----------------------------------------------------------|-------------------------------------------------|-------------------------------------------------------|-------------------------------------------------------------------------|------------------------------------------------|----------------------------------------------|
+| uid                                     | Firebase Auth                                            | Firebase Auth                                   | 発行元（端末SDKが「今ログイン中のuid」を保持）           | users/{uid}のID、accounts.ownerUid、membersのID                          | cached_user.uid（写し）                        | —                                            |
+| deviceId (ANDROID_ID)                   | Android(OS)                                              | Android(OS)（端末が持つ）                        | —                                                     | devices と users/{uid}/devices のドキュメントID（SHA-256 のハッシュ。生の値は持たない） | —                                              | —                                            |
+| firstUseDate (トライアル起点)           | FireMint（Cloud Functions）。その端末を初めて登録する時    | Firestore                                       | —                                                     | devices/{deviceIdHash}.firstUseDate                                     | cached_user.firstUseDate（この端末の日付の写し） | —                                            |
+| accountId                               | FireMint（Cloud Functions）createAccount / joinAccount   | Firestore                                         | —                                                   | users/{uid}.accountId（accountsのドキュメントIDでもある）                 | cached_user.accountId（写し）                  | —                                            |
+| email / 表示名                          | Google                                                   | Firebase Auth                                     | Googleから受け取り、ユーザー情報として保持             | users/{uid}.email、members/{uid}.email（写し）                           | —                                              | —                                            |
+| Firebaseのログイン用トークン            | Firebase Auth                                             | 端末のFirebase Auth SDK（端末にしか無い）           | 端末SDKが保持（サーバーは検証する側）                   | —                                                                       | —                                              | —                                            |
+| Googleの認証トークン(アカウント機能)    | Google                                                     | 保存しない                                      | Firebaseの資格情報に変換して使い、終わり                  | —                                                                       | —                                              | —                                            |
+| purchaseToken                           | Google Play                                             | Google Play                                     | —                                                      | subscriptions/{purchaseToken}（検証時に保存した記録）                     | —（保存しない。Playから取り直す＝購入の復元）      | 購入の元データ                               |
+| expiryTime / lastNotificationType       | Google Play                                             | Google Play                                     | —                                                      | subscriptions（検証とRTDNで更新する記録。利用可否は、これから判定する）     | —（端末には持たない）                            | 元の値（APIで取得、RTDNで通知）              |
+| 契約中 / トライアル / 期限切れ          | FireMint（アプリが計算）                                    | 保存しない（毎回、expiryTimeと現在時刻から計算）    | —                                                     | —                                                                       | —                                              | —                                            |
+| 外部Firestore接続のGoogle認証(connection)| Google                                                  | 端末の暗号化ストレージ(Keystore)                    | —                                                    | —                                                                       | —（SQLiteではなく、暗号化ストレージ）             | —                                            |
+| プロジェクト名簿・設定                  | FireMint（アプリ）。ユーザーが入力                            | 端末のSQLite                                    | —                                                     | —                                                                       | firemint_workspace.db / firemint_settings.db   | —                                            |
+
+
+
+
+読み方:
+•	端末のSQLite（firemint_account.db の cached_user）に残るのは、uid / accountId / firstUseDate
+	の3項目だけで、すべて「写し」。正は、uid なら Firebase Auth SDK、accountId は users/{uid}、
+	firstUseDate は devices/{deviceIdHash}。uid が食い違えば、写しを捨てて、正から作り直す（基本ルール6）。
+•	課金の元データ（purchaseToken / expiryTime / 通知の種類）の正は Google Play。Firestore の subscriptions は、
+	検証（verifyAndroidPurchase）と RTDN で更新した「記録」で、アプリの利用可否は、この記録から判定する。
+	記録が古い・欠けている時は、Playから取り直す（購入の復元）。
+•	Firebaseのログイン用トークンは、端末のSDKの中にしか無く、こちらのコードからは触れない。
+	アンインストールで消えるのはこのため（再インストール後は、新しい匿名ユーザーで始まる。トライアルは、端末の日付で続く。003_001の基本ルール5）。
+•	契約状態（契約中 / トライアル / 期限切れ）は、保存すると必ずズレるので、保存しない。
+	subscriptions の expiryTime と現在時刻から、表示のたびに計算する（003_001「利用状態の基本ロジック」）。
+•	Firebase Auth上のユーザー（管理画面の「Authentication」に出るもの）と、こちらの Firestore の
+	users/{uid} は別物。uid で対応しているだけ。
+•	データ削除の後に残るのは、devices（端末のIDのハッシュと firstUseDate）だけ。
+	その端末を使っている Google アカウントが他にいなければ、削除から1年で消す（Firestore の TTL）。
+	uid・email・accountId は持たない（003_011_device.txt）。
+•	アカウント機能のGoogle認証と、外部Firestore接続(connection)のGoogle認証は、別の仕組みで、
+	保存場所も別。前者は端末に保存しない（Firebase側のセッションのみ）。後者は端末の暗号化ストレージに保存する。
+	（外部Firestore接続の保存方針は 001_pre/001_002_機能_詳細.txt「非揮発性メモリ」）
+
+
+
+
+
+
+
+
+
+
+================================================================================
+先送りにした項目（優先度低）
+================================================================================
+
+
+
+
+================================================================================
+テスト購入の挙動（ライセンステスター）
+================================================================================
+
+•	テスト購入の月額サブスクは、実際の1か月ではなく約5分ごとに自動更新される（最大6回、
+	購入から約35分後に期限切れ）。RTDN（SUBSCRIPTION_RENEWED / EXPIRED）と
+	expiryTime の更新、期限切れ後の画面表示の確認に使える。
+•	更新のたびに androidRtdnWebhook が起動する。成功時は「RTDNを反映しました」
+	（通知の種類・accountId・新しい expiryTime）がログに出る。
+	（firebase functions:log --only androidRtdnWebhook）
+•	検証に失敗してacknowledgeされなかった購入は、Googleが自動で取り消す
+	（SUBSCRIPTION_REVOKED / EXPIRED。voidedPurchaseNotification も届く）。
+	この時、FireMint側には記録が無いので「未知のpurchaseToken」の警告になるが、正常。
+•	購入ダイアログにテスト購入の表示が出ない場合は、ライセンステスターの設定を
+	確認してから購入すること（本当に課金される）。
+
+
+
+
+================================================================================
+実機テストの確認状況
+================================================================================
+
+確認済み:
+  ✅ 匿名認証での起動 / Googleログイン / account自動作成
+  ✅ 購入 → サーバー検証 → 「契約中」表示
+  ✅ 検証に失敗した後の購入の復元（購入済みでも、先へ進める）
+  ✅ RTDNの疎通（テスト通知、購入通知、5分ごとの更新通知）
+  ✅ 画面を開き直しても、契約情報が消えない（accountIdはサーバーを正とする）
+  ✅ 自動更新の反映と期限切れ（約35分「契約中」→「トライアル + 購入ボタン」に戻る）
+  ✅ 2つ目のGoogleアカウントをメンバーに追加 → 別端末でログイン → 同じ契約で「契約中」
+  ✅ 起動しただけで匿名ユーザーができ、この端末のトライアルが始まる（アカウント画面を
+     開かなくても。003_008_test.txt A1）
+  ✅ 匿名のまま再インストール → 新しい匿名ユーザーで始まり、トライアルが続く（A2）
+  ✅ Googleログイン済みで再インストール → 未ログインで始まり、ログインで元の契約に戻る（A3）
+  ✅ 1つのGoogleで複数の端末 → 同じ契約。トライアルは端末ごと（A4）
+  ✅ データ削除の後 → トライアルが戻らない（N1 / N3）
+  ✅ データ削除（member / 未所属）→ Firestore と Firebase Auth のユーザーが消える（F1 / F2）
+  ✅ データ削除（owner）→ Google Playの解約 → Firestore削除 → Firebase Auth削除（F4 / H3）
+  ✅ 解約（Playストアから）→ 期限まで使え、期限後に切れる
+
+  ※ 項目ごとの結果は 003_008_test.txt が正。

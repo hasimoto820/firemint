@@ -1,0 +1,578 @@
+
+todo 完了分
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+003_006_todo.txt から、対応済みの項目をここへ移す（todoをスッキリさせるため）。
+新しい決定・発見は、まず003_006_todo.txtに書き、対応が終わったらここへ移す。
+
+※「作り直すか、パッチするか」の方針決定は、コード修正の完了項目ではないため、
+　003_004_構築.txt「方針」に記録済み（このファイルには置かない）。
+　auth.ts・billing.ts・deleteAccount系・Android Kotlin側・firestore.rulesの確認結果
+　（firestore.rulesは仕様どおり、validateSessionはオフラインと無効の区別を既に実装
+　済みだった等）も同じくそちらを参照。
+
+
+================================================================================
+一覧（全17件。詳細は下の各セクション）
+================================================================================
+
+【優先度：高（4件）】
+ 1. deleteAccountCoreが、owner以外のmemberのusers・Authユーザーも削除していた
+ 2. androidRtdnWebhookが、REVOKED/返金時にexpiryTimeを現在時刻にしていなかった
+ 3. joinAccountが、アプリ起動のたびに呼ばれていなかった（InviteWatcher新設で対応）
+ 4. joinAccount.ts自体が「参加確認」「課金中なら黙って拒否」を一切実装していなかった
+    （③の配線中に発覚。respondToInvite.ts/retireAccount.tsを新設）
+
+【優先度：中（4件）】
+ 5. addMember.tsの上限チェックが競合に弱かった（db.runTransaction化）
+ 6. computeEntitlementが猶予期間（GRACE_PERIOD）を見ていなかった
+ 7. 購入ボタンがowner限定になっていなかった（サーバー側にも二重チェックを追加）
+ 8. メンバー一覧の表示と脱退の画面が無かった（removeMember.tsの自己脱退対応込み）
+    ＋配線中に発覚: accountId空の人が次回起動時に自動再作成されない問題
+
+【フロー毎の実装確認で発覚。見落とし（5件）】
+ 9.  003_002_flow.txtの表に、退会フロー修正前の古い記述が残っていた（ドキュメントのみ）
+10. entitlementがAccountScreen.tsx以外で一切参照されず、本体機能が無制限に使えていた
+11. joinAccount/respondToInviteのemail検索が、自分の既存エントリと新規招待を
+    区別できていなかった（Aに所属中の人が、別のBから招待された場合に取りこぼす）
+12. 退会の二重確認（メールアドレス入力）と、自己脱退のトライアル切れ警告の出し分けが、
+    ドキュメントの決定通りに実装されていなかった（AccountScreen.tsxにモーダル・
+    条件分岐を追加）
+
+【実機テスト（003_008_test.txt D1/E）で発覚（4件）】
+13. 脱退・除外後にaccountIdが空になったGoogleログイン済みユーザーに、購入ボタンが
+    出ない（owner操作で外された後も、自己脱退後も、再度accountを持つ導線が無かった）
+14. firstUseDateがSQLiteキャッシュにしか依存せず、セッション有効時にサーバーの値と
+    照合・更新する処理が無かった（Firestoreコンソールで書き換えても反映されない）
+15. HomeScreenのentitlement stateがマウント時の1回しか計算されず、trialが切れても
+    ホーム画面に戻ってきた時点では遮断されなかった（E2で発覚）
+16. trialのみ（accountId無し）でも、オフラインだと「不明」扱いになり遮断されない
+    抜け穴があった（機内モードでゲートを素通り→後でWi-Fiオンにすれば使い放題。
+    E4で発覚）
+
+【実機テスト後の整理（1件）】
+17. accounts/{accountId}.status が、書き込むだけでどこからも読まれていなかった（削除）
+
+
+================================================================================
+対応済みtodo（優先度：高。決定と正面から矛盾していたもの）
+================================================================================
+
+•	functions/src/account/deleteAccountCore.ts が、owner以外のmemberのusers・
+	Authユーザーも削除していた問題。
+	usersSnapを「owner本人」と「他member」に分け、owner本人の分だけ削除、
+	他memberの分は accountId を null に更新するだけに直した。
+	authUidsも、削除対象はowner本人のみに絞った。
+
+•	functions/src/billing/androidRtdnWebhook.ts が、REVOKED/返金時に
+	expiryTime を現在時刻にしていなかった問題。
+	notificationType===12（REVOKED）の場合は、fetchSubscriptionの結果を使わず
+	expiryTime=現在時刻を書き込むよう分岐を追加。voidedPurchaseNotification
+	（返金・チャージバック。別のPub/Subペイロード）も新たに受信し、同様に
+	expiryTimeを現在時刻に更新する処理を追加した。
+
+•	joinAccountが、アプリ起動のたびに呼ばれていなかった問題。
+	src/app/App.tsx（LocaleRoot/ThemeRootの内側）に、常駐コンポーネント
+	InviteWatcher.tsx を追加。マウント時（コールドスタート相当）と、AppStateの
+	フォアグラウンド復帰時に、bootstrap.tsのcheckForInvite()（内部でjoinAccountを
+	呼ぶ）を実行するようにした。
+
+•	[当初の想定より大きな修正] functions/src/account/joinAccount.ts 自体が、
+	「参加する／参加しない」の確認や「自分が課金中なら黙って拒否」を一切実装しておらず、
+	招待が見つかったら確認なしで即座に強制合流していた問題（③の配線中に発覚）。
+	  ・joinAccount.ts は「確認・照会」だけを行い、合流を確定させない設計に変更
+	    （課金中なら黙って招待を削除して{joined:false}、そうでなければ
+	    {joined:false, pendingInvite:{accountId, ownerEmail}}を返す）。
+	  ・新設 respondToInvite.ts が「参加する／参加しない」の応答を確定させる
+	    （参加する場合、削除の直前に自分のaccountが課金中でないことを再確認してから、
+	    乗り換え前の旧account/旧membershipを片付ける）。
+	  ・新設 retireAccount.ts（retireOwnAccountForJoin）が、旧accountの片付けを担当
+	    （自分がownerだった場合は旧account・members・subscriptionsを削除しつつ、
+	    サブ垢がいればaccountIdクリアのみ。自分が他accountのmemberだった場合は
+	    自分のmembersエントリだけ削除）。
+	  ・util.ts に isAccountSubscribed(accountId) を追加（addMember/joinAccount/
+	    respondToInviteで共用）。
+	  ・AccountFunctionsModule.kt・functions.ts（native）・types.ts に respondToInvite
+	    を追加。
+	  ・確認ダイアログ（「〇〇さんのFireMintに参加しますか？」）は、
+	    src/features/account/ui/joinInvitePrompt.ts として実装し、AccountScreen.tsx
+	    （Googleログイン直後）とInviteWatcher.tsx（起動・フォアグラウンド復帰時）の
+	    両方から使う。i18nキー（account.joinInvite*）を4言語分すべてに追加した。
+
+
+
+
+================================================================================
+対応済みtodo（優先度：中）
+================================================================================
+
+•	functions/src/account/addMember.ts の上限チェックが競合に弱かった問題。
+	既存の読み取り→書き込みを db.runTransaction() でアトミックにまとめた。
+
+•	src/features/account/native/entitlement.ts の computeEntitlement が、
+	猶予期間を見ていなかった問題。lastNotificationTypeが"GRACE_PERIOD"を含む場合は
+	subscribed扱いにする分岐（isGracePeriod）を追加した。ON_HOLD/EXPIREDは対象外のまま。
+
+•	src/features/account/ui/AccountScreen.tsx の購入ボタンが、owner限定に
+	なっていなかった問題。
+	  ・android/.../AccountModule.kt#fetchAccountOwnerUid を新設（accounts/{accountId}.
+	    ownerUidをClient直接で読む）。auth.ts・AccountScreen.tsxに配線し、isOwner state
+	    を追加。購入ボタンの表示条件・onPurchaseの実行条件の両方にisOwnerを追加した。
+	  ・ついでに見つかった同種の抜け（addMemberボタン・退会ボタンもowner区別が無く、
+	    memberに表示されていた）も、isOwnerで表示を分けるよう直した。
+	  ・サーバー側 functions/src/billing/verifyAndroidPurchase.ts にも
+	    「呼び出し元がaccounts.ownerUidと一致すること」のチェックを追加し、
+	    UIをバイパスされても購入確定できないようにした（防御的多層化）。
+
+•	メンバー一覧の表示と、脱退の画面が無かった問題。
+	  ・android/.../AccountModule.kt#fetchMembers を新設（accounts/{accountId}/members
+	    をClient直接で読む）。auth.ts・types.ts（MemberEntry）に配線。
+	  ・AccountScreen.tsxにメンバー一覧表示、owner視点の「脱退させる」ボタン
+	    （removeMember(targetId)）、member視点の「脱退する」ボタン（自己脱退。
+	    removeMember(自分のuid)、トライアル切れの注意文言つき確認ダイアログ）を追加。
+	  ・functions/src/account/removeMember.ts自体を改修（決定と食い違っていた）。
+	    対象が呼び出し元自身の場合はowner権限チェックをスキップする分岐を追加
+	    （対象がowner本人なら「退会フローへ」と案内して拒否。対象が自分以外なら
+	    従来どおりowner権限チェック必須）。
+	  ・i18nキー（account.membersTitle等）を4言語分すべてに追加した。
+
+•	[配線中に発覚し、あわせて対応済み] Googleログイン済みでaccountIdが空（owner退会後・
+	招待辞退後・自己脱退直後など）になった場合、次回起動時に自動で自分だけのaccountを
+	作る（決定。「FireMint Account作成」）処理が、どこにも実装されていなかった問題。
+	bootstrap.tsのcheckForInvite内に、招待が無くaccountIdも空の場合にcreateAccountを
+	呼ぶ分岐を追加した（InviteWatcher経由で、起動・フォアグラウンド復帰時に実行される）。
+
+
+
+
+================================================================================
+対応済みtodo（フロー毎の実装確認で発覚。見落とし）
+================================================================================
+
+•	003_002_flow.txt「起動時の判定順」の表「owner退会後の、他memberの端末」の行が、
+	退会フローの修正前（他memberのuid/Authも削除していた頃）の記述のまま古くなっていた。
+	「セッションはそのまま。accountIdがnullになるため、次のjoinAccount呼び出し
+	（InviteWatcher）で自動的に自分だけのaccountが作られる」に直した（ドキュメントのみ）。
+
+•	[見落とし。重大] entitlement（trial/subscribed/expired）が、AccountScreen.tsxの
+	表示以外では一切参照されておらず、FireMint本体の機能（HomeScreen経由の
+	auth/projects/transfer/snippets。ProjectListScreen・TransferScreen・
+	SnippetListScreenがいずれもconnection/workspaceのFirestoreアクセスを行う）が、
+	トライアル切れ・未課金でも無制限に使えてしまっていた。
+	src/app/HomeScreen.tsxに、ensureUser/fetchUserDocument/fetchEntitlementで
+	entitlementを取得するrefreshEntitlementを追加し、onCardで
+	GATED_CARD_IDS(auth/projects/transfer/snippets)を押した時、entitlement==='expired'
+	なら遮断してaccount画面へ誘導するアラートを表示するようにした。
+	account/settings/appInfoは対象外（課金のためにaccount画面へは常に行けないといけない）。
+	entitlementが不明（読み込み中・通信失敗）な間は遮断しない（オフライン時の楽観判定と
+	同じ考え方。確実にexpiredと分かった時だけ遮断する）。
+	※ connection先の外部Firestoreは、FireMintが所有するデータではないため、
+	  サーバー側での利用制限は不可能（外部プロジェクトの権限はその持ち主が管理する）。
+	  クライアント側でのこのゲートが、実行可能な唯一の制御。i18nキー
+	  （home.trialExpired*）を4言語分すべてに追加した。
+
+•	[見落とし。重大] functions/src/account/joinAccount.ts / respondToInvite.ts の
+	email検索（collectionGroup("members").where("email","==",email).limit(1)）が、
+	「自分が既に所属しているaccountの自分自身のエントリ」と「新規の招待」を
+	区別できていなかった。既にaccount Aに所属している人が、別のaccount Bから
+	招待された場合、両方とも同じemailでヒットするため、limit(1)がどちらを返すか
+	保証されず、Bの招待が検知されないまま取りこぼされる可能性があった。
+	検索結果から自分のuidのドキュメントを除外し、【まだ自分のものになっていない、
+	新規の招待】だけを対象にするよう修正した（joinAccount.ts・respondToInvite.ts両方）。
+	これに伴い、「既に自分のuidで所属している（2台目端末など）」という分岐が
+	不要になったため削除した（users/{uid}.accountIdで既に分かるため、
+	joinAccount側で探す必要が無い）。
+	この変更の副作用として、src/features/account/ui/AccountScreen.tsxの
+	joinOrCreateAccountが、合流(switched)直後に既にaccountId確定済みの人に対して
+	誤ってcreateAccountを呼び、サーバー側でalready-existsエラーになる問題が
+	新たに発生したため、既存のaccountIdを先にチェックしてから作成するよう修正した。
+	003_002_flow.txt「匿名ユーザー→Google認証」の該当分岐の記述も実態に合わせて直した。
+
+•	[見落とし] 003_002_flow.txt「退会・データ削除要請」の owner分岐が「確認ダイアログ
+	（二重確認。googleアカウント名をユーザーに入力させる）」と決めているのに対し、
+	AccountScreen.tsxのonDeleteAccountは単純な2択のAlert.alertのみで、
+	メールアドレスの入力を求めていなかった。1回目の確認（既存のAlert）の後、
+	2回目としてGoogleアカウントのメールアドレスの入力を求めるモーダル
+	（deleteAccountModalVisible / confirmDeleteAccount）を追加し、入力値が
+	現在ログイン中のemailと一致した時だけ削除ボタンを有効にするようにした。
+	i18nキー（account.deleteAccountType*）を4言語分すべてに追加した。
+
+•	[見落とし] 003_002_flow.txt「メンバー脱退」の自己脱退分岐が「自分のfirstUseDateが
+	既に60日を超えている場合、脱退後すぐに利用不可になる旨を確認ダイアログに明示する」
+	と決めているのに対し、AccountScreen.tsxのonLeaveAccountは、実際に60日を超えて
+	いるかを判定せず、常に同じ「もし終了していたら」という条件文の汎用文言を
+	表示していた。firstUseDate + TRIAL_MSと現在時刻を比較し、既に切れている場合は
+	断定形の文言（account.leaveAccountConfirmExpired）を、そうでなければ従来の
+	文言を出し分けるようにした。i18nキーを4言語分すべてに追加した。
+
+
+================================================================================
+対応済みtodo（実機テスト（003_008_test.txt D1）で発覚）
+================================================================================
+
+•	[実機テストで発覚] メンバーから外れた（owner操作で外された／自己脱退した）後、
+	accountIdが空になった状態のGoogleログイン済みユーザーに、購入ボタンが出ない
+	問題。優先度中8番の対応（bootstrap.tsのcheckForInvite新設）は、InviteWatcher
+	経由（起動・フォアグラウンド復帰時）でしか動いておらず、次の2箇所が未配線だった。
+	  ・AccountScreen.tsxのbootstrap()自体は、accountIdをサーバーから読むだけで、
+	    checkForInviteを呼んでいなかった。アカウント画面を素早く開くと、
+	    InviteWatcherの非同期処理より先にaccountId=nullの状態を読んでしまい、
+	    isOwnerもfalseのまま（購入ボタン・脱退ボタン・追加ボタンが全てaccountId
+	    前提のため）何も表示されない画面になっていた。
+	  ・自己脱退（onLeaveAccount）自体が、removeMember実行後にaccountIdをnullに
+	    セットするだけで、新しいaccountを作る処理を呼んでいなかった（既にGoogle
+	    ログイン済みのため、画面上に「アカウントを作る」ボタンを新設するのはUI的に
+	    不自然という判断。ユーザー指摘により「ボタンを増やすのではなく、脱退ロジックの
+	    延長で自動化する」方針に決定）。
+	AccountScreen.tsxのbootstrap()に、doc.email有り・accountId空の場合に
+	checkForInvite()を呼んでからfetchUserDocument()で最新accountIdを再取得する
+	処理を追加。onLeaveAccountにも同様にremoveMember直後にcheckForInvite()を呼ぶ
+	処理を追加し、isOwner/members/entitlementも新accountIdで再計算するようにした。
+	招待が見つかった場合はcheckForInviteがcreateAccountを呼ばずnullを返すため、
+	accountIdは空のままになり、InviteWatcher側の確認ダイアログに委ねる（競合しない）。
+	003_002_flow.txt「メンバー脱退」の対応コード・フロー本文も実態に合わせて直した。
+
+•	[実機テストで発覚。E章のテスト中に判明] users/{uid}.firstUseDateをFirestore
+	コンソールで直接書き換えても、アプリ側の判定（trial/expired）に反映されない問題。
+	bootstrap.tsのdoEnsureUserは、SQLiteキャッシュのuidが今のFirebase Authのuidと
+	一致する場合、サーバーに問い合わせずキャッシュのfirstUseDateをそのまま返す
+	（基本ルール6は「uidの判定にキャッシュを使わない」という意味であり、
+	firstUseDateの値自体を毎回サーバーで確認しないという意味ではない。
+	003_002_flow.txt「起動時の判定順」①の「サーバー(users/{uid})を正として、
+	SQLiteの写しを作り直す」という記述と実装が食い違っていた）。
+	accountIdは、AccountScreen.tsx・HomeScreen.tsxの両方が
+	ensureUser()とは別にfetchUserDocument()でサーバーから再取得し、キャッシュと
+	食い違えば更新するよう既に実装されていたが、firstUseDateは同じdocに入っているのに
+	この上書きの対象から漏れていた。
+	android/.../account/AccountDb.ktにupdateFirstUseDate、AccountModule.ktに
+	updateCachedFirstUseDate（ReactMethod）を新設。auth.tsに配線し、
+	AccountScreen.tsxのbootstrap()・HomeScreen.tsxのrefreshEntitlement()の両方で、
+	accountIdと同じパターン（doc.firstUseDateを優先し、キャッシュと食い違えば
+	updateCachedFirstUseDateで更新）に直した。
+
+•	[実機テストで発覚。E2のテスト中に判明] firstUseDateの同期を直した後も、
+	トライアル切れでホーム画面の機能（プロジェクト一覧・インポート/エクスポート・
+	スニペット・認証）が遮断されない問題が残っていた。
+	App.tsxのタブスタック実装（src/app/App.tsx）は、画面遷移してもコンポーネントを
+	unmountしない（opacity/pointerEventsで表示を切り替えるだけ）。react-navigationの
+	ようなfocusイベントも実装していない。そのためHomeScreen.tsxのuseEffect（空の
+	依存配列）はアプリ起動後の最初の1回しか走らず、entitlement stateはそのまま
+	固定される。アプリを起動したまま時間が経ってtrialが切れた場合や、アカウント画面
+	から戻ってきた直後は、ホーム画面のentitlement stateが古いまま（例: 'trial'）に
+	なり、遮断されなかった。
+	refreshEntitlement()が最新のEntitlementを返り値として返すように変更し、
+	onCard(id)をasyncにして、GATED_CARD_IDSに該当するカードが押された瞬間に
+	毎回refreshEntitlement()を呼び直し、その場で返ってきた最新の値だけで
+	遮断判定するようにした（マウント時のstateは参照しない）。
+	003_002_flow.txt「利用状態の判定」の対応コード注記も実態に合わせて直した。
+
+•	[実機テストで発覚。E4のテスト中に判明。重大。方針自体を見直し（E4見直し）]
+	「不明な状態では遮断しない」という決定（オフライン時の楽観判定）が、accountIdの
+	有無にかかわらず一律に適用されていたため、trialのみ（accountId無し）のユーザーが
+	機内モードでアプリを起動すると、refreshEntitlement()内のfetchUserDocument()
+	（Firestore読み取り）が失敗して丸ごとcatchに落ち、entitlementが常にnull
+	（＝遮断しない）になっていた。trial切れの人が機内モードでゲートを素通りし、
+	入った後にWi-Fiをオンにすれば無制限に使えてしまう抜け穴だった。
+
+	最初の対応（カード押下のたびに毎回サーバーへ再確認する実装）は、ユーザーの
+	レビューで「通過側の判定は毎回ネットを待つ必要は無い。門の正はメモリ上の値にして、
+	NG/不明の時だけサーバーに確認すればいい」という方針に差し戻され、以下の決定で
+	作り直した。
+
+	決定（最終）:
+	「不明なら遮断しない」はやめる。許可（trial/subscribed）の時だけ進む。
+	門の正はメモリ上（キャッシュ）のentitlement。SQLiteのfirstUseDateの写しを、
+	その場の判定の正にはしない。
+	  カード押下時の順:
+	  ・メモリで通過（trial/subscribed）→ そのまま進む（ネット待たない）
+	  ・メモリでNG（expired）→ Firestoreで確認。復活していれば通す。切れなら止める
+	  ・メモリが無い（null）→ クラウドで取る。許可が取れなければ入れない
+	通過側のメモリが多少古いことは許容する（課金切れでも1〜2日程度のずれは可）。
+	そのためメモリ更新をサボると穴になる。少なくとも次で塗り替える:
+	起動時／フォアグラウンド復帰／アカウント画面での購入・脱退・合流など。
+	ページ内（一覧の先）でのentitlement再判定は、今は必須にしない。機内モードで
+	潜る穴は門で塞ぐ。
+
+	実装:
+	  ・新設 src/features/account/native/entitlementCache.ts に、プロセス内メモリ
+	    だけのentitlementの写し（getCachedEntitlement/setCachedEntitlement）を
+	    置いた。SQLite/Firestoreではなく、アプリプロセスが終われば消える。
+	  ・HomeScreen.tsxのrefreshEntitlement()は、計算結果をstateとこのメモリの
+	    両方に書く。accountId無しはサーバーに聞かず（聞く必要が無い）
+	    computeEntitlement（ローカル計算）で確定させる。accountId有りの場合のみ
+	    サーバー（fetchLatestSubscription）に問い合わせ、失敗時（オフライン等）は
+	    既存の決定通り「subscribedだろう」と楽観的に継続させる。
+	  ・HomeScreen.tsxのuseEffectに、AppState（'active'復帰時）のリスナーを追加し、
+	    フォアグラウンド復帰のたびにrefreshEntitlement()を呼んでメモリを塗り替える
+	    （InviteWatcher.tsxと同じパターン）。
+	  ・onCard(id)は、まずgetCachedEntitlement()を見て'trial'/'subscribed'なら
+	    即座に通し、それ以外（expired/null）の時だけrefreshEntitlement()で
+	    サーバーに確認し直す。
+	  ・AccountScreen.tsxのrefreshEntitlement(accountId, firstUseDate)（購入・
+	    脱退・合流・Googleログイン直後などから呼ばれる共通関数）、bootstrap()内の
+	    entitlement計算、退会・データ削除時のentitlement=null設定の3箇所すべてに
+	    setCachedEntitlementを追加し、ホーム画面のメモリが古いまま取り残されない
+	    ようにした（影響範囲の確認）。
+	003_002_flow.txt「利用状態の判定」の対応コード・決定事項を全面的に書き直し、
+	003_008_test.txtのE4も新方針に合わせて書き直した。
+
+•	[影響範囲の洗い直しで発覚・対応] entitlementCacheを新設した直後、ユーザーから
+	「SQLiteではなくメモリにした理由」「更新箇所の洗い出しは本当に必要か」の
+	確認が入り、設計を再検討した。
+	  ・SQLite（永続）に判定結果（entitlement）まで持たせる案は却下。
+	    「起動時に必ず塗り替える」という決定がある以上、永続化しても再計算前に
+	    一瞬読める以上の利点が無く、むしろ「何日も前の値を、起動直後オフラインの時
+	    だけ信用してしまう」という、firstUseDate問題（優先度高14番）と同種の
+	    リスクを再び持ち込む。メモリ（プロセス終了で消える）の方が、古さの上限が
+	    「このプロセスが生きている間」に強制的に縛られるため安全、という結論になった。
+	  ・「フォアグラウンド復帰」「アカウント画面での操作」の更新トリガーは、
+	    日数の大小とは無関係に重要度が高いと確認した。Androidはホームボタンで
+	    離脱してもプロセスが生き続け、次に開いた時は「起動（マウント）」ではなく
+	    「同じプロセスの再表示」になるため、フォアグラウンド復帰の塗り替えを省くと
+	    E2で直したばかりの「ホーム画面のstateが古いまま」バグがそのまま再発する。
+	    アカウント画面での操作も、日数ではなく同一セッション内（購入直後に
+	    ホームへ戻って遮断される、等）の即時不整合を防ぐためのものであり、
+	    どちらも省略不可と判断した。
+	  ・洗い直しの結果、src/features/account/ui/InviteWatcher.tsxに更新漏れを
+	    発見した。起動時・フォアグラウンド復帰時に、招待への合流やcheckForInvite
+	    内の自動account作成（bootstrap.ts#doCheckForInvite）でaccountIdが
+	    静かに変わるのに、entitlementCacheを一切更新していなかった。
+	    HomeScreen.tsx側の同じタイミングのリスナーに結果的に拾われることを
+	    期待する作りは非同期の完了順序が保証されずレースになるため、
+	    InviteWatcher.tsx自身のrun()の最後で明示的に塗り替えるようにした。
+	  ・この過程で、entitlementの再計算＋メモリ書き込みのロジックを
+	    HomeScreen.tsxとInviteWatcher.tsxの2箇所に重複させていたのをやめ、
+	    entitlementCache.tsにrefreshCachedEntitlement()として一本化した
+	    （HomeScreen.tsxのrefreshEntitlement()は、これを呼んで画面のstateに
+	    反映するだけの薄いラッパーになった）。
+	003_002_flow.txt「利用状態の判定」の対応コード・塗り替えるタイミングの一覧に、
+	InviteWatcher.tsxとrefreshCachedEntitlementへの一本化を追記した。
+
+
+================================================================================
+対応済みtodo（実機テスト後の整理）
+================================================================================
+
+•	firestore の accounts/{accountId}.status の削除。
+	createAccount.ts で "active" を書き込むだけで、読む箇所が一つも無かった
+	（サーバー・アプリとも accounts から読むのは ownerUid だけ。firestore.rules・
+	firestore.indexes.json にも条件無し。デスクトップ側もまだ accounts に触らない）。
+	利用状態は subscriptions の事実から都度計算する方針（003_001「利用状態の基本
+	ロジック」）なので、今後も status を持たせる理由は無い。
+	  ・functions/src/account/createAccount.ts から status: "active" を削除。
+	    デプロイ・実機確認済み（新規 account は createdAt / ownerUid のみ）。
+	  ・003_001_plan.txt「データ構造の方向性」、003_002_flow.txt「FireMint Account作成」、
+	    003_008_test.txt B1 の期待値から status を削除。
+	  ・既存の accounts ドキュメントに残っている status は、読む箇所が無いので放置する。
+
+
+
+＊　サブ垢招待時のサブ垢端末のメッセージ
+    現状、アプリのバックグランドからの復帰でメッセージ表示。
+    →　画面遷移だけで招待を受けたい。
+	→　修正済。ＯＫ．
+
+
+
+================================================================================
+対応済みtodo（コードレビューで指摘。7件）
+================================================================================
+指摘の文面は、指摘した時点のまま（ファイル名・行番号は当時のもの）。
+各項目の「→」が、対応の結果。確認した章は 003_008_test.txt。
+
+
+＊　購入の横取り（高）: verifyAndroidPurchase.ts:57 は、既存の purchaseToken の accountId を呼び出し元のものに上書きします。Play の購入は端末の Play アカウントに紐づくので、同じ端末で別の Google でログインした owner B が「購入の復元」を押すと、A の契約が B に移ります。既存ドキュメントの accountId が違うなら拒否してください。
+
+    →　対応済み。別の account に記録済みの purchaseToken は、拒否する。H1 / H2 で OK。
+
+
+
+＊　退会時の解約失敗（中）: deleteAccountCore.ts:33 は Play 側の解約に失敗しても警告だけ出して削除を続けます。flow 文書は「成功を確認した後にのみ削除」と定めているので、purchaseToken を失ったまま課金だけが続く恐れがあります。「既に失効済み」だけを許容して、それ以外は中断するのが文書どおりです。
+
+    →　対応済み。解約に成功、または対象なしを確認できた後にだけ削除する。H3〜H6 で OK。
+
+
+
+＊　猶予期間のサーバー判定（中）: util.ts:36 の isAccountSubscribed は expiryTime しか見ず、
+    クライアントの computeEntitlement は猶予期間も契約中として扱います。
+    猶予期間中の owner が招待を受けると、課金中のまま account と subscription が削除されます（retireAccount.ts）。
+    D4 は skip のままで未検証です。
+
+    →　対応済み。isAccountSubscribed を、アプリ側の computeEntitlement と揃えた。I1〜I3 で OK。
+        （D4 は skip のまま。I1 は、Firestore の書き換えで猶予期間を作って確認した）
+
+
+＊　再インストール時の復元失敗（中）: bootstrap.ts:70 で recoverUid が通信エラーで落ちると、
+    匿名ユーザーだけが作られた状態になります。次回起動では isNewUser=false になって復元を試みず、新しいトライアルが始まります。
+
+    →　解消。recoverUid は廃止した（003_011_device.txt）。トライアルの起点は devices が持つので、
+        端末の登録に失敗しても、次の起動で登録し直すだけで、日付は変わらない。N7 で OK。
+
+
+＊　users の update ルール: firestore.rules:37 は email や deviceId の書き換えを許可しています。
+    招待ダイアログの ownerEmail は users/{ownerUid}.email から取るので、偽装できます。
+    更新できるキーを絞るか、サーバー側に寄せてください。
+
+    →　対応済み。更新できるのは email と name だけ（email は IDトークンの値に限る）。
+        招待ダイアログの email は、Firebase Auth のユーザー情報から取る。K1〜K4 で OK。
+        （users.deviceId は、その後 003_011_device.txt で廃止した）
+
+
+＊　メールアドレスの検証なし: addMember.ts:22 はメールアドレスをそのままドキュメントIDにしています。
+    / を含む値だと internal エラーになります。
+
+    →　対応済み。登録する前に、形式を確かめる。L1 / L2 で OK。
+
+
+
+＊　猶予期間と保留の区別: androidPublisher.ts:75 は paymentState === 0 を全部 IN_GRACE_PERIOD にします。
+    ON_HOLD も同じ値になるか、私の知識では断定できないので Play のドキュメントで確認してください。
+    同じなら、ON_HOLD でも利用できてしまいます（仕様は不可）。
+
+    →　対応済み。paymentState 0 は、期限で見分ける（期限が先 → IN_GRACE_PERIOD、
+        過ぎている → ON_HOLD）。M1 / M2 で OK（保留そのものは、実機では作れない）。
+
+
+
+
+
+
+
+
+＊　退会と、データ削除の違い。
+
+    →　OK
+        firemint_m_001_m_006_003
+        versionCode 27
+
+
+
+＊　google認証など、ローディングの導入
+
+    →　OK
+        firemint_m_001_m_006_004
+        versionCode 28
+
+
+
+＊　認証情報の保持に関して
+    現在は、
+    GoogleSessionStore.kt は、暗号化したファイルに書き込み。アプリを閉じても、端末を再起動しても残る。
+
+消えるタイミング
+接続側のサインアウトをした時（signOut が保存領域を空にします）。
+アプリのデータを消去した時、またはアンインストールした時。
+
+→　サインアウトでも保持した方が良いかな？？？？要件等。
+
+    →　OK
+        firemint_m_001_m_006_005
+        versionCode 29
+
+
+
+
+
+
+
+
+
+
+
+＊　ホスティングのurl構成が違う。基本を英語。
+    日本語ページは、urlに _jaを付けていたのに、AIに勝手に変えられた。
+
+    → OK
+
+
+
+
+
+
+
+＊　アカウント画面
+　　owner, memberの表示順序の入れ替え
+
+    →　OK
+
+
+
+
+
+＊　ownerとしての、サブ垢管理のUI
+　　ownerのアカウント画面。
+    サブ垢を登録済の状態で、メンバーを"外す"処理が先に必要なのに、メンバー追加がアクティブな現状
+    →　サブ垢を持っているなら、追加を非活性か、非表示に
+
+    →　OK
+        firemint_m_001_m_006_003
+        versionCode 27
+
+
+
+
+＊　メンバーのアカウント画面
+    "このアカウントから脱退する"
+    このメッセージの変更"このグループから脱退する"
+
+    →　OK
+        firemint_m_001_m_006_003
+        versionCode 27
+
+
+
+
+
+
+＊　データ削除後に、アカウント画面を開くと、firestore/device/expireAtが消去される
+
+    →　データ削除後に、アプリを落とす処理を入れる。
+    →　OK
+        firemint_m_001_m_006_003
+        versionCode 27
+
+
+
+
+
+＊　N7 初めての起動がオフラインだと、使えない。次の起動で登録される
+    トライアル期間　関連のメッセージが出ているので、ユーザーは迷うかも。
+
+    →　OK
+        firemint_m_001_m_006_003
+        versionCode 27
+
+
+
+
+＊　B6. 招待チェックがアプリ起動のたびに動く（InviteWatcher）
+    →　立ち上げ直後のメッセージが英語で表示された。言語設定を読み込む前だから？？？
+
+    →　OK
+        firemint_m_001_m_006_003
+        versionCode 27
+
+
+
+
+
+
+B4. 課金中は確認すら出ずに拒否される
+　前提: Bが自分のaccountで既に課金中（D2を先に実施しておく）
+　手順: Aが（別の）accountからBのemailをaddMember → Bでアプリを開く
+
+上記の動きなら、Ａ端末で招待を送る際に相手状況を確認する方がベターかも。
+
+    →　対応。Aが招待する時点で、相手が課金中なら「招待は受け付けられませんでした。」と出して、
+        登録しない（理由は伝えない）。functions/src/account/addMember.ts。
+    →　OK
+        firemint_m_001_m_006_006
+        versionCode 30
+
+
+
+
+
+
+

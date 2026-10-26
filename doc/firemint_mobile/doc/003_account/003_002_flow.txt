@@ -1,0 +1,922 @@
+
+Account Flow
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+
+
+
+
+
+
+
+================================================================================
+要点
+================================================================================
+
+• FireMintの利用者は、Firebase Authenticationで識別する。
+• 初回起動時はGoogleログインを必須とせず、匿名認証で開始する。
+• 「いま誰か」の正は、端末のFirebase Auth SDKのセッション。通常のアプリ再起動では作り直さない。
+• トライアルの起点（firstUseDate）は、端末（devices）が持つ。トライアルは端末ごと。
+　ログイン・合流・再インストール・データ削除では、リセットしない（003_011_device.txt）。
+• Android IDは、端末を見分けるためだけに使う。サーバーには、ハッシュにして devices のIDとして持つ。
+　端末初期化等で変わった場合は、別の端末として扱う。追加の指紋認証は行わない。
+• SQLiteは、表示を速くするためのキャッシュ。判定には使わない。
+• Firestoreのusers/{uid}は、Firebase AuthenticationのUIDと対応する。
+• usersはuid単位で管理する（匿名の間は端末単位、Googleログイン後はGoogleアカウント単位）。
+• accountsはFireMintの契約単位で管理する。ownerUidを持ち、owner判定はこの1フィールドで行う。
+• accounts/{accountId}/members/{uid}で、その契約に所属するGoogleアカウントを管理する。
+• 1つのFireMint契約に最大2個のGoogleアカウント（owner含む）を紐付ける。
+• member（サブ垢）の追加・削除はowner本人のみが行える。member自身には変更権限を与えない。
+• subscriptionsは契約の課金情報を管理する。課金権はaccount単位、Trial権は端末単位。
+• Androidの課金はGoogle Play、デスクトップの課金はStripeを使用する。
+• 課金経路の違いに関係なく、FireMint側でentitlement（利用権）を一元管理する。
+• Androidの解約はGoogle Play側の管理画面に依存し、FireMintはその導線を持たない。
+• Googleアカウントで認証した場合、そのGoogleが未使用なら、匿名ユーザーのuidのままGoogleユーザーに昇格する。
+　既に別のuidに紐づいているGoogleなら、そのuidに合流する（基本ルール2・3）。
+• 1つのGoogleアカウントは、必ず1つのuidに対応する。Googleログイン前のAndroidとデスクトップは別uidになり得るが、同じGoogleでログインすれば同じuidになる。
+• 同じGoogleアカウントで同じFireMint Accountに所属することで、Trialとは別に課金による利用権を共有する。
+• サインアップ／サインインの導線は分けない。Google認証1本で、そのGoogleが未使用なら昇格、既に別のuidに紐づいていれば合流になる（基本ルール2・3）。emailは、招待の照合に使う。
+• 本プロダクトは個人（または少人数での共同）利用を想定し、譲渡や大人数共有は想定しない。
+
+
+
+
+================================================================================
+フロー　　■ 起動時の判定順（全体像。以降の「初回起動」「通常起動」はこの詳細）
+================================================================================
+対応コード: src/features/account/native/bootstrap.ts（ensureUser/doEnsureUser）、
+            functions/src/account/registerDevice.ts（端末を登録する。003_011_device.txt）、
+            src/features/account/ui/AccountScreen.tsx・src/app/HomeScreen.tsx
+            （accountId のサーバーとの再照合）
+
+アプリ起動時に行う（基本ルール0）。
+
+① Firebase Auth SDK に、ログイン中のuidがあるか（正はここ。最初にここだけ見る）
+   │  ※ 先に validateSession で、そのセッションが有効かを確認する。
+   │    サーバー側でユーザーが削除されていた場合（別の端末でのデータ削除など）や、セッションが無いのに
+   │    キャッシュだけ残っている場合は、セッションもキャッシュも捨てて「無い」扱いにする。
+   │  ※ オフライン（validateSessionが呼べない）の場合は「無効」と決めつけない（決定）。
+   │    SQLiteキャッシュ（uid/accountId/この端末のfirstUseDate）を信じて、そのまま利用継続する。
+   │    subscriptionのexpiryTimeはSQLiteに無いため、accountId有りの人は「subscribedだろう」
+   │    という前提で継続させる（見た目だけの話。Firestoreへの実際の読み書きはFirebase Auth SDKの
+   │    IDトークンとfirestore.rulesで別途守られており、validateSessionを経ていなくても、
+   │    オンラインになった時点で正常に成立する。オフライン中の楽観判定によってデータが
+   │    不正に読み書きされることはない）。
+   │    オンライン復帰の検知に専用のネットワーク監視は用意しない。①〜③の再実行は、
+   │    アプリの起動（コールドスタート）と、フォアグラウンド復帰時にだけ行う。
+   │    プロジェクト一覧などの「コンテンツ更新ボタン」には挟まない（目的が違う。
+   │    高頻度・軽量な操作であり、account再チェックとは無関係）。
+   │
+   ├─ ある（有効） → そのuidで確定（匿名でもGoogleでも区別しない）。②へ
+   └─ 無い（初回起動・再インストール・データ消去・削除済み） → 匿名ユーザーを作る。②へ
+
+② SQLite に、このuidの写し（この端末の firstUseDate を含む）があるか
+   ├─ ある → 終わり（サーバーには聞かない）
+   └─ 無い → ③へ
+
+③ 端末を登録する（サーバーの関数。Android ID を渡す。003_011_device.txt）
+   ・devices/{deviceIdHash} が無ければ、firstUseDate = 今 で作る。あれば、日付はそのまま
+   ・devices に期限（expireAt）が入っていれば消す
+   ・devices が既にあった場合は、その端末に残っている古い匿名ユーザーを削除する
+   ・users/{uid} が無ければ作る。users/{uid}/devices に、この端末を足す
+   ・firstUseDate を返す。アプリは、SQLite に写す。終わり
+   ※ オフライン等で③が失敗した場合は、SQLite に写しが無いままになる。
+     この端末の日付が分からない間は、利用不可。次の起動で、③をやり直す。
+
+―― ここから先は、起動とは別の出来事（ユーザーの操作）――
+
+④ Googleでログイン
+     ├─ そのGoogleが未使用 → 今のuidのまま、Googleユーザーに昇格（基本ルール2）
+     └─ そのGoogleが既に別のuidに紐づいている → そのuidに合流（基本ルール3）
+            ・一時的な匿名ユーザーを、サーバー(discardAnonymous)で削除してから切り替える
+            ・切り替えた後に、③（端末を登録する）を行う（合流先の users/{uid}/devices に、この端末を足す）
+            ・端末のキャッシュを、サーバーの値で作り直す
+     続けて joinAccount（招待済みならその契約へ合流）→ 無ければ createAccount
+
+SQLiteは、uid の判定には使わない。①でuidが決まった後の写しにすぎない（基本ルール6）。
+accountId の正はサーバー（users/{uid}）。呼び出し元（AccountScreen.tsx/HomeScreen.tsx）が
+fetchUserDocument() で取得し、キャッシュと食い違えば updateCachedAccountId で更新する。
+この端末の firstUseDate は変わらないので、写しをそのまま使う。
+
+各ケースの結果:
+| ケース                               | ① | ②③                         | ④    | 結果                                   |
+|--------------------------------------|---|------------------------------|------|----------------------------------------|
+| 通常の再起動                         | 有 | 写しあり                     | —    | セッションのuidをそのまま使う          |
+| 初めての起動                         | 無 | 登録（devices を作る）       | —    | 新しい匿名ユーザー、この端末のトライアル開始 |
+| 匿名のまま再インストール             | 無 | 登録（devices は既にある）   | —    | 新しい匿名ユーザー。前の匿名ユーザーは削除。トライアルは続く |
+| Googleログイン済みで再インストール   | 無 | 登録（devices は既にある）   | 合流 | 新しい匿名 → ログインで元のuidに合流。トライアルは続く |
+| データ削除の後                 | 無 | 登録（devices は既にある。期限を消す） | — | 新しい匿名ユーザー。トライアルは続く |
+| ownerのデータ削除後の、他memberの端末        | 有（uid/Authは削除されない） | 写しあり | — | セッションはそのまま。accountIdがnullになっているため、次のjoinAccount呼び出し時（InviteWatcher、またはAccountScreen.tsxのbootstrap()）に、招待が無ければ自動で自分だけのaccountが作られる |
+
+
+================================================================================
+フロー　　■ 初回起動：Android（起動時の判定順の詳細）
+================================================================================
+対応コード: src/features/account/native/bootstrap.ts（doEnsureUser）、
+            android/.../account/AccountModule.kt（signInAnonymously）、
+            functions/src/account/registerDevice.ts
+
+パターンＡ（その端末で初めての起動）
+アプリ起動
+↓
+Firebase Auth SDK にログイン中のuidが無い（validateSession で無効の場合も同じ）
+↓
+匿名ユーザーを作る（匿名認証。Firebase Auth UIDを取得）
+↓
+Android IDを取得し、端末を登録する（サーバーの関数）
+↓
+サーバーが作る
+├─ devices/{deviceIdHash}
+│    └─ firstUseDate = 現在日時（サーバー時刻）
+├─ users/{uid}
+│    ├─ email = ""、name = ""
+│    ├─ platform = android
+│    └─ accountId = null
+└─ users/{uid}/devices/{deviceIdHash}
+↓
+返ってきた firstUseDate を、SQLiteに写す（キャッシュ）
+↓
+この端末の、60日間のTrial開始
+↓
+FireMint利用開始
+
+
+
+
+
+
+パターンＢ（アプリ再インストール。匿名のまま）
+アプリ起動
+↓
+Firebase Auth SDK にログイン中のuidが無い
+↓
+匿名ユーザーを作る（新しいuid）
+↓
+Android IDを取得し、端末を登録する
+↓
+devices/{deviceIdHash} は既にある。firstUseDate は、そのまま
+↓
+サーバーが、前の匿名ユーザー（Firebase Auth・users・その一覧）を削除する
+↓
+サーバーが、新しい users/{uid} と users/{uid}/devices/{deviceIdHash} を作る
+↓
+返ってきた firstUseDate を、SQLiteに写す。Trialは続く（リセットしない）
+↓
+通常起動のフローへと移る
+
+
+
+
+
+
+パターンＣ（アプリ再インストール。Googleログイン済みだった）
+アプリ起動 → パターンＢと同じく、新しい匿名ユーザーで始まる（Trialは続く）
+↓
+ユーザーがGoogleでログイン → 元のuidに合流（後述「匿名ユーザー→Google認証」の合流）
+
+
+
+
+
+
+パターンＤ（データ削除の後）
+アプリ起動 → パターンＢと同じ。devices/{deviceIdHash} に入っていた期限（expireAt）は、ここで消える
+※ データ削除の直後は、アプリを閉じる。同じ起動のままでは、ここへ来ない（003_012_datadel.txt）
+
+
+※初回起動の処理（匿名認証・端末の登録）は、アプリの起動時に行う（基本ルール0）。
+　アカウント画面を開いた時ではない。
+
+
+
+
+
+
+
+================================================================================
+フロー　　■ 通常起動：Android
+================================================================================
+対応コード: src/features/account/native/bootstrap.ts（doEnsureUser）、
+            src/features/account/native/entitlement.ts（fetchEntitlement）、
+            src/features/account/ui/InviteWatcher.tsx（フォアグラウンド復帰時のjoinAccount再実行）
+
+アプリ起動
+↓
+Firebase Auth SDK のセッションを確認（validateSession。サーバー側で削除済みなら無効）
+↓
+有効 → そのuidで確定（匿名でもGoogleでも区別しない）
+↓
+firestore/users/{uid}を取得し、SQLiteの写しを作り直す
+↓
+users/{uid}.accountId を確認
+　（accountId の正はサーバー(Firestore)。ローカルSQLiteのキャッシュと食い違えば、
+　　サーバーの値でキャッシュを更新する）
+├─ accountId 無し → Trialのみで利用可否判定（この端末の firstUseDate + 60日）
+└─ accountId 有り → 最新のsubscription（expiryTime降順で1件）を確認
+↓
+利用状態を判定（後述「利用状態の判定」フロー）
+↓
+未契約（subscribed でない）かつ accountId 有りの場合は、
+Google Play側に既存の購入が無いかを自動で確認する（後述「購入の復元」）
+↓
+FireMint利用継続
+
+※セッションが無効・無い場合は、上の「初回起動」のフローになる。
+※Googleユーザーの場合のみ、①〜上記の一連の処理とは並行して（順番待ちせず）、
+　バックグラウンドで joinAccount も呼ぶ。詳細は下の「※招待チェックは非同期」を参照。
+※ローカルキャッシュだけを信用しない理由:
+　Googleログインで契約(account)が作られた直後にキャッシュを更新し忘れると、
+　画面を開き直した時に「契約が無い」表示になる不具合が実際に起きたため。
+※招待チェックは非同期（決定）:
+　joinAccount（招待の有無をemailで横断検索するCloud Function）は、Googleユーザーなら
+　毎回のアプリ起動で呼ぶが、起動をブロックしない。UIはローカルキャッシュ（SQLite）の値で
+　先に表示してしまい、joinAccountはバックグラウンドで裏から呼ぶ。
+　招待が見つかった時だけ、後乗せでフラッシュメッセージ（「〇〇さんのFireMintに参加しますか？」）
+　を表示する。招待は緊急性が低いため、起動を遅くしてまで先に確認する理由が無い。
+※招待チェックのタイミング（決定）:
+　・アプリ起動時、フォアグラウンド復帰時（InviteWatcher.tsx）
+　・アカウント画面を開いた時（AccountScreen.tsxのbootstrap()。accountIdの有無に関係なく、
+　　Googleユーザーなら確認する。画面は先に表示し、確認は後から。招待があれば同じ確認
+　　ダイアログを出し、参加した場合は画面の表示を取り直す）
+　画面遷移のたびには確認しない（joinAccountはCloud Functionのため、呼び出し回数を抑える）。
+　起動直後にアカウント画面を開くと、上の2つが同時に動き得るが、確認ダイアログは
+　表示中に重ねて出さない（joinInvitePrompt.ts）。後から来た側は何もしない。
+
+
+
+
+
+
+
+================================================================================
+フロー　　■ 匿名ユーザー → Google認証（サインアップ／サインイン統一）
+================================================================================
+対応コード: android/.../account/AccountModule.kt（linkWithGoogle）、
+            functions/src/account/discardAnonymous.ts、
+            functions/src/account/joinAccount.ts（確認・照会のみ。合流は確定させない）、
+            functions/src/account/respondToInvite.ts（「参加する／参加しない」の応答を確定）、
+            functions/src/account/retireAccount.ts（乗り換え前の旧accountの片付け）、
+            src/features/account/ui/InviteWatcher.tsx（起動・フォアグラウンド復帰時の呼び出し）、
+            src/features/account/ui/AccountScreen.tsx（Googleログイン直後と、画面を開いた時の呼び出し）
+
+匿名ユーザーでFireMintを利用中
+↓
+Googleアカウントでログイン操作
+↓
+そのGoogleアカウントは、既に別のuidに紐づいている？
+├─ 紐づいていない（昇格）
+│     ↓
+│  今の匿名uidに、Google認証情報を紐付ける（uidは変わらない）
+│
+└─ 紐づいている（合流。別端末・再インストール後など）
+      ↓
+   一時的な匿名ユーザーを、サーバー(discardAnonymous)で削除
+   （Firebase Auth・users・その端末の一覧）
+      ↓
+   Googleでログインし直し、既存のuidに切り替える
+      ↓
+   端末を登録する（合流先の users/{uid}/devices に、この端末を足す）
+      ↓
+   端末のキャッシュを、サーバーの値（users/{uid}）で作り直す
+   （Trialは、この端末の日付のまま）
+↓
+続けて joinAccount（Cloud Functions）を呼ぶ。
+（Googleログイン済みの人は、ログインの時だけでなく、毎回のアプリ起動・フォアグラウンド
+　 復帰のたび（InviteWatcher）と、アカウント画面を開いた時にもここを行う。招待された時に
+　 既にログイン済みでも、次の起動かアカウント画面を開いた時に確認が出る）
+取得したemailで、既存accountのmembersに招待歴が無いか確認（emailでの検索）
+├─ 該当accountの members/{email}（招待の仮登録）が存在する
+│     ↓
+│  自分のaccountが課金中（subscribed）？
+│  （判定は「利用状態の判定」のsubscribedと同じ。期限が過去でも、猶予期間中なら
+│  　課金中として扱う。サーバー側の実装は functions/src/account/util.ts の
+│  　isAccountSubscribed で、アプリ側の computeEntitlement と揃える）
+│     ├─ YES → 招待は受けられない。確認は出さない。
+│     │        招待（owner側の members/{email}）は削除する（「参加しない」と同じ）。
+│     │        （もう一度招待したい場合は、owner側で再登録する）
+│     └─ NO  → joinAccountは{pendingInvite}を返すだけで、ここでは何も確定させない。
+│              UIが「参加しますか？」を表示し、応答は respondToInvite で確定させる
+│              （課金中でなければ、どんな場合も確認する）
+│  「〇〇さんのFireMintに参加しますか？」
+│     ├─ 参加する（respondToInvite({accept:true})）
+│     │     ↓
+│     │  「参加する」を押して初めて、乗り換え前の自分の所属を片付ける（押す前は、何も消さない。決定）。
+│     │  乗り換え前の自分の所属は、次のどちらか一方（両方が同時に成立することはない）。
+│     │    ・自分がowner だった　→　自分のaccountを削除する
+│     │      （削除の直前に、自分のaccountが課金中でないことをサーバーで再確認する）
+│     │      （accounts/{accountId} と、その members。サブ垢（2人目のmember）がいれば、その分も。
+│     │       サブ垢だった人の users/{uid}.accountId は、「メンバー脱退」と同じくクリアする。
+│     │       その人は、次の起動で、自動で自分のaccountを持つ。
+│     │       その accountId に紐づく subscriptions（課金中でないので、残っていても期限切れの履歴のみ）も削除する）
+│     │    ・自分が他account（ownerA側）の member だった　→　その旧account側の
+│     │      members/{uid}（自分自身のエントリ）を削除する（＝ownerA側から見て、
+│     │      自分が脱退したのと同じ状態にする。ownerA側のaccount本体・他member・
+│     │      subscriptionsには影響しない）
+│     │     ↓
+│     │  users/{uid}.accountId を該当accountIdに更新
+│     │     ↓
+│     │  members/{email} を members/{uid} に更新（emailフィールドは保持）
+│     │
+│     └─ 参加しない（respondToInvite({accept:false})）
+│           ↓
+│        members/{email}（招待）を削除する。
+│        （もう一度招待したい場合は、owner側で再登録する）
+│
+└─ 該当なし（新規の招待が無い場合。既に自分のuidで所属しているaccountがある場合も含む）
+      ↓
+   何もしない。自分が既にaccountを持っているかは users/{uid}.accountId で判定できるため、
+   ここでは探さない（joinAccountの検索対象は、常に「まだ自分のものになっていない、
+   新規の招待」だけに絞る。自分の既存エントリも同じemailでヒットしてしまうため、
+   検索結果からは自分のuidのドキュメントを除外する）
+      ↓
+   accountId が無ければ、「FireMint Account作成」が自動で行われる
+
+
+
+
+
+
+
+================================================================================
+フロー　　■ FireMint Account作成
+================================================================================
+対応コード: functions/src/account/createAccount.ts
+
+Googleログインした直後（標準）に、所属するaccountが無い場合、自動で作成される
+（Cloud Functions: createAccount。ユーザーが作成操作をするわけではない）。
+次の場合も同じく自動で作成するが、タイミングが2通りある。
+　・ログイン操作そのものの中で招待が見つかり、その場で「参加しない」を選んだ場合
+　　（AccountScreen.tsxのonLinkGoogle→joinOrCreateAccount経由）:
+　　同じログイン処理の中で、間を置かずその場でcreateAccountまで実行される
+　　（次回起動やフォアグラウンド復帰を待たない）。
+　・既にログイン済みの人が、後から招待され、フォアグラウンド復帰時の確認
+　　（InviteWatcher.tsx）で「参加しない」を選んだ場合、またはownerに外された場合
+　　（accountId をクリアされた場合）:
+　　その場ではcreateAccountを呼ばない（InviteWatcher.tsx側は辞退時に何もしない）。
+　　次回のアプリ起動かフォアグラウンド復帰時、checkForInviteが「招待なし・
+　　accountId空」を検知した時点で、改めて自動作成される。
+匿名ユーザーには作らない（Trialのみ）。
+↓
+accounts/{accountId} を作成
+├─ createdAt
+└─ ownerUid = 作成者のuid
+↓
+accounts/{accountId}/members/{uid} を作成
+├─ email
+└─ addedAt
+↓
+users/{uid}.accountId を作成したaccountIdに更新
+↓
+このAccountが契約・利用権（subscription）の単位となる
+↓
+Trial（60日）はこれまで通り端末単位で継続（この端末の firstUseDate）。account作成自体はTrial日数に影響しない
+
+
+
+
+
+
+
+================================================================================
+フロー　　■ 2つ目のGoogleアカウントを追加（owner操作）
+================================================================================
+対応コード: functions/src/account/addMember.ts（上限チェックはdb.runTransaction化済み）
+
+owner（ownerUidを持つ本人）が追加を実行
+↓
+owner以外からの追加操作は拒否
+↓
+追加対象のemailを入力
+↓
+メールアドレスの形式が正しい？（サーバー側で確認。前後の空白を取り、小文字にした上で、
+「@」が1つで前後に文字があり、「@」の後ろに「.」があり、空白と「/」を含まないこと）
+├─ 正しくない → エラー（「メールアドレスの形式が正しくありません。」）。登録しない
+└─ 正しい
+↓
+招待する相手は、課金中？
+（相手を Firebase Auth でメールアドレスから探し、その users/{uid}.accountId の account を、
+　joinAccount と同じ isAccountSubscribed で判定する。猶予期間中も課金中として扱う。
+　まだFireMintにGoogleログインしていない相手は、見つからないので、課金中ではない扱い）
+├─ 課金中 → エラー（「招待は受け付けられませんでした。」）。登録しない。
+│            理由は伝えない（相手の課金状況を、メールアドレスを入れるだけで知れてしまうため）
+└─ 課金中ではない
+↓
+memberが既に2件（owner含む）ある？
+├─ 有る → エラー（上限）
+└─ 無い
+      ↓
+   accounts/{accountId}/members/{email} を仮登録
+   ├─ email
+   └─ addedAt
+      ↓
+   （そのGoogleアカウントが後日ログインした時点で、
+     上記「匿名ユーザー→Google認証」フローの招待の確認（参加する／しない）を経て、
+     参加する場合に members/{email} が members/{uid} に更新される）
+
+※そのemailが他のaccountに所属しているか、などの確認（バリデーション）はしない。
+　（無関係な人をサブ垢にするメリットが無いため。本人が、招待を受ける時に参加の可否を決める）
+　例外は、上の「課金中」だけ（決定）。課金中の相手は、招待しても、相手の端末で確認を出さずに
+　招待が削除される。招待した側には何も伝わらず、後で一覧から消えているだけになるため、先に止める。
+　招待の後で相手が課金を始めることもあるので、joinAccount 側の拒否（確認を出さずに削除）は残す。
+※サブ垢の変更（入れ替え）は、古いmemberを外し（後述「メンバー脱退」）、新しいemailを仮登録する。
+　owner が触るのは、自分の account 配下の members と、その member の users/{uid}.accountId だけ。
+
+
+
+
+
+
+
+
+================================================================================
+フロー　　■ Androidで課金
+================================================================================
+対応コード: android/.../account/BillingModule.kt（purchaseSubscription）、
+            functions/src/billing/verifyAndroidPurchase.ts、
+            functions/src/billing/androidRtdnWebhook.ts（RTDN受信。REVOKED/voidedのexpiryTime
+            即時無効化に対応済み）
+
+前提（決定）: 購入ボタンは、匿名のままでは押せない（表示しない）。Googleログイン済み
+　　　　　　　　（＝accountId有り。Googleログイン直後に自動作成される）が前提。
+　　　　　　　　匿名のまま購入できてしまうと、subscriptions.accountId が null になり、
+　　　　　　　　「利用状態の判定」がaccountIdの無いuidとしてtrialだけを見るため、
+　　　　　　　　支払った記録がどの利用権にも結びつかない「孤児」になる。
+前提（決定）: 購入できるのは owner のみ（uid === accounts.ownerUid）。member には購入ボタンを
+　　　　　　　　表示しない。member が課金できてしまうと、後で脱退・メンバー交代した時に
+　　　　　　　　「もう使えないaccountの購入を、本人のクレカが払い続ける」問題が生まれるため、
+　　　　　　　　そもそも発生させない。owner判定はfetchAccountOwnerUid経由でクライアントに
+　　　　　　　　実装済み。サーバー側（verifyAndroidPurchase.ts）でも二重にチェックしている。
+↓
+ユーザーがAndroidから購入（Google Play Billing Library / Kotlin）
+↓
+Google Play側で購入完了 → purchaseToken を取得
+↓
+Cloud Functions(Node.js/TypeScript) へ purchaseToken を送信
+↓
+サーバー側で Android Publisher API を使い購入を検証
+↓
+サーバー側で acknowledge（購入から3日以内。行わないと自動返金される）
+↓
+検証OKなら subscriptions/{purchaseToken} を作成（ドキュメントID ＝ purchaseToken）
+├─ accountId = users/{uid}.accountId
+├─ provider = Google Play
+├─ purchaseToken
+├─ productId
+├─ expiryTime            ← 現在の請求期間の終了日時（事実）
+├─ lastNotificationType  ← 直近の通知種別（事実の記録）
+├─ createdAt
+└─ updatedAt
+↓
+このaccountIdに紐づく全member（全uid）の利用可否は、「利用状態の判定」フローで判定する
+↓
+Android / デスクトップの双方で利用可能
+↓
+※解約はGoogle Play側の管理画面から行う（FireMintは解約導線を持たない）
+↓
+※以後の状態変化（解約・支払い失敗・猶予期間等）は
+　Google Play Real-time Developer Notifications(RTDN) をCloud Functionsで受信し、
+　同じ subscriptions ドキュメントを更新する
+
+※購入トークン(purchaseToken)と subscriptions の対応:
+　1つの定期購入は、更新を何回繰り返しても purchaseToken は同じ1つのまま。
+　毎月の自動更新では、同じドキュメントの expiryTime が延びていくだけで、
+　件数は増えない。新しい purchaseToken（＝新しいドキュメント）ができるのは、
+　「解約 → 期限切れ → 再契約」をした時。
+　判定は expiryTime 降順の先頭1件だけを見るので、古い期限切れの記録が残っていても問題ない。
+
+※RTDNが検証より先に届くことがある（実測で約0.2秒）。
+　その場合、初回の SUBSCRIPTION_PURCHASED は「未知のトークン」として無視されるが、
+　初回は verifyAndroidPurchase 側が expiryTime を保存するので実害は無い。
+
+
+================================================================================
+フロー　　■ 購入の復元（既存の購入をFireMintへ反映し直す）
+================================================================================
+対応コード: android/.../account/BillingModule.kt（restorePurchase）、
+            src/features/account/ui/AccountScreen.tsx（restoreIfAny）
+
+「購入する」を押した時 / アカウント画面を開いた時 / Googleでログインした直後
+（いずれも、未契約の owner の場合）
+↓
+Google Play側の既存の購入を問い合わせる（queryPurchasesAsync）
+↓
+購入が有る？
+├─ 有る → その purchaseToken を Cloud Functions(verifyAndroidPurchase) に送って再検証
+│         （購入トークンをドキュメントIDにして上書き保存し、acknowledgeは未済の時だけ行うので、
+│           何度呼んでも安全）
+│         ↓
+│      その purchaseToken は、既に別のaccountの契約として記録されている？
+│      （subscriptions/{purchaseToken}.accountId が、呼び出し元のaccountIdと違う）
+│      ├─ YES → 拒否する（決定）。記録は書き換えない。復元も新規購入もできない。
+│      │        Playの購入は端末のPlayアカウントに紐づくため、同じ端末で別のGoogleで
+│      │        ログインしたownerが、他人の契約を自分のaccountへ付け替えるのを防ぐ。
+│      │        アカウント画面を開いた時の自動復元では何も表示せず、「購入する」を
+│      │        押した時だけ「別のFireMintアカウントで使用されています」と表示する
+│      └─ NO（同じaccount、または記録なし）→ 次へ
+│         ↓
+│      検証結果の expiryTime が未来？
+│      ├─ YES → 復元成功。新規購入はしない
+│      └─ NO  → 期限切れ。通常の新規購入に進む
+└─ 無い → 通常の新規購入に進む
+
+データ削除（owner）の後に残っている購入:
+　データ削除で、FireMint側の購入の記録（subscriptions）は消える。Google Play側の購入は、自動更新が
+　止まった状態で、支払い済みの期間の終わりまで残る。
+　その間に、同じPlayストアのアカウントの端末でログインした owner の account に、この復元で付く
+　（最初にログインした account。データ削除した本人かどうかは区別しない）。
+　期間が終わると切れる。更新はされない。
+
+この復元が必要な理由:
+　Google Play側の購入は成功したのに、FireMint側の検証が失敗した場合
+　（APIの未有効化、通信断など）、Playは「すでに購入済み」と返すため、
+　復元の経路が無いと、購入ボタンを押しても先へ進めなくなる。
+　再インストール・端末変更の場合も同じ経路で救える。
+
+注意（時間制限）:
+　購入から3日以内に acknowledge されないと、Googleが自動で返金・取り消しする
+　（SUBSCRIPTION_REVOKED / EXPIRED が届く）。検証が失敗したままにしない。
+
+
+
+
+
+
+
+================================================================================
+フロー　　■ デスクトップで課金
+================================================================================
+対応コード: このリポジトリには無い（別リポジトリ。003_004_構築.txt参照）
+
+前提（決定）: 購入ボタンは、匿名のままでは押せない（表示しない）。Googleログイン済み
+　　　　　　　　（＝accountId有り）が前提（理由はAndroidで課金と同じ）。
+前提（決定）: 購入できるのは owner のみ（理由はAndroidで課金と同じ）。
+↓
+ユーザーがデスクトップから購入（Stripe）
+↓
+Stripe Checkout / Customer Portal で購入完了
+↓
+Webhook等でFireMint側へ課金状態を反映
+↓
+subscriptions/{ID} を作成（IDの決め方はデスクトップ側で決定。Androidは purchaseToken）
+├─ accountId = users/{uid}.accountId
+├─ provider = Stripe
+├─ expiryTime            ← 現在の請求期間の終了日時（事実）
+├─ lastNotificationType  ← 直近の通知種別（事実の記録）
+├─ createdAt
+└─ updatedAt
+↓
+このaccountIdに紐づく全member（全uid）の利用可否は、「利用状態の判定」フローで判定する
+↓
+Android / デスクトップの双方で利用可能
+↓
+※解約はFireMint側で用意するStripe管理画面から行う（操作権限は別途要検討）
+
+
+
+
+
+
+
+================================================================================
+フロー　　■ 利用状態の判定
+================================================================================
+対応コード: src/features/account/native/entitlement.ts（computeEntitlement/fetchEntitlement。
+            猶予期間の判定（isGracePeriod）に対応済み）、
+            src/features/account/native/entitlementCache.ts（ゲートが参照する、
+            プロセス内メモリだけのentitlementの写し。SQLite/Firestoreではない。
+            getCachedEntitlement/setCachedEntitlementに加えて、再計算とこの
+            メモリへの書き込みを一本化したrefreshCachedEntitlementを持つ。
+            HomeScreen.tsxとInviteWatcher.tsxの両方がこの1つの関数を呼ぶ。
+            ロジックを画面ごとに重複させると更新漏れの元になるため、あえて
+            ここに集約してある）、
+            src/app/HomeScreen.tsx（判定結果を実際に使ってFireMint本体の機能を遮断する
+            唯一の箇所。GATED_CARD_IDS。AccountScreen.tsxは表示のみで、遮断はしていない）、
+            src/features/account/ui/AccountScreen.tsx（購入・脱退・合流など、
+            entitlementが変わり得る操作の直後にentitlementCacheを更新する）、
+            src/features/account/ui/InviteWatcher.tsx（招待への合流・自動account作成の
+            直後にrefreshCachedEntitlementを呼ぶ。下記「塗り替えるタイミング」の
+            「合流」に対応）
+            ※ホーム画面のカード並び順を決定: 「アカウント」（firemintアカウント。課金・
+            トライアル）を左上に、「認証」（firestoreアカウント。外部Firestore接続）は
+            下に配置する（テスト中に発生した混同を受けての対応）
+
+            ※決定（E4見直し。旧「不明なら遮断しない」案の置き換え）:
+            「不明なら遮断しない」はやめる。許可（trial/subscribed）の時だけ、
+            認証・プロジェクト一覧・インポート/エクスポート・スニペットへ進む。
+            門の正はメモリ上（entitlementCache）のentitlement。SQLiteには、uid/accountId/
+            この端末のfirstUseDateという「事実」だけを置き、entitlementという「判定結果」は
+            持たせない。
+              カード押下時の順:
+              ・メモリで通過（trial/subscribed）→ そのまま進む（ネット待たない）
+              ・メモリでNG（expired）→ サーバーで確認し直す。復活していれば通す。
+                切れなら止める
+              ・メモリが無い（null）→ サーバーで取得する。許可が取れなければ入れない
+            通過側のメモリが多少古いことは許容する（課金切れでも1〜2日程度のずれは可）。
+            そのためメモリの更新をサボると穴になる。少なくとも次のタイミングで塗り替える:
+              ・起動時（HomeScreenマウント時）
+              ・フォアグラウンド復帰時（AppState。HomeScreen.tsxとInviteWatcher.tsxの
+                両方にリスナーがある。ホーム画面に戻ってきても、画面遷移では
+                unmountされないため、起動時の1回だけでは古くなっていく＝必須）
+              ・アカウント画面での購入・脱退・合流など（AccountScreen.tsxの
+                refreshEntitlement経由）
+              ・招待への合流・自動account作成（InviteWatcher.tsx経由。起動時・
+                フォアグラウンド復帰時にcheckForInviteの裏でaccountIdが変わり
+                得るため、HomeScreen側の同時リスナーに頼らず明示的に塗り替える）
+            一覧画面などページ内でのentitlement再判定は、今は必須にしない（門を
+            上記にすれば、機内モードで潜る穴は門で塞げるため）。
+            accountId無し（trialのみ）の人は、サーバーに聞かず、SQLiteにある
+            この端末のfirstUseDateだけで確定できる（ネットワーク不要）ため、オフラインでも
+            必ず判定できる。accountId有りの人のsubscription状態だけが、本当に
+            「サーバーに聞けないと分からない」対象になる。
+            （実機テストE2で、trialが切れてもホーム画面に戻った時に遮断されない
+            不具合が、E4で機内モードでゲートを素通りできる不具合が発覚し、
+            この決定に至った）
+
+users/{uid} を取得
+↓
+accountId を持つ？
+├─ NO  → Trialのみで判定
+│         この端末の firstUseDate + 60日以内？
+│         ├─ YES → trial → 利用可能
+│         └─ NO  → expired → 利用不可
+│
+└─ YES → accounts/{accountId} に紐づく最新のsubscription（expiryTime降順で1件）が有効？
+          　（有効 ＝ expiryTime が未来。
+          　　未来でなければ、lastNotificationType が猶予期間系（IN_GRACE_PERIOD等）かで判定。
+          　　保留（ON_HOLD）は猶予期間ではないので、利用不可。
+          　　Google Playの paymentState 0（支払い保留）は、猶予期間と保留の両方で返るため、
+          　　verifyAndroidPurchase がラベルを付ける時は、期限で見分ける
+          　　（期限が先 → IN_GRACE_PERIOD、過ぎている → ON_HOLD。androidPublisher.ts）。
+          　　RTDN側は、通知の種類がそのままラベルになる（SUBSCRIPTION_IN_GRACE_PERIOD /
+          　　SUBSCRIPTION_ON_HOLD））
+          ├─ YES → subscribed → 利用可能
+          └─ NO  → この端末の firstUseDate + 60日以内？
+                    ├─ YES → trial → 利用可能
+                    └─ NO  → expired → 利用不可
+
+※ Trial判定は、いま使っている端末の firstUseDate（devices。SQLite の写し）で行う。
+　 同じGoogleアカウントでも、端末ごとに残り日数が違う（003_001_plan の基本ルール5）。
+　 課金（subscribed）判定のみaccount単位で共有される。
+※ 画面の文言は「この端末のトライアル 残り○日」。
+
+
+
+
+
+================================================================================
+フロー　　■ データ削除
+================================================================================
+対応コード: functions/src/account/deleteAccount.ts、
+            functions/src/account/deleteAccountCore.ts（deleteAccountAndAllData。owner分岐の実体）、
+            functions/src/account/deleteMyData.ts（member/未所属分岐）、
+            src/features/account/ui/AccountScreen.tsx（確認・二重確認のモーダル・端末側の後始末）
+            functions/src/account/devices.ts（端末の期限・一覧・ハッシュの共通処理。003_011_device.txt）
+画面・確認の文面・端末側の後始末の詳細は 003_012_datadel.txt。
+
+入口は1つ（画面の「データ削除」ボタン。owner・member・匿名で共通）。
+中身は、申請者が owner か member か未所属かで分かれる（実体はここに書く3分岐だけ。
+以前は、owner を「退会」、それ以外を「自分のデータを削除」と呼び分けていた。今は呼び分けない）。
+
+画面のボタンと確認（決定）:
+　・ボタンは「データ削除」の1つ。
+　・Googleログイン済み（owner / member）は、二重確認。1回目は通常の確認、2回目は、自分の
+　　Googleアカウントのメールアドレスを入力させる（一致するまで実行できない）。
+　・匿名は、メールアドレスが無いので、1回の確認だけ。
+　・owner は deleteAccount、それ以外は deleteMyData を呼ぶ。サーバー側（deleteMyData）の owner
+　　分岐は残す（画面を通さずに呼ばれた時も、Google Play の解約 → 削除の順序を守るため）。
+　・owner かどうかの確認が済むまでは、ボタンを出さない（owner を member として扱わないため）。
+
+申請者は誰か？
+│
+├─ owner（accountを持っている）
+│     ↓
+│  確認ダイアログ（二重確認。googleアカウント名をユーザーに入力させる。猶予期間は設けず、確定後は即削除）
+│  契約中の場合は、1回目の確認に、次を表示する:
+│  「お支払い済みの期間は、もう一度ログインすると、期間の終わりまでご利用いただけます。
+│  　その後の更新は行いません。」
+│     ↓
+│  確定
+│     ↓
+│  Cloud Functions を呼び出し、accountId を渡す
+│     ↓
+│  accounts/{accountId} に紐づく subscriptions から
+│  provider = Google Play で、期限（expiryTime）がまだ先の purchaseToken を取得
+│  （期限切れの契約は、請求が既に止まっているので対象にしない）
+│     ↓
+│  対象の purchaseToken が存在する？
+│  ├─ YES → Android Publisher API で
+│  │         purchases.subscriptions.cancel を実行
+│  │         （今後の自動更新を停止。当該期間分の利用・返金は対象外）
+│  │         ↓
+│  │      成功を確認（決定: cancel がエラーなく返れば成功とみなす）
+│  │      ├─ 成功 → 次へ
+│  │      └─ 失敗 → Play側の状態を取り直す
+│  │                ├─ 既に解約済み（自動更新が止まっている）・失効済み → 成功と同じ扱い
+│  │                └─ それ以外 → 【データ削除を中断】。FireMint側のデータは何も削除しない。
+│  │                              端末に「解約できなかったので、もう一度試してください」と表示
+│  └─ NO  → （Google Play購入なし。デスクトップ/Stripeのみ、
+│            または未課金・期限切れの場合はこのステップをスキップ）
+│     ↓
+│  Google Play側の解約に成功、または対象なしを確認できた後にのみ、
+│  FireMint側データを削除
+│  ├─ owner本人の端末に期限を入れ、一覧を削除する（下の「端末の期限」）
+│  ├─ accounts/{accountId} を削除
+│  ├─ accounts/{accountId}/members 配下を全て削除
+│  ├─ subscriptions（このaccountIdに紐づく全件）を削除
+│  ├─ 他member（owner以外）の users/{uid}.accountId をクリア（削除はしない。メンバー脱退と同じ扱い）
+│  ├─ owner本人の users/{uid} を削除
+│  └─ Firebase Authのユーザー（owner本人のみ）も削除（Admin SDK）
+│     ↓
+│  削除完了
+│     ↓
+│  owner の端末は、下の「端末側の後始末」へ
+│     ↓
+│  他member の端末は、次回起動時、次のとおりに扱う
+│  　（accountId無しとして、まずトライアルのみで利用可否判定。その端末の firstUseDate が既に60日超なら、
+│  　　その時点で利用不可。続けて「FireMint Account作成」フローにより、自分だけの新しいaccount
+│  　　が自動作成される。新accountにsubscriptionsは無いため、トライアル切れなら要購入）
+│
+├─ member（owner以外。accountに所属中）
+│     ↓
+│  本人確認（いまFirebase Authでログイン中のuid本人であることの確認のみ。追加の本人確認は行わない）
+│     ↓
+│  確認ダイアログ（二重確認。ownerと同じく、googleアカウント名をユーザーに入力させる。
+│  猶予期間は設けず、確定後は即削除）
+│     ↓
+│  確定
+│     ↓
+│  本人の端末に期限を入れ、一覧を削除する（下の「端末の期限」）
+│     ↓
+│  accounts/{accountId}/members/{uid} を削除（自分自身のエントリのみ）
+│     ↓
+│  users/{uid} を削除、Firebase Authのユーザーも削除
+│     ↓
+│  account本体・owner・他member・subscriptionsには影響しない
+│     ↓
+│  本人の端末は、下の「端末側の後始末」へ
+│
+└─ accountに未所属（匿名 または Trial中のみ）
+      ↓
+   本人確認（いまFirebase Authでログイン中のuid本人であることの確認のみ。匿名でもGoogleでも同じ）
+      ↓
+   確認ダイアログ（即削除。猶予期間なし。匿名はメールアドレスが無いので、1回の確認だけ。
+   Googleログイン済みで未所属の人は、owner / member と同じ二重確認）
+      ↓
+   確定
+      ↓
+   本人の端末に期限を入れ、一覧を削除する（下の「端末の期限」）
+      ↓
+   users/{uid} を削除、Firebase Authのユーザーも削除（他に削除対象のデータなし）
+      ↓
+   本人の端末は、下の「端末側の後始末」へ
+
+端末側の後始末（3分岐とも共通。サーバーの削除が済んだ後。003_012_datadel.txt）
+　1. FireMintアカウントのセッションを捨てる（Firebase Auth のサインアウト）
+　2. firestoreアカウント（外部Firestoreへの接続）のセッションを消す
+　3. 端末の中の作業データを消す（SQLite: ユーザーの写し / 名簿 / スニペット / 設定。一時ファイル）
+　4. 完了の案内「データを削除しました。アプリを終了します。」（OKだけ）
+　5. OK → アプリのデータを丸ごと消して、アプリを閉じる
+　・ここから先は、失敗しても「削除できませんでした」と出さない。2 か 3 に失敗した時だけ、
+　　案内の文面を変えて、端末の設定からの消去（またはアンインストール）を頼む。
+　・次に開いた時は、新しい匿名ユーザーで「初回起動」のフローから始まる
+　　（Trialは、端末の日付のまま続く）。同じ起動のままでは、端末を登録し直さない。
+
+端末の期限（3分岐とも共通。003_011_device.txt）
+　削除する本人の一覧（users/{uid}/devices）にある端末を、1台ずつ見る。
+　├─ その端末が、他の Google アカウントの一覧にも入っている → 何もしない
+　└─ 他に誰もいない → devices/{deviceIdHash}.expireAt = 今 + 1年
+　・firstUseDate には触らない。
+　・その後、本人の一覧（users/{uid}/devices）を削除する。
+　・期限が入った端末で、また起動すると、期限は消える（端末を登録する時）。
+　　データ削除の直後は、アプリを閉じるので、消えるのは次の起動の時。
+　・期限を過ぎた devices は、Firestore の TTL が削除する。
+
+※ purchaseToken を先に取得・解約してから FireMint側データを削除する順序を厳守する（ownerの場合）。
+　 逆順にすると purchaseToken を失い、Google Play側を解約できなくなる。
+※ Stripe（デスクトップ）側の解約も、同じフローの中で合わせて実行する
+　（詳細な実装方法はデスクトップ側で決定）。
+※ owner以外のuid・Authユーザーは、owner申請の削除では消さない（決定。003_007_todo_done.txt 一覧の1番）。
+　 member本人・未所属本人が自分のデータを消したい場合は、上記の各自の分岐を使う。
+※「member自身にはメンバー構成を変更する権限を与えない」という通常運用の制約は、
+　 自分自身のデータ削除要請（法令に基づく権利行使）には適用しない。
+　 これは owner の承認なしに member 自身が実行できる、唯一の例外操作とする。
+※ member・未所属の削除は即時・不可逆。owner側と同様、猶予期間は設けない。
+※ ローカル（端末側 SQLite・firestoreアカウントのセッション・一時ファイル）のデータも、削除の実行と
+　 合わせて端末側で消去する（上の「端末側の後始末」）。
+※ データ削除をしても、トライアルはリセットされない（003_001_plan 基本ルール5）。
+
+
+
+================================================================================
+フロー　　■ メンバー脱退（owner操作 / 自己脱退）
+================================================================================
+対応コード: functions/src/account/removeMember.ts（自己脱退に対応済み）、
+            src/features/account/ui/AccountScreen.tsx（メンバー一覧・owner用「脱退させる」・
+            member用「脱退する」ボタン。自己脱退(onLeaveAccount)はremoveMember実行後に
+            checkForInviteを呼び、招待が無ければその場で自動的に新しいaccountに乗る）、
+            src/features/account/native/bootstrap.ts（checkForInvite。Googleログイン済みで
+            accountIdが空、招待も無い場合に自動でcreateAccountする判定はここに実装済み）
+
+入口は2つ。実処理（accountId クリア）は同じで、誰が引き金を引くかだけが違う（決定）。
+
+├─ owner操作（対象は自分以外の誰か）
+│     ↓
+│  owner が member 一覧から対象を選択（owner自身は対象外。owner自身が抜ける場合は「データ削除」フロー）
+│     ↓
+│  owner以外からの操作は拒否
+│
+└─ 自己脱退（対象は自分自身。UIは member 自身の画面にのみ「脱退する」ボタンを置く。
+             ownerには表示しない）
+      ↓
+   呼び出し元が、対象と同じuidであることのみ確認（owner権限は不要。deleteMyDataの
+   「本人による自分自身への操作はowner承認不要」と同じ考え方）
+      ↓
+   この端末のfirstUseDateが既に60日を超えている場合、脱退後すぐに利用不可になる旨を
+   確認ダイアログに明示する
+
+↓
+確認ダイアログ
+↓
+確定
+↓
+accounts/{accountId}/members/{uid} を削除（Cloud Functions: removeMember。
+対象が呼び出し元自身の場合はowner権限チェックをスキップし、それ以外は従来どおりowner権限を必須とする）
+↓
+そのmemberの users/{uid}.accountId をクリア（Cloud Functions。クライアントからは変更できない）
+（他人の users を書き換える唯一の例外。自分の account 配下のmemberの分だけ。
+　自己脱退の場合は、自分自身のusersを書き換えるだけなので、この例外には該当しない）
+↓
+対象memberの端末は、以後「accountId無し」として扱われる
+↓
+checkForInviteが（招待が無ければ）自動で新しいaccountを作る。
+├─ 自己脱退 → onLeaveAccountの中でremoveMember直後に同じ画面上で実行（即時）
+└─ owner操作で外された側 → その端末では操作が起きた瞬間はまだ検知できないため、
+    次回のアプリ起動・フォアグラウンド復帰（InviteWatcher）か、
+    アカウント画面を開いた時（AccountScreen.tsxのbootstrap()）に検知される
+↓
+新しいaccountが作られた時点でTrialのみで利用可否判定
+（この端末の firstUseDate + 60日以内なら利用可、超過していれば利用不可。
+　作成自体はTrial日数に影響しない）
+↓
+脱退したGoogleアカウントは、別のFireMint Accountへ新規に
+所属する、または新たにAccountを作成することが可能になる
+
+※ 課金（subscription）はaccount単位で管理されているため、
+　 脱退した member 自身がその課金を維持することはない。
+　 owner側のaccountに紐づくsubscriptionはそのまま残り、
+　 owner・残りのmemberはこれまで通り利用可能。
+※ 購入できるのはownerのみ（決定。「Androidで課金」参照）なので、
+　 「脱退させられたmemberが過去purchaserだった場合の課金の扱い」は起こり得ない
+　 （memberが購入者になること自体が無い）。
+
+
+
+
+
+
+================================================================================
+データの関係
+================================================================================
+
+Firebase Authentication
+│
+│ UID
+↓
+Firestore
+users/{uid}
+├─ devices/{deviceIdHash}（この人が使っている端末の一覧）
+│
+│ accountId
+↓
+accounts/{accountId}
+├─ ownerUid
+├─ members/{uid}
+│
+└─ ...
+
+subscriptions/{subscriptionId}
+│
+└─ accountId → accounts/{accountId}
+
+Android ID
+│
+│ SHA-256（サーバーが計算）
+↓
+devices/{deviceIdHash}
+├─ firstUseDate（Trial起点／端末単位。一度決まったら変わらない）
+└─ expireAt（データ削除から1年後。ふだんは無い。Firestore の TTL）
+※ サーバーだけが読み書きする。
+
+
+
+
+
+
+================================================================================
+注記
+================================================================================
+
+＊２	Android ID は「署名鍵ごと」に別の値になる（Android 8以降の仕様）。
+	デバッグ版 / 自前署名のリリース版 / Playストア版（Play App Signing）は、
+	同じ端末でも別の端末として扱われる（devices も、トライアルも別）。
