@@ -58,7 +58,8 @@ simple/query                                モードタブ
 
 
 
-
+firemintアカウント          firemintを操作する権限。googleアカウントを使用。課金を管理。２アカウントまで使用可。
+firebaseアカウント          firebaseを操作する権限。googleアカウントを使用。複数アカウント使用可。
 
 
 
