@@ -235,9 +235,23 @@ import / export
                     "9007199254740993" も元の文字列で受け取れる。
                     JSON.rawJSON("1.0") は 1.0 と書き出される。
 
+＊　確かめたこと（本番、テスト用プロジェクト mintfarm-b62db、scripts/exp_number_type_prod.mjs）
+    v1 クライアントを、サービスアカウントの JSON で繋ぐ。
+      new v1({ credentials: { client_email, private_key }, projectId })
+    通信は gRPC と REST の両方で試し、結果は同じ。
+      REST  new v1({ ...同じ, fallback: 'rest' }, require('google-gax/build/src/fallback'))
+            （アプリの preferRest: true と同じ方式）
+    v1 で書く      doubleValue 1 は小数 1.0 のまま残る。integerValue "9007199254740993" は桁どおり残る。
+                   マップ・配列の中も型が残る。NaN も残る。
+    useBigInt で読む   整数は BigInt、小数は number。マップ・配列の中も同じ。
+                   （preferRest: true の通常の API で読んだ）
+    batchWrite      既にあるドキュメントへの追記は code=6（ALREADY_EXISTS）。他の書き込みは道連れにならない。
+                    無いドキュメントへの追記は code=0。
+                    上書きは code=0 で、ドキュメントが置き換わる。
+    書き込みは _firemint_exp の下だけ。最後に全部消した（残り 0 件）。
+
 ＊　まだ確かめていないこと
-    本番の Firestore での動き。
-    v1 クライアントを、サービスアカウントの JSON / Google ログイン（OAuth）の認証で繋ぐこと。
+    v1 クライアントを、Google ログイン（OAuth）の認証で繋ぐこと。
 
 
 
