@@ -1,11 +1,8 @@
-import type { EnvironmentKind } from '@shared/safety/environment'
-
 export type ConnectResult =
   | {
       ok: true
       projectId: string
       clientEmail: string
-      environment: EnvironmentKind
       rootCollections: string[]
       authType?: 'serviceAccount' | 'google' | 'emulator'
     }
@@ -17,7 +14,6 @@ export type ConnectResult =
 export type ConnectionStatus = {
   projectId: string
   clientEmail: string
-  environment: EnvironmentKind
   readOnly: boolean
   authType?: 'serviceAccount' | 'google' | 'emulator'
   /** Native Firestore でないとき。read-only とは別 */

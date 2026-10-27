@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { ConnectResult, ConnectionStatus } from '@features/connection/shared/types'
 import { workspaceAuthLabel, type WorkspaceState } from '@features/workspace/shared/types'
-import EnvironmentBadge from '@shared/ui/EnvironmentBadge'
 
 type ConnectionPanelProps = {
   onConnected?: () => void
@@ -252,8 +251,7 @@ function ConnectionPanel({
       {status && (
         <div className="connection-panel__status">
           <p>
-            プロジェクト: <strong>{status.projectId}</strong>{' '}
-            <EnvironmentBadge environment={status.environment} />
+            プロジェクト: <strong>{status.projectId}</strong>
           </p>
           <p>
             {status.authType === 'emulator'
@@ -263,11 +261,6 @@ function ConnectionPanel({
                 : 'サービスアカウント'}
             : {status.clientEmail}
           </p>
-          {status.environment === 'production' && (
-            <p className="connection-panel__warning">
-              本番プロジェクトに接続しています。操作に注意してください。
-            </p>
-          )}
           {status.writeBlockedReason && (
             <p className="connection-panel__warning">{status.writeBlockedReason}</p>
           )}

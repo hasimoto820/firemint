@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { useFieldAutocompleteItems } from '@features/autocomplete/renderer/hooks'
-import type { EnvironmentKind } from '@shared/safety/environment'
 import type { DiffPreviewItem } from '@features/bulk_operations/shared/types'
 import {
   buildDestructiveConfirmMessage,
@@ -17,7 +16,6 @@ import DiffPreviewPanel from '@shared/ui/DiffPreviewPanel'
 
 type BulkActionsPanelProps = {
   projectId: string
-  environment: EnvironmentKind
   selectedPaths: string[]
   loading: boolean
   onLoadingChange: (loading: boolean) => void
@@ -28,7 +26,6 @@ type BulkActionsPanelProps = {
 
 function BulkActionsPanel({
   projectId,
-  environment,
   selectedPaths,
   loading,
   onLoadingChange,
@@ -80,7 +77,7 @@ function BulkActionsPanel({
       return
     }
 
-    const message = buildDestructiveConfirmMessage('update', selectedPaths.length, environment)
+    const message = buildDestructiveConfirmMessage('update', selectedPaths.length)
     if (!(await confirmAction(message))) {
       return
     }
@@ -112,7 +109,7 @@ function BulkActionsPanel({
   }
 
   const handleDelete = async (): Promise<void> => {
-    const message = buildDestructiveConfirmMessage('delete', selectedPaths.length, environment)
+    const message = buildDestructiveConfirmMessage('delete', selectedPaths.length)
     if (!(await confirmAction(message))) {
       return
     }

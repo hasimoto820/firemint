@@ -1,5 +1,3 @@
-import type { EnvironmentKind } from './environment'
-
 export const FIRESTORE_BATCH_LIMIT = 500
 
 export type OperationEstimate = {
@@ -75,15 +73,10 @@ export function formatBatchMessage(itemCount: number, batchSize = FIRESTORE_BATC
 
 export function buildDestructiveConfirmMessage(
   action: 'delete' | 'update',
-  count: number,
-  environment: EnvironmentKind
+  count: number
 ): string {
   const actionLabel = action === 'delete' ? '削除' : '一括更新'
   const batchInfo = formatBatchMessage(count)
-  const productionWarning =
-    environment === 'production'
-      ? '\n\n⚠ 本番プロジェクトです。本当に実行しますか？'
-      : ''
 
-  return `${count} 件のドキュメントを${actionLabel}します。\n${batchInfo}${productionWarning}`
+  return `${count} 件のドキュメントを${actionLabel}します。\n${batchInfo}`
 }

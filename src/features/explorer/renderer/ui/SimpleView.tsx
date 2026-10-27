@@ -809,7 +809,6 @@ function SimpleView({
                 !readOnly && bulkSelectedPaths.size > 0 ? (
               <BulkActionsPanel
                 projectId={projectId}
-                environment={status.environment}
                 selectedPaths={Array.from(bulkSelectedPaths)}
                 loading={loading}
                 onLoadingChange={setLoading}

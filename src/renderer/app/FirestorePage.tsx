@@ -13,7 +13,6 @@ import type { WorkspaceEntry } from '@features/workspace/shared/types'
 import type { EmulatorPageMode } from '@features/emulator/shared/types'
 import { DEFAULT_EMULATOR_HOST } from '@features/connection/shared/emulator'
 import { useT } from '@shared/i18n/renderer/I18nProvider'
-import { detectEnvironment } from '@shared/safety/environment'
 import { confirmAction } from '@shared/ui/confirmAction'
 import CollectionCreateDialog from '@features/explorer/renderer/ui/CollectionCreateDialog'
 import CollectionRenameDialog from '@features/explorer/renderer/ui/CollectionRenameDialog'
@@ -139,7 +138,6 @@ function connectionStatusForTab(
   return {
     projectId: tab.projectId,
     clientEmail: focused.clientEmail,
-    environment: detectEnvironment(tab.projectId),
     readOnly: entry?.readOnly ?? false,
     authType: entry?.authType,
     writeBlockedReason: writeBlockedReasons[tab.projectId] ?? null

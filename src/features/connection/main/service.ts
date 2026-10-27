@@ -6,7 +6,6 @@ import {
 } from '@shared/firestore/client'
 import { formatUnavailableFirestoreMessage } from '@shared/firestore/native_check'
 import { logError, logInfo, logWarn } from '@shared/logging/logger'
-import { detectEnvironment } from '@shared/safety/environment'
 import {
   addEmulatorEntryAndLoad,
   addEntryAndLoad,
@@ -168,7 +167,6 @@ export async function connectWithServiceAccountFile(filePath: string): Promise<C
     logFirestoreState('after initializeApp')
 
     const rootCollections = await listRootCollectionsWithTimeout(entry.id)
-    const environment = detectEnvironment(entry.id)
 
     logInfo(
       'connection',
@@ -181,7 +179,6 @@ export async function connectWithServiceAccountFile(filePath: string): Promise<C
       ok: true,
       projectId: entry.id,
       clientEmail: info?.clientEmail ?? '',
-      environment,
       rootCollections,
       authType: 'serviceAccount'
     }
@@ -248,7 +245,6 @@ export async function connectWithGoogleProject(
 
     const entry = addResult.data
     const rootCollections = await listRootCollectionsWithTimeout(entry.id)
-    const environment = detectEnvironment(entry.id)
     const info = getConnectionInfo(entry.id)
 
     logInfo(
@@ -260,7 +256,6 @@ export async function connectWithGoogleProject(
       ok: true,
       projectId: entry.id,
       clientEmail: info?.clientEmail ?? input.accountEmail,
-      environment,
       rootCollections,
       authType: 'google'
     }
@@ -308,7 +303,6 @@ export async function connectWithGoogleAccount(
     }
 
     const rootCollections = await listRootCollectionsWithTimeout(focusedProjectId)
-    const environment = detectEnvironment(focusedProjectId)
     const info = getConnectionInfo(focusedProjectId)
 
     logInfo(
@@ -320,7 +314,6 @@ export async function connectWithGoogleAccount(
       ok: true,
       projectId: focusedProjectId,
       clientEmail: info?.clientEmail ?? input.accountEmail,
-      environment,
       rootCollections,
       authType: 'google'
     }
@@ -361,7 +354,6 @@ export async function connectWithEmulator(input: EmulatorConnectInput): Promise<
       ok: true,
       projectId: entry.id,
       clientEmail: info?.clientEmail ?? entry.emulatorHost ?? '',
-      environment: 'development',
       rootCollections,
       authType: 'emulator'
     }
@@ -406,10 +398,6 @@ export function getConnectionStatus(): ConnectionStatus | null {
   return {
     projectId: focused.projectId,
     clientEmail: focused.info.clientEmail,
-    environment:
-      focused.entry?.authType === 'emulator' || focused.info.authType === 'emulator'
-        ? 'development'
-        : detectEnvironment(focused.projectId),
     readOnly: focused.entry?.readOnly ?? false,
     authType: focused.info.authType ?? focused.entry?.authType,
     writeBlockedReason: getWriteBlockedReason(focused.projectId)
