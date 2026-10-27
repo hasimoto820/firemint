@@ -101,8 +101,7 @@ export const en: Record<string, string> = {
 
   'explorer.firestore': 'FIRESTORE',
   'explorer.open_title': 'Open a collection',
-  'explorer.open_hint':
-    'Pick a collection from the tree, or press Ctrl+P (⌘P) to open Command Palette.',
+  'explorer.open_hint': 'Select a collection of a project in the left tree.',
   'explorer.conflict.message':
     'This document was changed elsewhere since you opened it. Saving would overwrite those changes.',
   'explorer.conflict.overwrite_confirm':

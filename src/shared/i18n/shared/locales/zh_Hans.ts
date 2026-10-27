@@ -102,8 +102,7 @@ export const zhHans: MessageCatalog = {
 
   'explorer.firestore': 'FIRESTORE',
   'explorer.open_title': '请打开集合',
-  'explorer.open_hint':
-    '从左侧树中选择集合，或按 Ctrl+P（Mac: ⌘P）打开 Command Palette。',
+  'explorer.open_hint': '请在左侧树中选择项目的集合。',
   'explorer.conflict.message':
     '此文档在您打开后已被其他地方更新。若直接保存会覆盖那些更改。',
   'explorer.conflict.overwrite_confirm': '仍要用您的内容强制覆盖吗？（取消＝不覆盖）',

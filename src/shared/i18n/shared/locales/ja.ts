@@ -103,8 +103,7 @@ export const ja: MessageCatalog = {
 
   'explorer.firestore': 'FIRESTORE',
   'explorer.open_title': 'コレクションを開いてください',
-  'explorer.open_hint':
-    '左のツリーからコレクションを選ぶか、Ctrl+P（Mac: ⌘P）で Command Palette を開き、タブとして開けます。',
+  'explorer.open_hint': '左ツリーのプロジェクトで、コレクションを選択してください。',
   'explorer.conflict.message':
     'このドキュメントは開いたあとに他で更新されています。このまま保存するとその変更を上書きします。',
   'explorer.conflict.overwrite_confirm':

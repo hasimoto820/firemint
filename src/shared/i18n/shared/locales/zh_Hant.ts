@@ -102,8 +102,7 @@ export const zhHant: MessageCatalog = {
 
   'explorer.firestore': 'FIRESTORE',
   'explorer.open_title': '請開啟集合',
-  'explorer.open_hint':
-    '從左側樹狀目錄選擇集合，或按 Ctrl+P（Mac: ⌘P）開啟 Command Palette。',
+  'explorer.open_hint': '請在左側樹狀目錄中選擇專案的集合。',
   'explorer.conflict.message':
     '此文件在您開啟後已被其他地方更新。若直接儲存會覆寫那些變更。',
   'explorer.conflict.overwrite_confirm': '仍要用您的內容強制覆寫嗎？（取消＝不覆寫）',
