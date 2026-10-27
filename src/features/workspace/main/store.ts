@@ -25,7 +25,11 @@ function normalizeEntry(raw: Partial<WorkspaceEntry> & { id?: string }): Workspa
   }
 
   const authType =
-    raw.authType === 'emulator' ? 'emulator' : raw.authType === 'google' ? 'google' : 'serviceAccount'
+    raw.authType === 'emulator'
+      ? 'emulator'
+      : raw.authType === 'google'
+        ? 'google'
+        : 'serviceAccount'
 
   return {
     id: raw.id,
@@ -55,7 +59,6 @@ export async function loadWorkspaceStore(): Promise<WorkspaceStore> {
     const entries = parsed.entries
       .map((entry) => normalizeEntry(entry as Partial<WorkspaceEntry>))
       .filter((entry): entry is WorkspaceEntry => entry !== null)
-      .filter((entry) => entry.authType !== 'emulator')
 
     const entryIds = new Set(entries.map((entry) => entry.id))
     const focusedProjectId =
@@ -69,11 +72,7 @@ export async function loadWorkspaceStore(): Promise<WorkspaceStore> {
       : []
     const loadedProjectIds = [
       ...new Set(
-        loadedFromFile.length > 0
-          ? loadedFromFile
-          : focusedProjectId
-            ? [focusedProjectId]
-            : []
+        loadedFromFile.length > 0 ? loadedFromFile : focusedProjectId ? [focusedProjectId] : []
       )
     ]
 
@@ -93,12 +92,10 @@ export async function loadWorkspaceStore(): Promise<WorkspaceStore> {
 }
 
 export async function saveWorkspaceStore(store: WorkspaceStore): Promise<void> {
-  const entries = store.entries.filter((entry) => entry.authType !== 'emulator')
+  const entries = store.entries
   const entryIds = new Set(entries.map((entry) => entry.id))
   const focusedProjectId =
-    store.focusedProjectId && entryIds.has(store.focusedProjectId)
-      ? store.focusedProjectId
-      : null
+    store.focusedProjectId && entryIds.has(store.focusedProjectId) ? store.focusedProjectId : null
   const loadedProjectIds = store.loadedProjectIds.filter((id) => entryIds.has(id))
   const persisted: WorkspaceStore = {
     version: 1,

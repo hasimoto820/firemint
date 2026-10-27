@@ -67,7 +67,9 @@ import type {
 
 import type { ImportProjectProgress } from '@features/data_transfer/shared/types'
 import type {
-  OfficialImportInput,
+  ImportFileInfoResult,
+  ImportVerifyInput,
+  OfficialExportInput,
   OfficialImportValidationResult
 } from '@features/data_transfer/shared/official'
 
@@ -225,9 +227,15 @@ export type DataTransferIpcApi = {
     listener: (progress: ImportProjectProgress) => void
   ) => () => void
   selectOfficialDump: () => Promise<{ canceled: boolean; filePath: string | null }>
+  /** ファイルの形式と、エクスポート元のプロジェクト */
+  inspectImportFile: (filePath: string) => Promise<ImportFileInfoResult>
   validateOfficialImport: (
-    input: OfficialImportInput
+    input: ImportVerifyInput
   ) => Promise<OfficialImportValidationResult>
+  /** 保存するファイル（選んだフォルダ、無ければ Documents/FireMint ＋ 選んだファイル名、無ければ自動） */
+  defaultExportPath: (input: OfficialExportInput) => Promise<string>
+  /** 「名前を付けて保存」で、場所とファイル名を選ぶ。キャンセルは null */
+  chooseExportPath: (input: OfficialExportInput) => Promise<string | null>
 }
 
 export type TransportIpcApi = {

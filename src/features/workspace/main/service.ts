@@ -1,19 +1,25 @@
 import {
   disconnectFirestore,
   getConnectionInfo,
+  getFirestore,
   isFirestoreConnected,
   listConnectedProjectIds,
   listWriteBlockedReasons
 } from '@shared/firestore/client'
 import { getFocusedProjectId, setFocusedProjectId } from '@shared/firestore/focused'
-import { logError } from '@shared/logging/logger'
+import { logError, logInfo } from '@shared/logging/logger'
 import {
   connectEmulator,
   connectGoogleProject,
   connectServiceAccountFile,
   connectWorkspaceEntry
 } from '@features/connection/main/connect_entry'
-import { emulatorEntryId, parseEmulatorHost, resolveEmulatorProjectId, EMPTY_EMULATOR_PROJECT_ID } from '@features/connection/shared/emulator'
+import {
+  emulatorEntryId,
+  parseEmulatorHost,
+  resolveEmulatorProjectId,
+  EMPTY_EMULATOR_PROJECT_ID
+} from '@features/connection/shared/emulator'
 import {
   forgetGoogleToken,
   loadGoogleAccountProfile,
@@ -107,86 +113,6 @@ function upsertEntry(entry: WorkspaceEntry): void {
   store.entries.push(entry)
 }
 
-function emptyEmulatorOnHost(host: string): WorkspaceEntry | null {
-  const emptyId = emulatorEntryId(EMPTY_EMULATOR_PROJECT_ID)
-  const empty = getWorkspaceEntry(emptyId)
-
-  if (!empty || empty.authType !== 'emulator') {
-    return null
-  }
-
-  if (!empty.emulatorHost) {
-    return empty
-  }
-
-  try {
-    return parseEmulatorHost(empty.emulatorHost) === host ? empty : null
-  } catch {
-    return null
-  }
-}
-
-/** 同じホストの空の入れ物を、今回の projectId の行にする。別行は足さない。 */
-async function adoptEmptyEmulatorContainer(
-  host: string,
-  next: {
-    id: string
-    emulatorProjectId: string
-    label?: string
-    color?: string
-    readOnly?: boolean
-  }
-): Promise<WorkspaceEntry | null> {
-  const empty = emptyEmulatorOnHost(host)
-
-  if (!empty) {
-    return null
-  }
-
-  if (empty.id === next.id) {
-    return empty
-  }
-
-  const taken = getWorkspaceEntry(next.id)
-
-  if (isFirestoreConnected(empty.id)) {
-    await disconnectFirestore(empty.id)
-  }
-
-  if (taken) {
-    store.entries = store.entries.filter((item) => item.id !== empty.id)
-
-    if (store.focusedProjectId === empty.id) {
-      store.focusedProjectId = taken.id
-      syncFocusedFromStore()
-    }
-
-    return taken
-  }
-
-  const adopted: WorkspaceEntry = {
-    ...empty,
-    id: next.id,
-    emulatorHost: host,
-    emulatorProjectId: next.emulatorProjectId,
-    label: next.label?.trim() || `${next.emulatorProjectId} emulator`,
-    color: defaultWorkspaceEntryColor('emulator', {
-      existing: empty.color,
-      override: next.color
-    }),
-    readOnly: next.readOnly ?? empty.readOnly
-  }
-
-  store.entries = store.entries.map((item) => (item.id === empty.id ? adopted : item))
-
-  if (store.focusedProjectId === empty.id) {
-    store.focusedProjectId = adopted.id
-    syncFocusedFromStore()
-  }
-
-  return adopted
-}
-
 async function ensureConnected(entry: WorkspaceEntry): Promise<WorkspaceResult<WorkspaceEntry>> {
   try {
     await connectWorkspaceEntry(entry)
@@ -196,15 +122,62 @@ async function ensureConnected(entry: WorkspaceEntry): Promise<WorkspaceResult<W
   }
 }
 
+/** Emulator に聞く時の待ち時間。動いていない Emulator で立ち上げを止めない */
+const EMULATOR_CHECK_TIMEOUT_MS = 3000
+
+/**
+ * workspace の Emulator の ID を 1 つずつ調べる。
+ *   ルートのコレクションが無い  workspace から破棄する
+ *   ある                        つなぐ（ツリーに出る）
+ *   Emulator が答えない          調べられないので、つながずに残す
+ */
+async function checkEmulatorEntries(): Promise<void> {
+  const emulatorEntries = store.entries.filter((entry) => entry.authType === 'emulator')
+
+  for (const entry of emulatorEntries) {
+    const result = await ensureConnected(entry)
+    if (!result.ok) {
+      continue
+    }
+
+    let rootCount: number
+    try {
+      const collections = await Promise.race([
+        getFirestore(entry.id).listCollections(),
+        new Promise<never>((_resolve, reject) =>
+          setTimeout(() => reject(new Error('timeout')), EMULATOR_CHECK_TIMEOUT_MS)
+        )
+      ])
+      rootCount = collections.length
+    } catch (error) {
+      logError('workspace', `emulator check failed project_id=${entry.id}`, error)
+      await disconnectFirestore(entry.id)
+      continue
+    }
+
+    if (rootCount === 0) {
+      await disconnectFirestore(entry.id)
+      store.entries = store.entries.filter((item) => item.id !== entry.id)
+      logInfo('workspace', `emulator entry removed (no collections) project_id=${entry.id}`)
+    }
+  }
+}
+
 export async function initializeWorkspace(): Promise<void> {
   store = await loadWorkspaceStore()
+
+  await checkEmulatorEntries()
 
   const restoreIds = [
     ...new Set(
       [
         ...store.loadedProjectIds,
         ...(store.focusedProjectId ? [store.focusedProjectId] : [])
-      ].filter((projectId) => getWorkspaceEntry(projectId))
+      ].filter((projectId) => {
+        const entry = getWorkspaceEntry(projectId)
+        // Emulator は上で調べ済み
+        return entry !== null && entry.authType !== 'emulator'
+      })
     )
   ]
 
@@ -322,17 +295,6 @@ export async function addEmulatorEntryAndLoad(
     const emulatorProjectId = resolveEmulatorProjectId(input.projectId)
     const host = parseEmulatorHost(input.host)
     const id = emulatorEntryId(emulatorProjectId)
-
-    if (emulatorProjectId !== EMPTY_EMULATOR_PROJECT_ID) {
-      await adoptEmptyEmulatorContainer(host, {
-        id,
-        emulatorProjectId,
-        label: input.label,
-        color: input.color,
-        readOnly: input.readOnly
-      })
-    }
-
     const existing = getWorkspaceEntry(id)
 
     await connectEmulator({
@@ -346,7 +308,9 @@ export async function addEmulatorEntryAndLoad(
       label:
         input.label?.trim() ||
         existing?.label ||
-        (emulatorProjectId === EMPTY_EMULATOR_PROJECT_ID ? 'emulator' : `${emulatorProjectId} emulator`),
+        (emulatorProjectId === EMPTY_EMULATOR_PROJECT_ID
+          ? 'emulator'
+          : `${emulatorProjectId} emulator`),
       color: defaultWorkspaceEntryColor('emulator', {
         existing: existing?.color,
         override: input.color
@@ -520,8 +484,7 @@ export async function importGoogleAccountProjects(input: {
     // 同じアカウントの古い取扱い分はいったん外す（プロファイルは import で上書き復元）
     // 接続そのものは loadProject → connection.connectWorkspaceEntry に任せる。
     store.entries = store.entries.filter(
-      (entry) =>
-        !(entry.authType === 'google' && entry.googleAccountKey === input.accountKey)
+      (entry) => !(entry.authType === 'google' && entry.googleAccountKey === input.accountKey)
     )
 
     for (const project of input.projects) {
@@ -543,7 +506,9 @@ export async function importGoogleAccountProjects(input: {
       (profile?.lastFocusedProjectId &&
       input.projects.some((project) => project.projectId === profile.lastFocusedProjectId)
         ? profile.lastFocusedProjectId
-        : null) ?? input.projects[0]?.projectId ?? null
+        : null) ??
+      input.projects[0]?.projectId ??
+      null
 
     await persistStore()
 

@@ -152,7 +152,7 @@ function BulkActionsPanel({
 
       <div className="bulk-actions__delete">
         <Button variant="danger" onClick={() => void handleDelete()} disabled={loading}>
-          一括削除
+          削除
         </Button>
         <span className="bulk-actions__cost">
           書込 {deleteEstimate.writeCount} 件 / {deleteEstimate.batchCount} バッチ / 概算{' '}

@@ -1,5 +1,6 @@
 import type {
-  ExportCollectionJsonInput,
+  ExportCollectionInput,
+  ExportGroupInput,
   ExportProjectInput
 } from '@features/data_transfer/shared/types'
 import type { OfficialImportInput } from '@features/data_transfer/shared/official'
@@ -35,8 +36,8 @@ export type ScriptJobSnapshot = {
 }
 
 export type StartScriptJobInput =
-  | ({ kind: 'export_collection' } & ExportCollectionJsonInput)
-  | ({ kind: 'export_group'; projectId: string; collectionId: string; filePath?: string })
+  | ({ kind: 'export_collection' } & ExportCollectionInput)
+  | ({ kind: 'export_group' } & ExportGroupInput)
   | ({ kind: 'export_project' } & ExportProjectInput)
   | ({ kind: 'import_official' } & OfficialImportInput)
   | ({ kind: 'transport' } & TransportInput)

@@ -6,6 +6,14 @@ export function serializeFirestoreValue(value: unknown): unknown {
     return value
   }
 
+  // NaN / 無限大は JSON で書けないので、型の名前を添える
+  if (typeof value === 'number' && !Number.isFinite(value)) {
+    return {
+      __firemint_type: 'double',
+      value: String(value)
+    }
+  }
+
   if (value instanceof Timestamp) {
     return {
       __firemint_type: 'timestamp',
@@ -84,6 +92,13 @@ export function deserializeFirestoreValue(value: unknown, projectId?: string): u
 
     if (typeMarker === 'bytes' && typeof record.base64 === 'string') {
       return Buffer.from(record.base64, 'base64')
+    }
+
+    if (
+      typeMarker === 'double' &&
+      (record.value === 'NaN' || record.value === 'Infinity' || record.value === '-Infinity')
+    ) {
+      return Number(record.value)
     }
 
     const result: Record<string, unknown> = {}

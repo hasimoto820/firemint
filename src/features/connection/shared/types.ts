@@ -31,6 +31,8 @@ export function isFirestoreWriteDisabled(status: ConnectionStatus): boolean {
 export type EmulatorConnectInput = {
   projectId: string
   host: string
+  /** 繋いだプロジェクトを選んだ状態にするか。省略時は選ぶ。起動時の自動検出では選ばない */
+  setFocused?: boolean
 }
 
 export type GoogleSignInResult =

@@ -78,12 +78,12 @@ export function buildDestructiveConfirmMessage(
   count: number,
   environment: EnvironmentKind
 ): string {
-  const actionLabel = action === 'delete' ? '削除' : '更新'
+  const actionLabel = action === 'delete' ? '削除' : '一括更新'
   const batchInfo = formatBatchMessage(count)
   const productionWarning =
     environment === 'production'
       ? '\n\n⚠ 本番プロジェクトです。本当に実行しますか？'
       : ''
 
-  return `${count} 件のドキュメントを一括${actionLabel}します。\n${batchInfo}${productionWarning}`
+  return `${count} 件のドキュメントを${actionLabel}します。\n${batchInfo}${productionWarning}`
 }

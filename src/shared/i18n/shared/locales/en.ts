@@ -148,7 +148,7 @@ export const en: Record<string, string> = {
     'Folder / ZIP and projectId are both optional. You can connect with both empty. If you select a file, it is written to the emulator and appears in the left tree.',
   'emulator.import_project_title': 'Add a project to the emulator',
   'emulator.import_project_lead':
-    'Select a folder or ZIP. It will appear as a new row in the left tree and be written to the workspace.',
+    'Choose the destination and a file (ZIP / JSONL) or folder. With a new ID, the project is created in the Emulator.',
   'emulator.import_collection_title': 'Add a collection to the emulator',
   'emulator.import_success': 'Imported {count} documents',
   'emulator.import_success_with_skip':

@@ -127,24 +127,22 @@ export function writeLeveldbRecord(data: Buffer): Buffer {
   return writeLeveldbRecords([data])
 }
 
-export function writeLeveldbRecords(records: Buffer[]): Buffer {
-  const chunks: Buffer[] = []
-  let blockUsed = 0
+/**
+ * LevelDB のログ形式で、レコードを 1 件ずつ書き足す。書いた分は emit に渡す。
+ * 全件をメモリに載せずに、ファイルへ流せる。
+ */
+export class LeveldbLogWriter {
+  private blockUsed = 0
 
-  const pad = (size: number): void => {
+  constructor(private readonly emit: (chunk: Buffer) => void) {}
+
+  private pad(size: number): void {
     if (size > 0) {
-      chunks.push(Buffer.alloc(size))
+      this.emit(Buffer.alloc(size))
     }
   }
 
-  const writeFragment = (type: number, data: Buffer): void => {
-    let remaining = BLOCK_SIZE - blockUsed
-    if (remaining < HEADER_LENGTH) {
-      pad(remaining)
-      blockUsed = 0
-      remaining = BLOCK_SIZE
-    }
-
+  private writeFragment(type: number, data: Buffer): void {
     const payload = Buffer.alloc(1 + data.length)
     payload[0] = type
     data.copy(payload, 1)
@@ -152,21 +150,21 @@ export function writeLeveldbRecords(records: Buffer[]): Buffer {
     header.writeUInt32LE(maskLeveldbCrc(crc32c(payload)), 0)
     header.writeUInt16LE(data.length, 4)
     header.writeUInt8(type, 6)
-    chunks.push(header, data)
-    blockUsed += HEADER_LENGTH + data.length
-    if (blockUsed >= BLOCK_SIZE) {
-      blockUsed = 0
+    this.emit(Buffer.concat([header, data]))
+    this.blockUsed += HEADER_LENGTH + data.length
+    if (this.blockUsed >= BLOCK_SIZE) {
+      this.blockUsed = 0
     }
   }
 
-  for (const record of records) {
+  write(record: Buffer): void {
     let offset = 0
     let first = true
     while (offset < record.length || first) {
-      let remaining = BLOCK_SIZE - blockUsed
+      let remaining = BLOCK_SIZE - this.blockUsed
       if (remaining < HEADER_LENGTH) {
-        pad(remaining)
-        blockUsed = 0
+        this.pad(remaining)
+        this.blockUsed = 0
         remaining = BLOCK_SIZE
       }
 
@@ -174,7 +172,7 @@ export function writeLeveldbRecords(records: Buffer[]): Buffer {
       const isLast = offset + take >= record.length
       const type =
         first && isLast ? RECORD_FULL : first ? RECORD_FIRST : isLast ? RECORD_LAST : RECORD_MIDDLE
-      writeFragment(type, record.subarray(offset, offset + take))
+      this.writeFragment(type, record.subarray(offset, offset + take))
       offset += take
       first = false
       if (isLast) {
@@ -182,6 +180,13 @@ export function writeLeveldbRecords(records: Buffer[]): Buffer {
       }
     }
   }
+}
 
+export function writeLeveldbRecords(records: Buffer[]): Buffer {
+  const chunks: Buffer[] = []
+  const writer = new LeveldbLogWriter((chunk) => chunks.push(chunk))
+  for (const record of records) {
+    writer.write(record)
+  }
   return Buffer.concat(chunks)
 }

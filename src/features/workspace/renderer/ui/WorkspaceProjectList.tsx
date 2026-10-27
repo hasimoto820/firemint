@@ -398,7 +398,7 @@ function WorkspaceProjectList({
           minSecond={120}
           ariaLabel="プロジェクト一覧の高さ"
           first={
-            <div data-area="projects" tabIndex={-1}>
+            <div className="project-list__items-wrap" data-area="projects" tabIndex={-1}>
               {entryList}
             </div>
           }

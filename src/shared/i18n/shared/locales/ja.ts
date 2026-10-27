@@ -150,7 +150,7 @@ export const ja: MessageCatalog = {
     'フォルダ / ZIP も projectId も任意です。どちらも空のまま接続できます。選ぶと Emulator に入れて左ツリーに出します。',
   'emulator.import_project_title': 'エミュレーターにプロジェクトを追加',
   'emulator.import_project_lead':
-    'フォルダまたは ZIP を選びます。左ツリーに新しい行として表示し、workspace に書き込みます。',
+    'インポート先とファイル（ZIP / JSONL）かフォルダを選びます。新規 ID なら、その ID のプロジェクトを Emulator に作って書きます。',
   'emulator.import_collection_title': 'エミュレーターにコレクションを追加',
   'emulator.import_success': '{count} 件をインポートしました',
   'emulator.import_success_with_skip': '{count} 件をインポートしました（スキップ {skipped} 件）',

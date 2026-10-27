@@ -942,6 +942,14 @@ code {
   min-height: 0;
 }
 
+/* プロジェクト一覧の囲み。枠の高さに合わせ、中の一覧（project-list__items）をスクロールさせる */
+.project-list__items-wrap {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
 .imp-exp-view--diff .imp-exp-form {
   max-width: none;
   height: 100%;
@@ -971,6 +979,11 @@ code {
   height: 100%;
   min-height: 0;
   overflow: auto;
+}
+
+/* 中身が高い時は、フォーム全体をスクロールする。ルート一覧などの枠を縮めない */
+.imp-exp-form > * {
+  flex-shrink: 0;
 }
 
 .imp-exp-form__toggles {
@@ -1045,6 +1058,73 @@ code {
 
 .imp-exp-form__root-list li + li {
   margin-top: 4px;
+}
+
+.imp-exp-form__section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.imp-exp-form__label {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ev-c-text-1);
+}
+
+.imp-exp-verify {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(560px, 100%);
+  margin-top: 8px;
+}
+
+.imp-exp-verify__summary {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.imp-exp-verify__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.imp-exp-verify__table th,
+.imp-exp-verify__table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--ev-c-gray-1);
+  text-align: left;
+}
+
+.imp-exp-verify__table thead th {
+  font-weight: 600;
+  color: var(--ev-c-text-2);
+}
+
+.imp-exp-verify__table tbody th {
+  font-weight: 600;
+}
+
+.imp-exp-verify__row--danger {
+  background: var(--color-danger-bg);
+}
+
+.imp-exp-verify__total {
+  font-variant-numeric: tabular-nums;
+}
+
+.imp-exp-verify__only {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.imp-exp-verify__empty {
+  color: var(--ev-c-text-3);
 }
 
 .imp-exp-form__actions {

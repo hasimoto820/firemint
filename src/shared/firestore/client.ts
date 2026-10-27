@@ -1,7 +1,7 @@
 import admin from 'firebase-admin'
 import type { Credential } from 'firebase-admin/app'
 import { initializeFirestore, type Firestore } from 'firebase-admin/firestore'
-import { Firestore as GoogleCloudFirestore } from '@google-cloud/firestore'
+import { Firestore as GoogleCloudFirestore, v1 } from '@google-cloud/firestore'
 import { PassThroughClient } from 'google-auth-library'
 import { getFocusedProjectId, requireFocusedProjectId, setFocusedProjectId } from './focused'
 import { logInfo } from '@shared/logging/logger'
@@ -15,14 +15,44 @@ const EMULATOR_ADMIN_CREDENTIAL: Credential = {
   }
 }
 
+/** 型つきの接続（インポート / エクスポート用）を作るための設定 */
+type TypedConnectionSettings =
+  | { kind: 'cloud'; projectId: string; credentials: object }
+  | { kind: 'emulator'; projectId: string; host: string }
+
+type FirestoreV1Client = InstanceType<typeof v1.FirestoreClient>
+
+/** v1 クライアント（型を明示して書く）。database は projects/{id}/databases/(default) */
+export type FirestoreV1Handle = {
+  client: FirestoreV1Client
+  projectId: string
+  database: string
+  /** Emulator の時だけ、管理者のヘッダーを付ける */
+  callOptions: { otherArgs?: { headers: Record<string, string> } }
+}
+
+type TypedClients = {
+  reader: GoogleCloudFirestore | null
+  writer: FirestoreV1Handle | null
+}
+
 type ConnectionEntry = {
   app: admin.app.App
   firestore: Firestore
   info: FirestoreConnectionInfo
   writeBlockedReason: string | null
+  typedSettings: TypedConnectionSettings
+  typed: TypedClients
 }
 
 const connections = new Map<string, ConnectionEntry>()
+
+async function closeTypedClients(entry: ConnectionEntry): Promise<void> {
+  const { reader, writer } = entry.typed
+  entry.typed = { reader: null, writer: null }
+  await reader?.terminate().catch(() => undefined)
+  await writer?.client.close().catch(() => undefined)
+}
 
 function parseServiceAccount(json: string): ServiceAccountJson {
   const parsed = JSON.parse(json) as Partial<ServiceAccountJson>
@@ -43,6 +73,7 @@ async function deleteExistingApp(projectId: string): Promise<void> {
 
   if (existing) {
     logInfo('firestore', `delete existing app project_id=${projectId}`)
+    await closeTypedClients(existing)
     await existing.app.delete()
     connections.delete(projectId)
   }
@@ -80,7 +111,21 @@ export async function connectFirestore(json: string): Promise<FirestoreConnectio
     authType: 'serviceAccount'
   }
 
-  connections.set(projectId, { app, firestore, info, writeBlockedReason: null })
+  connections.set(projectId, {
+    app,
+    firestore,
+    info,
+    writeBlockedReason: null,
+    typedSettings: {
+      kind: 'cloud',
+      projectId,
+      credentials: {
+        client_email: serviceAccount.client_email,
+        private_key: serviceAccount.private_key
+      }
+    },
+    typed: { reader: null, writer: null }
+  })
   await attachNativeFirestoreGuard(projectId)
   logInfo('firestore', `firestore client initialized project_id=${projectId}`)
 
@@ -136,7 +181,14 @@ export async function connectFirestoreWithGoogle(input: {
     authType: 'google'
   }
 
-  connections.set(projectId, { app, firestore, info, writeBlockedReason: null })
+  connections.set(projectId, {
+    app,
+    firestore,
+    info,
+    writeBlockedReason: null,
+    typedSettings: { kind: 'cloud', projectId, credentials: refreshTokenJson },
+    typed: { reader: null, writer: null }
+  })
   await attachNativeFirestoreGuard(projectId)
   logInfo('firestore', `firestore client initialized via google project_id=${projectId}`)
 
@@ -181,7 +233,14 @@ export async function connectFirestoreWithEmulator(input: {
     authType: 'emulator'
   }
 
-  connections.set(poolId, { app, firestore, info, writeBlockedReason: null })
+  connections.set(poolId, {
+    app,
+    firestore,
+    info,
+    writeBlockedReason: null,
+    typedSettings: { kind: 'emulator', projectId, host },
+    typed: { reader: null, writer: null }
+  })
   logInfo('firestore', `firestore client initialized via emulator pool_id=${poolId} host=${host}`)
 
   return info
@@ -201,6 +260,7 @@ export async function disconnectFirestore(projectId?: string): Promise<void> {
   }
 
   logInfo('firestore', `disconnect firebase app project_id=${resolvedProjectId}`)
+  await closeTypedClients(entry)
   await entry.app.delete()
   connections.delete(resolvedProjectId)
 
@@ -218,6 +278,89 @@ export function getFirestore(projectId?: string): Firestore {
   }
 
   return entry.firestore
+}
+
+function requireEntry(projectId?: string): ConnectionEntry {
+  const resolvedProjectId = resolveProjectId(projectId)
+  const entry = connections.get(resolvedProjectId)
+
+  if (!entry) {
+    throw new Error(`Firestore is not connected: ${resolvedProjectId}`)
+  }
+
+  return entry
+}
+
+/**
+ * 型つきで読む接続（useBigInt）。整数は BigInt、小数は number で返る。
+ * インポート / エクスポート専用。アプリ全体の接続（getFirestore）は変えない。
+ */
+export function getTypedFirestore(projectId?: string): GoogleCloudFirestore {
+  const entry = requireEntry(projectId)
+
+  if (!entry.typed.reader) {
+    const settings = entry.typedSettings
+    entry.typed.reader =
+      settings.kind === 'emulator'
+        ? new GoogleCloudFirestore({
+            projectId: settings.projectId,
+            host: settings.host,
+            ssl: false,
+            preferRest: true,
+            useBigInt: true,
+            authClient: new PassThroughClient()
+          } as ConstructorParameters<typeof GoogleCloudFirestore>[0])
+        : new GoogleCloudFirestore({
+            projectId: settings.projectId,
+            preferRest: true,
+            useBigInt: true,
+            credentials: settings.credentials as { client_email?: string; private_key?: string }
+          })
+  }
+
+  return entry.typed.reader
+}
+
+/**
+ * 型を明示して書く v1 クライアント。小数の 1.0 を小数のまま書ける。
+ * クラウド・Emulator とも REST（アプリの preferRest と同じ）。Emulator は http。
+ */
+export function getFirestoreV1(projectId?: string): FirestoreV1Handle {
+  const entry = requireEntry(projectId)
+
+  if (!entry.typed.writer) {
+    const settings = entry.typedSettings
+    const database = `projects/${settings.projectId}/databases/(default)`
+
+    // google-gax は import しない（v1 クライアントが中で読む）。
+    // 先に google-gax/build/src/fallback を読むと、バンドルの中で読み込み順が循環して起動時に落ちる。
+    if (settings.kind === 'emulator') {
+      const [servicePath, port] = settings.host.split(':')
+      const client = new v1.FirestoreClient({
+        projectId: settings.projectId,
+        servicePath,
+        port: Number(port),
+        fallback: 'rest',
+        protocol: 'http',
+        authClient: new PassThroughClient()
+      } as unknown as ConstructorParameters<typeof v1.FirestoreClient>[0])
+      entry.typed.writer = {
+        client,
+        projectId: settings.projectId,
+        database,
+        callOptions: { otherArgs: { headers: { Authorization: 'Bearer owner' } } }
+      }
+    } else {
+      const client = new v1.FirestoreClient({
+        projectId: settings.projectId,
+        credentials: settings.credentials as { client_email?: string; private_key?: string },
+        fallback: 'rest'
+      })
+      entry.typed.writer = { client, projectId: settings.projectId, database, callOptions: {} }
+    }
+  }
+
+  return entry.typed.writer
 }
 
 /** 接続プール上の app から Admin Auth を返す（Auth ユーザー管理用） */

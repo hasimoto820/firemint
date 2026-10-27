@@ -2,27 +2,30 @@ import type { BrowserWindow } from 'electron'
 import { dialog } from 'electron'
 import { basename } from 'path'
 import { ensureFirestoreWritable } from '@features/workspace/main/guard'
-import {
-  addEmulatorEntryAndLoad,
-  getWorkspaceEntry
-} from '@features/workspace/main/service'
+import { addEmulatorEntryAndLoad, getWorkspaceEntry } from '@features/workspace/main/service'
 import { emulatorEntryId } from '@features/connection/shared/emulator'
-import type { ExportDocument } from '../../shared/types'
 import type {
+  ImportFileInfoResult,
+  ImportVerifyInput,
+  ImportVerifyRow,
   OfficialImportInput,
   OfficialImportResult,
+  OfficialImportSummary,
   OfficialImportValidationResult
 } from '../../shared/official'
 import type { ImportProjectProgress } from '../../shared/types'
-import { getDocumentRef } from '@shared/firestore/paths'
-import { getFirestore, isFirestoreConnected } from '@shared/firestore/client'
-import { deserializeDocumentData } from '@shared/firestore/serialize'
-import { FIRESTORE_BATCH_LIMIT } from '@shared/safety/operations'
+import { collectionIdOf, typedFieldsEqual, type TypedDocument } from '../../shared/typed_value'
+import { getFirestoreV1, getTypedFirestore, isFirestoreConnected } from '@shared/firestore/client'
 import { isCanceledError, throwIfCanceled } from '@shared/safety/canceled'
 import { logError, logInfo } from '@shared/logging/logger'
-import { readOfficialDump } from './read_dump'
+import { fromSdkData } from '../typed/convert'
+import { openImportSource, type ImportSource } from '../typed/source'
+import { TypedBatchWriter } from '../typed/writer'
 
 type ProgressReporter = (progress: ImportProjectProgress) => void
+
+/** 詳細検証で、クラウドから 1 回に読む件数 */
+const VERIFY_CHUNK = 100
 
 function ensureConnected(projectId: string): void {
   if (!isFirestoreConnected(projectId)) {
@@ -30,53 +33,44 @@ function ensureConnected(projectId: string): void {
   }
 }
 
-function previewWriteProjectId(
-  selectedProjectId: string,
-  sourceProjectId: string | null
-): string {
-  const dest = getWorkspaceEntry(selectedProjectId)
+const NO_SOURCE_PROJECT_MESSAGE =
+  'ファイルから projectId が取れません。Emulator にプロジェクトとして入れられません。'
 
-  if (!dest || dest.authType !== 'emulator') {
-    return selectedProjectId
+type WriteTarget = Pick<OfficialImportInput, 'projectId' | 'emulatorHost' | 'emulatorProjectId'>
+
+/** Emulator に新しく作る時のプロジェクト ID。指定が無ければファイルのエクスポート元 */
+function newEmulatorProjectId(target: WriteTarget, sourceProjectId: string | null): string {
+  const id = target.emulatorProjectId?.trim() || sourceProjectId
+  if (!id) {
+    throw new Error(NO_SOURCE_PROJECT_MESSAGE)
   }
+  return id
+}
 
-  if (!sourceProjectId) {
-    throw new Error('ダンプから projectId が取れません。Emulator にプロジェクトとして入れられません。')
+/** 書き込む先。選んだプロジェクトか、Emulator に新しく作るプロジェクト */
+function previewWriteProjectId(target: WriteTarget, sourceProjectId: string | null): string {
+  if (!target.emulatorHost) {
+    return target.projectId
   }
-
-  if (dest.emulatorProjectId === sourceProjectId) {
-    return dest.id
-  }
-
-  return emulatorEntryId(sourceProjectId)
+  return emulatorEntryId(newEmulatorProjectId(target, sourceProjectId))
 }
 
 async function resolveWriteProjectId(
-  selectedProjectId: string,
+  target: WriteTarget,
   sourceProjectId: string | null
 ): Promise<string> {
-  const dest = getWorkspaceEntry(selectedProjectId)
-
-  if (!dest || dest.authType !== 'emulator') {
-    return selectedProjectId
+  const writtenProjectId = previewWriteProjectId(target, sourceProjectId)
+  if (!target.emulatorHost) {
+    return writtenProjectId
+  }
+  if (getWorkspaceEntry(writtenProjectId) && isFirestoreConnected(writtenProjectId)) {
+    return writtenProjectId
   }
 
-  const writtenProjectId = previewWriteProjectId(selectedProjectId, sourceProjectId)
-  if (writtenProjectId === dest.id) {
-    return dest.id
-  }
-
-  if (!sourceProjectId) {
-    throw new Error('ダンプから projectId が取れません。Emulator にプロジェクトとして入れられません。')
-  }
-
-  if (!dest.emulatorHost) {
-    throw new Error('Emulator のホストがありません')
-  }
-
+  const projectId = newEmulatorProjectId(target, sourceProjectId)
   const added = await addEmulatorEntryAndLoad({
-    projectId: sourceProjectId,
-    host: dest.emulatorHost,
+    projectId,
+    host: target.emulatorHost,
     setFocused: true
   })
 
@@ -85,92 +79,48 @@ async function resolveWriteProjectId(
   }
 
   logInfo(
-    'data_transfer:official',
-    `emulator new project host=${dest.emulatorHost} source=${sourceProjectId} pool=${added.data.id}`
+    'data_transfer:import',
+    `emulator new project host=${target.emulatorHost} id=${projectId} source=${sourceProjectId ?? '-'} pool=${added.data.id}`
   )
 
   return added.data.id
 }
 
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : 'ダンプのインポートに失敗しました'
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback
 }
 
-function pathDepth(path: string): number {
-  return path.split('/').filter(Boolean).length
+function percentOf(processed: number, total: number, from: number, to: number): number {
+  if (total <= 0) {
+    return from
+  }
+  return Math.min(to, from + Math.round(((to - from) * processed) / total))
 }
 
-function sortByPath(documents: ExportDocument[]): ExportDocument[] {
-  return [...documents].sort((left, right) => {
-    const depth = pathDepth(left.path) - pathDepth(right.path)
-    if (depth !== 0) {
-      return depth
-    }
-    return left.path.localeCompare(right.path)
-  })
-}
-
-async function writeDocuments(
-  projectId: string,
-  documents: ExportDocument[],
+/** 1 回目: 件数を数える。見出しが無い・中身が無い時は、書き始める前に止める */
+async function countSource(
+  source: ImportSource,
   onProgress?: ProgressReporter,
   signal?: AbortSignal
-): Promise<{ writtenCount: number; skippedCount: number; collisionSamples: string[] }> {
-  const db = getFirestore(projectId)
-  const collisionSamples: string[] = []
-  const pending: ExportDocument[] = []
-  let writtenCount = 0
-  let skippedCount = 0
-  const ordered = sortByPath(documents)
-  const totalCount = ordered.length
-
-  const flush = async (): Promise<void> => {
-    if (pending.length === 0) {
-      return
-    }
-
+): Promise<number> {
+  let count = 0
+  await source.forEach((entry) => {
     throwIfCanceled(signal)
-    const batch = db.batch()
-    for (const document of pending) {
-      batch.create(
-        getDocumentRef(document.path, projectId),
-        deserializeDocumentData(document.data, projectId)
-      )
-    }
-    await batch.commit()
-    writtenCount += pending.length
-    pending.length = 0
-  }
-
-  for (let index = 0; index < ordered.length; index += 1) {
-    throwIfCanceled(signal)
-    const document = ordered[index]
-    const snapshot = await getDocumentRef(document.path, projectId).get()
-    if (snapshot.exists) {
-      skippedCount += 1
-      if (collisionSamples.length < 20) {
-        collisionSamples.push(document.path)
-      }
-    } else {
-      pending.push(document)
-      if (pending.length >= FIRESTORE_BATCH_LIMIT) {
-        await flush()
-      }
-    }
-
-    if (index === 0 || (index + 1) % 50 === 0 || index + 1 === totalCount) {
+    count += 1
+    if (count === 1 || count % 1000 === 0) {
       onProgress?.({
-        phase: 'writing',
-        processedCount: index + 1,
-        totalCount,
-        percent: totalCount === 0 ? 100 : Math.min(99, Math.round(((index + 1) / totalCount) * 100)),
-        detail: document.path
+        phase: 'counting',
+        processedCount: count,
+        totalCount: 0,
+        percent: 5,
+        detail: entry.kind === 'document' ? entry.document.path : entry.label
       })
     }
+  })
+  if (count === 0) {
+    throw new Error('ファイルにドキュメントがありません')
   }
-
-  await flush()
-  return { writtenCount, skippedCount, collisionSamples }
+  return count
 }
 
 export async function selectOfficialDump(
@@ -179,11 +129,12 @@ export async function selectOfficialDump(
   const choice = window
     ? await dialog.showMessageBox(window, {
         type: 'question',
-        buttons: ['フォルダ', 'ZIP', 'キャンセル'],
+        buttons: ['ファイル（ZIP / JSONL）', 'フォルダ', 'キャンセル'],
         defaultId: 0,
         cancelId: 2,
-        message: 'フォルダ / ZIP を選ぶ',
-        detail: 'コンソール / gcloud / Emulator のフォルダ、またはその zip。'
+        message: 'インポートするファイルを選ぶ',
+        detail:
+          '公式ダンプ（zip、またはコンソール / gcloud / Emulator のフォルダ）か、JSON（.jsonl）。'
       })
     : { response: 0 }
 
@@ -192,11 +143,11 @@ export async function selectOfficialDump(
   }
 
   const options =
-    choice.response === 1
+    choice.response === 0
       ? {
-          title: 'ZIP を選択',
+          title: 'ファイルを選択',
           properties: ['openFile' as const],
-          filters: [{ name: 'ZIP', extensions: ['zip'] }]
+          filters: [{ name: 'ZIP / JSONL', extensions: ['zip', 'jsonl'] }]
         }
       : {
           title: 'フォルダを選択',
@@ -214,75 +165,145 @@ export async function selectOfficialDump(
   return { canceled: false, filePath: result.filePaths[0] }
 }
 
+/** ファイルの形式と、エクスポート元のプロジェクトを読む（中身は読まない） */
+export async function inspectImportFile(filePath: string): Promise<ImportFileInfoResult> {
+  let source: ImportSource | null = null
+  try {
+    source = await openImportSource(filePath)
+    return {
+      ok: true,
+      data: {
+        filePath,
+        format: source.format,
+        sourceProjectId: source.sourceProjectId,
+        scopeKind: source.scopeKind
+      }
+    }
+  } catch (error) {
+    logError('data_transfer:import', `inspectImportFile failed path=${filePath}`, error)
+    return { ok: false, error: errorMessage(error, 'ファイルを読めませんでした') }
+  } finally {
+    await source?.close()
+  }
+}
+
+/**
+ * 検証（書かない）。コレクション ID ごとに、クラウドとファイルの件数を並べる。
+ *   簡易  件数だけ
+ *   詳細  ファイルのドキュメントをパスでクラウドから読んで比べ、側ごとの「だけ」の件数を出す
+ */
 export async function validateOfficialImport(
-  input: OfficialImportInput,
+  input: ImportVerifyInput,
   onProgress?: ProgressReporter,
   signal?: AbortSignal
 ): Promise<OfficialImportValidationResult> {
-  try {
-    ensureConnected(input.projectId)
-    throwIfCanceled(signal)
+  let source: ImportSource | null = null
 
+  try {
+    if (!input.emulatorHost) {
+      ensureConnected(input.projectId)
+    }
     onProgress?.({
       phase: 'extracting',
       processedCount: 0,
       totalCount: 0,
-      percent: 5,
-      detail: 'ダンプを読み込み中…'
+      percent: 2,
+      detail: 'ファイルを開いています…'
     })
+    source = await openImportSource(input.dumpPath)
+    const totalCount = await countSource(source, onProgress, signal)
 
-    const loaded = await readOfficialDump(input.dumpPath)
-    if (!loaded.ok) {
-      return loaded
-    }
-
-    const documents = loaded.data.documents
-    if (documents.length === 0) {
-      return { ok: false, error: 'ダンプにドキュメントがありません' }
-    }
-
-    const writtenProjectId = previewWriteProjectId(
-      input.projectId,
-      loaded.data.sourceProjectId
-    )
+    const writtenProjectId = previewWriteProjectId(input, source.sourceProjectId)
     const canCheck =
       getWorkspaceEntry(writtenProjectId) !== null && isFirestoreConnected(writtenProjectId)
+    const db = canCheck ? getTypedFirestore(writtenProjectId) : null
+    const detailed = input.level === 'detailed' && db !== null
 
-    const collisionSamples: string[] = []
-    let checkedCount = 0
-    const totalCount = documents.length
+    const fileCount = new Map<string, number>()
+    const fileOnly = new Map<string, number>()
+    const matched = new Map<string, number>()
+    const changed = new Map<string, number>()
+    const add = (map: Map<string, number>, id: string): void => {
+      map.set(id, (map.get(id) ?? 0) + 1)
+    }
 
-    if (canCheck) {
-      for (const document of documents) {
-        throwIfCanceled(signal)
-        checkedCount += 1
+    let chunk: TypedDocument[] = []
+    let processed = 0
 
-        if (checkedCount === 1 || checkedCount % 50 === 0 || checkedCount === totalCount) {
-          onProgress?.({
-            phase: 'validating',
-            processedCount: checkedCount,
-            totalCount,
-            percent: totalCount === 0 ? 90 : Math.min(90, Math.round((checkedCount / totalCount) * 90)),
-            detail: document.path
-          })
+    const compare = async (): Promise<void> => {
+      if (!db || chunk.length === 0) {
+        return
+      }
+      const snapshots = await db.getAll(...chunk.map((document) => db.doc(document.path)))
+      chunk.forEach((document, index) => {
+        const id = collectionIdOf(document.path)
+        const snapshot = snapshots[index]
+        if (!snapshot.exists) {
+          add(fileOnly, id)
+          return
         }
-
-        const snapshot = await getDocumentRef(document.path, writtenProjectId).get()
-        if (snapshot.exists && collisionSamples.length < 5) {
-          collisionSamples.push(document.path)
+        add(matched, id)
+        if (!typedFieldsEqual(document.fields, fromSdkData(snapshot.data() ?? {}))) {
+          add(changed, id)
         }
+      })
+      chunk = []
+    }
 
-        if (collisionSamples.length >= 5) {
-          break
+    await source.forEach(async (entry) => {
+      throwIfCanceled(signal)
+      processed += 1
+      if (entry.kind === 'document') {
+        add(fileCount, collectionIdOf(entry.document.path))
+        if (detailed) {
+          chunk.push(entry.document)
+          if (chunk.length >= VERIFY_CHUNK) {
+            await compare()
+          }
         }
       }
-    } else {
-      checkedCount = documents.length
+      if (processed === 1 || processed % 200 === 0 || processed === totalCount) {
+        onProgress?.({
+          phase: 'validating',
+          processedCount: processed,
+          totalCount,
+          percent: percentOf(processed, totalCount, 10, 90),
+          detail: entry.kind === 'document' ? entry.document.path : entry.label
+        })
+      }
+    })
+    await compare()
+
+    const ids = new Set(fileCount.keys())
+    if (db && source.scopeKind === 'project') {
+      for (const collection of await db.listCollections()) {
+        ids.add(collection.id)
+      }
+    }
+
+    const rows: ImportVerifyRow[] = []
+    for (const id of ids) {
+      throwIfCanceled(signal)
+      const cloudTotal = db ? Number((await db.collectionGroup(id).count().get()).data().count) : 0
+      const both = matched.get(id) ?? 0
+      const diff = changed.get(id) ?? 0
+      const fileTotal = fileCount.get(id)
+      rows.push({
+        collectionId: id,
+        cloud:
+          cloudTotal > 0
+            ? { total: cloudTotal, only: detailed ? Math.max(0, cloudTotal - both) + diff : null }
+            : null,
+        file:
+          fileTotal !== undefined
+            ? { total: fileTotal, only: detailed ? (fileOnly.get(id) ?? 0) + diff : null }
+            : null
+      })
     }
 
     onProgress?.({
       phase: 'done',
-      processedCount: checkedCount,
+      processedCount: totalCount,
       totalCount,
       percent: 100,
       detail: null
@@ -292,93 +313,141 @@ export async function validateOfficialImport(
       ok: true,
       data: {
         dumpPath: input.dumpPath,
-        documentCount: documents.length,
-        samplePaths: documents.slice(0, 8).map((document) => document.path),
-        hasCollisions: collisionSamples.length > 0,
-        collisionSamples,
-        checkedCount,
-        sourceProjectId: loaded.data.sourceProjectId,
+        format: source.format,
+        level: detailed ? 'detailed' : 'quick',
+        documentCount: [...fileCount.values()].reduce((sum, count) => sum + count, 0),
+        rows,
+        changedCount: detailed
+          ? [...changed.values()].reduce((sum, count) => sum + count, 0)
+          : null,
+        sourceProjectId: source.sourceProjectId,
         writtenProjectId
       }
     }
   } catch (error) {
     const canceled = isCanceledError(error)
-    logError('data_transfer:official', 'validateOfficialImport failed', error)
+    logError('data_transfer:import', 'validateOfficialImport failed', error)
     return {
       ok: false,
-      error: canceled ? '検証をキャンセルしました' : errorMessage(error),
+      error: canceled ? '検証をキャンセルしました' : errorMessage(error, '検証に失敗しました'),
       canceled
     }
+  } finally {
+    await source?.close()
   }
 }
 
+/**
+ * インポート。1 回目に件数を数え、2 回目に書く。全体をメモリに載せない。
+ *   追記    クラウドに無いドキュメントだけ作る。既にあるものは飛ばした件数
+ *   上書き  ファイルにあるドキュメントを、ファイルの中身で丸ごと置き換える
+ * 同じパスが 2 回以上出てきた時は、最初の行だけを書く。読めない行は書けなかった件数。
+ */
 export async function importOfficialDump(
   input: OfficialImportInput,
   onProgress?: ProgressReporter,
   signal?: AbortSignal
 ): Promise<OfficialImportResult> {
+  const writeMode = input.writeMode ?? 'append'
+  let source: ImportSource | null = null
+  let summary: OfficialImportSummary | null = null
+  let writer: TypedBatchWriter | null = null
+
+  const snapshotSummary = (stoppedReason: string | null): OfficialImportSummary | null => {
+    if (!summary || !writer) {
+      return null
+    }
+    return { ...summary, ...writer.counts, stoppedReason }
+  }
+
   try {
     throwIfCanceled(signal)
-
     onProgress?.({
       phase: 'extracting',
       processedCount: 0,
       totalCount: 0,
-      percent: 5,
-      detail: 'ダンプを読み込み中…'
+      percent: 2,
+      detail: 'ファイルを開いています…'
     })
+    source = await openImportSource(input.dumpPath)
+    const totalCount = await countSource(source, onProgress, signal)
 
-    const loaded = await readOfficialDump(input.dumpPath)
-    if (!loaded.ok) {
-      return loaded
-    }
-
-    const documents = loaded.data.documents
-    if (documents.length === 0) {
-      return { ok: false, error: 'ダンプにドキュメントがありません' }
-    }
-
-    const writtenProjectId = await resolveWriteProjectId(
-      input.projectId,
-      loaded.data.sourceProjectId
-    )
+    const writtenProjectId = await resolveWriteProjectId(input, source.sourceProjectId)
     ensureConnected(writtenProjectId)
     ensureFirestoreWritable(writtenProjectId)
 
     logInfo(
-      'data_transfer:official',
-      `importOfficialDump selected=${input.projectId} written=${writtenProjectId} source=${loaded.data.sourceProjectId ?? '-'} documents=${documents.length} dump=${input.dumpPath}`
+      'data_transfer:import',
+      `import format=${source.format} mode=${writeMode} selected=${input.projectId} written=${writtenProjectId} source=${source.sourceProjectId ?? '-'} entries=${totalCount} file=${input.dumpPath}`
     )
 
-    const write = await writeDocuments(writtenProjectId, documents, onProgress, signal)
+    summary = {
+      dumpPath: input.dumpPath,
+      format: source.format,
+      writeMode,
+      documentCount: totalCount,
+      writtenCount: 0,
+      skippedCount: 0,
+      failedCount: 0,
+      skippedSamples: [],
+      failedSamples: [],
+      stoppedReason: null,
+      sourceProjectId: source.sourceProjectId,
+      writtenProjectId
+    }
+    const activeWriter = new TypedBatchWriter(getFirestoreV1(writtenProjectId), writeMode, signal)
+    writer = activeWriter
+
+    const seen = new Set<string>()
+    let processed = 0
+
+    await source.forEach(async (entry) => {
+      throwIfCanceled(signal)
+      processed += 1
+
+      if (entry.kind === 'bad') {
+        activeWriter.countFailed(entry.label)
+      } else if (seen.has(entry.document.path)) {
+        activeWriter.countSkipped(`${entry.document.path}（同じパスの 2 回目以降）`)
+      } else {
+        seen.add(entry.document.path)
+        await activeWriter.add(entry.document)
+      }
+
+      if (processed === 1 || processed % 200 === 0 || processed === totalCount) {
+        onProgress?.({
+          phase: 'writing',
+          processedCount: processed,
+          totalCount,
+          percent: percentOf(processed, totalCount, 10, 99),
+          detail: entry.kind === 'document' ? entry.document.path : entry.label
+        })
+      }
+    })
+    await activeWriter.flush()
 
     onProgress?.({
       phase: 'done',
-      processedCount: documents.length,
-      totalCount: documents.length,
+      processedCount: totalCount,
+      totalCount,
       percent: 100,
       detail: basename(input.dumpPath)
     })
 
-    return {
-      ok: true,
-      data: {
-        dumpPath: input.dumpPath,
-        documentCount: documents.length,
-        writtenCount: write.writtenCount,
-        skippedCount: write.skippedCount,
-        collisionSamples: write.collisionSamples,
-        sourceProjectId: loaded.data.sourceProjectId,
-        writtenProjectId
-      }
-    }
+    return { ok: true, data: snapshotSummary(null) as OfficialImportSummary }
   } catch (error) {
     const canceled = isCanceledError(error)
-    logError('data_transfer:official', 'importOfficialDump failed', error)
+    const message = canceled
+      ? 'インポートをキャンセルしました'
+      : errorMessage(error, 'インポートに失敗しました')
+    logError('data_transfer:import', 'importOfficialDump failed', error)
     return {
       ok: false,
-      error: canceled ? 'インポートをキャンセルしました' : errorMessage(error),
-      canceled
+      error: message,
+      canceled,
+      partial: snapshotSummary(message) ?? undefined
     }
+  } finally {
+    await source?.close()
   }
 }

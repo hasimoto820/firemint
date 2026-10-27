@@ -113,8 +113,14 @@ const api: IpcApi = {
     },
     selectOfficialDump: () =>
       ipcRenderer.invoke(IPC_CHANNELS.DATA_TRANSFER_SELECT_OFFICIAL_DUMP),
+    inspectImportFile: (filePath) =>
+      ipcRenderer.invoke(IPC_CHANNELS.DATA_TRANSFER_INSPECT_IMPORT_FILE, filePath),
     validateOfficialImport: (input) =>
-      ipcRenderer.invoke(IPC_CHANNELS.DATA_TRANSFER_VALIDATE_OFFICIAL_IMPORT, input)
+      ipcRenderer.invoke(IPC_CHANNELS.DATA_TRANSFER_VALIDATE_OFFICIAL_IMPORT, input),
+    defaultExportPath: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.DATA_TRANSFER_DEFAULT_EXPORT_PATH, input),
+    chooseExportPath: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.DATA_TRANSFER_CHOOSE_EXPORT_PATH, input)
   },
   transport: {
     validate: (input) => ipcRenderer.invoke(IPC_CHANNELS.TRANSPORT_VALIDATE, input),

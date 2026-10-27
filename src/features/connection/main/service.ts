@@ -341,7 +341,7 @@ export async function connectWithEmulator(input: EmulatorConnectInput): Promise<
     const addResult = await addEmulatorEntryAndLoad({
       projectId: input.projectId,
       host: input.host,
-      setFocused: true
+      setFocused: input.setFocused ?? true
     })
 
     if (!addResult.ok) {

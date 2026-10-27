@@ -7,14 +7,13 @@ import { isCanceledError } from '@shared/safety/canceled'
 import type { OfficialExportProgress } from '@features/data_transfer/shared/official'
 import type { TransportProgress } from '@features/transport/shared/types'
 import type { ImportProjectProgress } from '@features/data_transfer/shared/types'
-import {
-  promptIncludeSubcollections
-} from '@features/data_transfer/main/service'
+import { promptIncludeSubcollections } from '@features/data_transfer/main/service'
 import { importOfficialDump } from '@features/data_transfer/main/official/write_dump'
-import {
-  chooseOfficialExportZipPath,
-  exportOfficialDump
-} from '@features/data_transfer/main/official/export_dump'
+import { exportOfficialDump } from '@features/data_transfer/main/official/export_dump'
+import type {
+  OfficialExportInput,
+  OfficialImportSummary
+} from '@features/data_transfer/shared/official'
 import { transportDocuments } from '@features/transport/main/service'
 import type {
   ScriptJobLogLine,
@@ -49,7 +48,9 @@ function jobTitle(input: StartScriptJobInput): string {
     case 'export_project':
       return `Export · Project · ${input.projectId}`
     case 'import_official':
-      return `Import · ${input.projectId}`
+      return input.emulatorHost
+        ? `Import · Emulator ${input.emulatorProjectId || input.emulatorHost}`
+        : `Import · ${input.projectId}`
     case 'transport':
       return `Transport · ${input.target} · ${input.sourceProjectId} → ${input.destinationProjectId}`
   }
@@ -94,11 +95,7 @@ function patchSnapshot(patch: Partial<ScriptJobSnapshot>): void {
   broadcast()
 }
 
-function applyProgress(
-  percent: number,
-  detail: string | null,
-  writtenCount?: number | null
-): void {
+function applyProgress(percent: number, detail: string | null, writtenCount?: number | null): void {
   if (!active) {
     return
   }
@@ -106,8 +103,7 @@ function applyProgress(
   patchSnapshot({
     percent,
     detail,
-    writtenCount:
-      writtenCount !== undefined ? writtenCount : active.snapshot.writtenCount
+    writtenCount: writtenCount !== undefined ? writtenCount : active.snapshot.writtenCount
   })
 }
 
@@ -153,9 +149,7 @@ function onTransportProgress(progress: TransportProgress): void {
 
 function onImportProgress(progress: ImportProjectProgress): void {
   const written =
-    progress.phase === 'writing' || progress.phase === 'done'
-      ? progress.processedCount
-      : undefined
+    progress.phase === 'writing' || progress.phase === 'done' ? progress.processedCount : undefined
   const total = progress.totalCount > 0 ? `/${progress.totalCount}` : ''
   const detail = progress.detail
     ? `${progress.phase} ${progress.processedCount}${total} / ${progress.detail}`
@@ -174,94 +168,95 @@ function appendCollisionSamples(samples: string[], reason: string): void {
   }
 }
 
-async function runJob(
-  input: StartScriptJobInput,
-  filePath: string | null,
-  signal: AbortSignal
-): Promise<void> {
+async function runExport(input: OfficialExportInput, signal: AbortSignal): Promise<void> {
+  const result = await exportOfficialDump(input, onOfficialExportProgress, signal)
+  if (!result.ok) {
+    throw Object.assign(new Error(result.error), { canceled: result.canceled })
+  }
+  patchSnapshot({
+    resultSummary: `${result.data.documentCount} 件を ${result.data.filePath} に保存しました`
+  })
+}
+
+/** 書いた / 飛ばした / 書けなかった件数と、途中で止まった理由 */
+function reportImportSummary(summary: OfficialImportSummary): void {
+  const mode = summary.writeMode === 'overwrite' ? '上書き' : '追記'
+  patchSnapshot({
+    writtenCount: summary.writtenCount,
+    resultSummary: `${mode}: 書いた ${summary.writtenCount} / 飛ばした ${summary.skippedCount} / 書けなかった ${summary.failedCount} → ${summary.writtenProjectId}`
+  })
+  appendLog(
+    'info',
+    `プロジェクト ${summary.sourceProjectId ?? '-'} → ${summary.writtenProjectId}（${mode}）`
+  )
+  appendLog(
+    'info',
+    `書いた ${summary.writtenCount} / 飛ばした ${summary.skippedCount} / 書けなかった ${summary.failedCount}（ファイル ${summary.documentCount} 件）`
+  )
+  appendCollisionSamples(summary.skippedSamples, '飛ばした')
+  if (summary.failedSamples.length > 0) {
+    appendLog('error', `書けなかった: ${summary.failedCount} 件（例）`)
+    for (const label of summary.failedSamples) {
+      appendLog('error', `  fail ${label}`)
+    }
+  }
+  if (summary.stoppedReason) {
+    appendLog('error', `途中で止まった理由: ${summary.stoppedReason}`)
+  }
+}
+
+async function runJob(input: StartScriptJobInput, signal: AbortSignal): Promise<void> {
   switch (input.kind) {
-    case 'export_collection': {
-      if (!filePath) {
-        throw new Error('保存先がありません')
-      }
-      const result = await exportOfficialDump(
+    case 'export_collection':
+      return runExport(
         {
           projectId: input.projectId,
           kind: 'collection',
+          format: input.format,
           collectionPath: input.collectionPath,
           includeSubcollections: input.includeSubcollections,
-          filePath
+          directory: input.directory,
+          fileName: input.fileName,
+          filePath: input.filePath
         },
-        onOfficialExportProgress,
         signal
       )
-      if (!result.ok) {
-        throw Object.assign(new Error(result.error), { canceled: result.canceled })
-      }
-      patchSnapshot({
-        resultSummary: `${result.data.documentCount} 件を ${result.data.filePath} に保存しました`
-      })
-      return
-    }
-    case 'export_group': {
-      if (!filePath) {
-        throw new Error('保存先がありません')
-      }
-      const result = await exportOfficialDump(
+    case 'export_group':
+      return runExport(
         {
           projectId: input.projectId,
           kind: 'group',
+          format: input.format,
           collectionId: input.collectionId,
-          filePath
+          directory: input.directory,
+          fileName: input.fileName,
+          filePath: input.filePath
         },
-        onOfficialExportProgress,
         signal
       )
-      if (!result.ok) {
-        throw Object.assign(new Error(result.error), { canceled: result.canceled })
-      }
-      patchSnapshot({
-        resultSummary: `${result.data.documentCount} 件を ${result.data.filePath} に保存しました`
-      })
-      return
-    }
-    case 'export_project': {
-      if (!filePath && !input.filePath) {
-        throw new Error('保存先がありません')
-      }
-      const result = await exportOfficialDump(
+    case 'export_project':
+      return runExport(
         {
           projectId: input.projectId,
           kind: 'project',
+          format: input.format,
           rootCollectionIds: input.rootCollectionIds,
           includeSubcollections: input.includeSubcollections,
-          filePath: filePath ?? input.filePath
+          directory: input.directory,
+          fileName: input.fileName,
+          filePath: input.filePath
         },
-        onOfficialExportProgress,
         signal
       )
-      if (!result.ok) {
-        throw Object.assign(new Error(result.error), { canceled: result.canceled })
-      }
-      patchSnapshot({
-        resultSummary: `${result.data.documentCount} 件を ${result.data.filePath} に保存しました`
-      })
-      return
-    }
     case 'import_official': {
       const result = await importOfficialDump(input, onImportProgress, signal)
       if (!result.ok) {
+        if (result.partial) {
+          reportImportSummary(result.partial)
+        }
         throw Object.assign(new Error(result.error), { canceled: result.canceled })
       }
-      patchSnapshot({
-        writtenCount: result.data.writtenCount,
-        resultSummary: `成功 ${result.data.writtenCount} / スキップ ${result.data.skippedCount} → ${result.data.writtenProjectId}`
-      })
-      appendLog(
-        'info',
-        `プロジェクト ${result.data.sourceProjectId ?? '-'} → ${result.data.writtenProjectId}`
-      )
-      appendCollisionSamples(result.data.collisionSamples, '既存のためスキップ')
+      reportImportSummary(result.data)
       return
     }
     case 'transport': {
@@ -344,51 +339,14 @@ export async function startScriptJob(
     return { ok: false, error: '別の Import / Export が実行中です', busy: true }
   }
 
-  let filePath: string | null = null
   let resolvedInput = input
 
-  if (input.kind === 'export_collection') {
-    let includeSubcollections = input.includeSubcollections ?? false
-    if (input.includeSubcollections === undefined) {
-      const prompt = await promptIncludeSubcollections(window, input.collectionPath)
-      if (prompt.canceled) {
-        return { ok: false, error: '保存をキャンセルしました', canceled: true }
-      }
-      includeSubcollections = prompt.includeSubcollections
-      resolvedInput = { ...input, includeSubcollections }
-    }
-
-    filePath = await chooseOfficialExportZipPath(window, {
-      projectId: input.projectId,
-      kind: 'collection',
-      collectionPath: input.collectionPath,
-      includeSubcollections
-    })
-    if (!filePath) {
+  if (input.kind === 'export_collection' && input.includeSubcollections === undefined) {
+    const prompt = await promptIncludeSubcollections(window, input.collectionPath)
+    if (prompt.canceled) {
       return { ok: false, error: '保存をキャンセルしました', canceled: true }
     }
-  }
-
-  if (input.kind === 'export_group' && !input.filePath) {
-    filePath = await chooseOfficialExportZipPath(window, {
-      projectId: input.projectId,
-      kind: 'group',
-      collectionId: input.collectionId
-    })
-    if (!filePath) {
-      return { ok: false, error: '保存をキャンセルしました', canceled: true }
-    }
-  }
-
-  if (input.kind === 'export_project' && !input.filePath) {
-    filePath = await chooseOfficialExportZipPath(window, {
-      projectId: input.projectId,
-      kind: 'project',
-      rootCollectionIds: input.rootCollectionIds
-    })
-    if (!filePath) {
-      return { ok: false, error: '保存をキャンセルしました', canceled: true }
-    }
+    resolvedInput = { ...input, includeSubcollections: prompt.includeSubcollections }
   }
 
   if (isJobRunning()) {
@@ -419,7 +377,7 @@ export async function startScriptJob(
   broadcast()
   logInfo('script_runner', `start kind=${resolvedInput.kind} id=${snapshot.id}`)
 
-  void runJob(resolvedInput, filePath, abort.signal)
+  void runJob(resolvedInput, abort.signal)
     .then(() => {
       finishJob('succeeded', null)
     })

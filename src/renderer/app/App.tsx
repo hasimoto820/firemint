@@ -77,9 +77,11 @@ function App(): React.JSX.Element {
       }
 
       if (result.data.length === 1) {
+        // 起動時の自動検出は、接続して一覧に載せるだけ。選ぶのはユーザー
         const connected = await window.api.connection.connectEmulator({
           host: result.data[0].firestoreHost,
-          projectId: result.data[0].projectId
+          projectId: result.data[0].projectId,
+          setFocused: false
         })
         if (!connected.ok || cancelled) {
           return

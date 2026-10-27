@@ -8,7 +8,7 @@ export async function promptIncludeSubcollections(
   const options = {
     type: 'question' as const,
     title: 'コレクションをエクスポート',
-    message: `「${collectionPath}」を zip に出します。`,
+    message: `「${collectionPath}」をエクスポートします。`,
     detail: 'サブコレクションを含めると、配下のドキュメントもすべて書き出します（件数・時間が増えます）。',
     checkboxLabel: 'サブコレクションを含む',
     checkboxChecked: false,

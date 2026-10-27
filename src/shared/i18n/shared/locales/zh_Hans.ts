@@ -147,7 +147,7 @@ export const zhHans: MessageCatalog = {
   'emulator.connect_import_lead':
     '文件夹 / ZIP 和 projectId 均可选。两者都空也可以连接。选择后会写入模拟器并显示在左侧树。',
   'emulator.import_project_title': '向模拟器添加项目',
-  'emulator.import_project_lead': '选择文件夹或 ZIP。会作为新行显示在左侧树，并写入 workspace。',
+  'emulator.import_project_lead': '选择导入目标和文件（ZIP / JSONL）或文件夹。新 ID 会在模拟器中创建该项目。',
   'emulator.import_collection_title': '向模拟器添加集合',
   'emulator.import_success': '已导入 {count} 件',
   'emulator.import_success_with_skip': '已导入 {count} 件（跳过 {skipped} 件）',
