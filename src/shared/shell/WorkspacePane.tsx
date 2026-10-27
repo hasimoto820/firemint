@@ -22,7 +22,8 @@ import {
   isTransportTab,
   type WorkspacePaneId,
   type WorkspaceTab,
-  type WorkspaceTabQueryDraftPatch
+  type WorkspaceTabQueryDraftPatch,
+  type WorkspaceTabSimpleState
 } from '@shared/shell/workspace_tab'
 
 type WorkspacePaneProps = {
@@ -65,6 +66,7 @@ type WorkspacePaneProps = {
   onCollectionBecameEmpty?: (collectionPath: string) => void
   onOpenDocumentPath?: (documentPath: string) => void
   onQueryDraftChange: (patch: WorkspaceTabQueryDraftPatch) => void
+  onSimpleStateChange?: (patch: Partial<WorkspaceTabSimpleState>) => void
 }
 
 /**
@@ -110,7 +112,8 @@ function WorkspacePane({
   onCollectionDocumentsChanged,
   onCollectionBecameEmpty,
   onOpenDocumentPath,
-  onQueryDraftChange
+  onQueryDraftChange,
+  onSimpleStateChange
 }: WorkspacePaneProps): React.JSX.Element {
   if (isTransportTab(tab)) {
     return (
@@ -253,6 +256,8 @@ function WorkspacePane({
           onOpenDocumentPath={onOpenDocumentPath}
           menuEnabled={menuEnabled}
           onOpenImpExp={onOpenImpExp}
+          simpleState={tab.simpleState}
+          onSimpleStateChange={onSimpleStateChange}
         />
       )}
     </div>

@@ -8,7 +8,13 @@ import {
   type TabGroupColor,
   type WorkspaceTabGroup
 } from './tab_group'
-import { isWorkspaceToolTab, workspaceTabLabel, type WorkspaceTab } from './workspace_tab'
+import {
+  isAuthTab,
+  isCollectionTab,
+  isWorkspaceToolTab,
+  workspaceTabLabel,
+  type WorkspaceTab
+} from './workspace_tab'
 
 type TabBarProps = {
   tabs: WorkspaceTab[]
@@ -20,6 +26,8 @@ type TabBarProps = {
   showProjectLabel?: boolean
   onActivate: (tabId: string) => void
   onClose: (tabId: string) => void
+  /** ＋ボタン。未指定なら出さない */
+  onNewTab?: () => void
   onDrop: (source: TabDragSource, dest: TabDropDest) => void
   onCreateGroup: (tabId: string) => void
   onJoinGroup: (tabId: string, groupId: string) => void
@@ -146,7 +154,7 @@ function TabItem({
     >
       <button type="button" className="tab-bar__label" onClick={() => onActivate(tab.id)}>
         <span className="tab-bar__name">{label}</span>
-        {isWorkspaceToolTab(tab) ? null : (
+        {!isCollectionTab(tab) ? null : (
           <span className="tab-bar__mode">{tab.view === 'query' ? 'Q' : 'S'}</span>
         )}
       </button>
@@ -176,6 +184,7 @@ function TabBar({
   showProjectLabel = false,
   onActivate,
   onClose,
+  onNewTab,
   onDrop,
   onCreateGroup,
   onJoinGroup,
@@ -220,15 +229,29 @@ function TabBar({
     }
   }, [contextMenu])
 
+  const newTabButton = onNewTab ? (
+    <button
+      type="button"
+      className="tab-bar__new"
+      title={t('tab.new_tab')}
+      aria-label={t('tab.new_tab')}
+      onClick={onNewTab}
+    >
+      +
+    </button>
+  ) : null
+
   if (tabs.length === 0) {
-    return <div className="tab-bar tab-bar--empty" />
+    return <div className="tab-bar tab-bar--empty">{newTabButton}</div>
   }
 
   const tabMeta = (tab: WorkspaceTab): { label: string; title: string } => {
     const projectLabel =
-      showProjectLabel && !isWorkspaceToolTab(tab) ? projectLabelFor?.(tab.projectId) : undefined
-    const label = workspaceTabLabel(tab, projectLabel)
-    const title = isWorkspaceToolTab(tab)
+      showProjectLabel && (isCollectionTab(tab) || isAuthTab(tab))
+        ? projectLabelFor?.(tab.projectId)
+        : undefined
+    const label = workspaceTabLabel(tab, projectLabel, t('tab.new_tab'))
+    const title = !isCollectionTab(tab)
       ? label
       : projectLabel
         ? `${tab.projectId} / ${tab.collectionPath}`
@@ -440,6 +463,8 @@ function TabBar({
           </div>
         )
       })}
+
+      {newTabButton}
 
       {contextMenu && (
         <div

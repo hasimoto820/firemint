@@ -58,9 +58,12 @@ function SplitPane({
   const dragRef = useRef<DragState | null>(null)
   const minSizedPx = sizeTarget === 'first' ? minFirst : minSecond
   const minOtherPx = sizeTarget === 'first' ? minSecond : minFirst
-  const [size, setSize] = useState(() =>
+  // preferred = ユーザーが選んだ大きさ（保存する値）。size = 今のコンテナに収めた表示値。
+  // コンテナが一時的に小さくなっても preferred は縮めないので、広がれば元に戻る。
+  const preferredRef = useRef<number>(
     storageKey != null ? (readLayoutSize(storageKey) ?? defaultSize) : defaultSize
   )
+  const [size, setSize] = useState(preferredRef.current)
   const sizeRef = useRef(size)
   sizeRef.current = size
   const [dragging, setDragging] = useState(false)
@@ -89,21 +92,17 @@ function SplitPane({
       return
     }
 
-    setSize((current) => {
-      const next = clampSplitSize({
-        size: current,
-        unit,
-        totalPx,
-        minSizedPx,
-        minOtherPx
-      })
-      if (Math.abs(next - current) < (unit === 'percent' ? 0.05 : 0.5)) {
-        return current
-      }
-      persist(next)
-      return next
+    const next = clampSplitSize({
+      size: preferredRef.current,
+      unit,
+      totalPx,
+      minSizedPx,
+      minOtherPx
     })
-  }, [minOtherPx, minSizedPx, orientation, persist, unit])
+    setSize((current) =>
+      Math.abs(next - current) < (unit === 'percent' ? 0.05 : 0.5) ? current : next
+    )
+  }, [minOtherPx, minSizedPx, orientation, unit])
 
   useLayoutEffect(() => {
     applyClamp()
@@ -121,6 +120,7 @@ function SplitPane({
 
   const commitSize = useCallback(
     (next: number): void => {
+      preferredRef.current = next
       sizeRef.current = next
       setSize(next)
       persist(next)
@@ -180,6 +180,7 @@ function SplitPane({
     dragRef.current = null
     draggingRef.current = false
     setDragging(false)
+    preferredRef.current = sizeRef.current
     persist(sizeRef.current)
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId)

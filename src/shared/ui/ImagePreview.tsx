@@ -39,12 +39,13 @@ function ImagePreview({ images }: ImagePreviewProps): React.JSX.Element | null {
   }
 
   return (
-    <section className="image-preview">
-      <h3 className="image-preview__title">画像</h3>
+    // 画像は高さを取るので、最初は閉じておき JSON を先に見せる
+    <details className="image-preview">
+      <summary className="image-preview__title">画像 ({images.length})</summary>
       {images.map((image) => (
         <ImagePreviewItem key={`${image.field}:${image.url}`} field={image.field} url={image.url} />
       ))}
-    </section>
+    </details>
   )
 }
 

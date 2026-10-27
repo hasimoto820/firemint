@@ -2,7 +2,8 @@ import { useI18n } from '@shared/i18n/renderer/I18nProvider'
 
 type AuthNavSectionProps = {
   active: boolean
-  onSelect: () => void
+  /** newTab = Ctrl+クリック / 中クリック（新しいタブで開く） */
+  onSelect: (newTab?: boolean) => void
   disabled?: boolean
 }
 
@@ -19,7 +20,13 @@ function AuthNavSection({
       <button
         type="button"
         className={active ? 'auth-nav__button auth-nav__button--active' : 'auth-nav__button'}
-        onClick={onSelect}
+        onClick={(event) => onSelect(event.ctrlKey || event.metaKey)}
+        onAuxClick={(event) => {
+          if (event.button === 1 && !disabled) {
+            event.preventDefault()
+            onSelect(true)
+          }
+        }}
         disabled={disabled}
       >
         {t('auth_users.nav')}

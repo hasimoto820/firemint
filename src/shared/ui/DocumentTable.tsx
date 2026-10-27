@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFieldAutocompleteItems } from '@features/autocomplete/renderer/hooks'
 import type { DocumentSummary } from '@features/explorer/shared/types'
 import Button from '@shared/ui/Button'
@@ -17,6 +17,7 @@ import {
   TABLE_FILTER_OPERATORS,
   type SortState,
   type TableFilterClause,
+  type DocumentTableViewState,
   type TableFilterOperator
 } from './document_table_utils'
 
@@ -53,6 +54,9 @@ type DocumentTableProps = {
   columnWidthsKey?: string
   projectId?: string
   paging?: DocumentTablePaging
+  /** tableKey が変わったとき（初回含む）に、この見た目から始める */
+  initialViewState?: DocumentTableViewState | null
+  onViewStateChange?: (state: DocumentTableViewState) => void
 }
 
 function filterValuePlaceholder(operator: TableFilterOperator): string {
@@ -219,22 +223,52 @@ function DocumentTable({
   tableKey,
   columnWidthsKey,
   projectId = '',
-  paging
+  paging,
+  initialViewState = null,
+  onViewStateChange
 }: DocumentTableProps): React.JSX.Element {
-  const [columnOrder, setColumnOrder] = useState<string[]>([])
-  const [hiddenColumns, setHiddenColumns] = useState<Set<string>>(new Set())
-  const [sort, setSort] = useState<SortState>(null)
-  const [filterClauses, setFilterClauses] = useState<TableFilterClause[]>([])
+  const [columnOrder, setColumnOrder] = useState<string[]>(
+    () => initialViewState?.columnOrder ?? []
+  )
+  const [hiddenColumns, setHiddenColumns] = useState<Set<string>>(
+    () => new Set(initialViewState?.hiddenColumns ?? [])
+  )
+  const [sort, setSort] = useState<SortState>(() => initialViewState?.sort ?? null)
+  const [filterClauses, setFilterClauses] = useState<TableFilterClause[]>(
+    () => initialViewState?.filterClauses ?? []
+  )
   const [showColumnPanel, setShowColumnPanel] = useState(false)
+  const initialViewStateRef = useRef(initialViewState)
+  initialViewStateRef.current = initialViewState
+  const onViewStateChangeRef = useRef(onViewStateChange)
+  onViewStateChangeRef.current = onViewStateChange
 
   useEffect(() => {
-    setColumnOrder((current) => mergeColumnOrder(current, documents, showPath))
-    setHiddenColumns(new Set())
-    setSort(null)
-    setFilterClauses([])
+    const restored = initialViewStateRef.current
+    // 戻すときは documents がまだ前のコレクションの分なので、merge せずそのまま使う
+    setColumnOrder((current) =>
+      restored ? restored.columnOrder : mergeColumnOrder(current, documents, showPath)
+    )
+    setHiddenColumns(new Set(restored?.hiddenColumns ?? []))
+    setSort(restored?.sort ?? null)
+    setFilterClauses(restored?.filterClauses ?? [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tableKey, showPath])
 
   useEffect(() => {
+    onViewStateChangeRef.current?.({
+      columnOrder,
+      hiddenColumns: Array.from(hiddenColumns),
+      sort,
+      filterClauses
+    })
+  }, [columnOrder, hiddenColumns, sort, filterClauses])
+
+  useEffect(() => {
+    // 見た目を覚えさせる使い方では、読込前の空の一覧で戻した列順を消さない
+    if (documents.length === 0 && onViewStateChangeRef.current) {
+      return
+    }
     setColumnOrder((current) => mergeColumnOrder(current, documents, showPath))
   }, [documents, showPath])
 

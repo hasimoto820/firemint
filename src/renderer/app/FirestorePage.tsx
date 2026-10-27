@@ -54,9 +54,11 @@ import CommandPalette, { type CommandPaletteItem } from '@shared/shell/CommandPa
 import TabBar from '@shared/shell/TabBar'
 import WorkspacePane from '@shared/shell/WorkspacePane'
 import {
+  createAuthTab,
   createDiffTab,
   createEmulatorImpExpTab,
   createImpExpTab,
+  createEmptyTab,
   createTransportTab,
   createWorkspaceTab,
   DIFF_TAB_LABEL,
@@ -66,15 +68,21 @@ import {
   isCollectionTab,
   isDiffTab,
   isEmulatorImpExpTab,
+  isAuthTab,
   isImpExpTab,
+  isEmptyTab,
+  isReplaceableTab,
   isTransportTab,
   isWorkspaceToolTab,
   parentCollectionPath,
+  retargetAuthTab,
+  retargetCollectionTab,
   remapFirestorePath,
   tabsInPane,
   workspaceTabLabel,
   type WorkspacePaneId,
-  type WorkspaceTab
+  type WorkspaceTab,
+  type WorkspaceTabSimpleState
 } from '@shared/shell/workspace_tab'
 import {
   applyTabBarDrop,
@@ -187,7 +195,6 @@ function FirestorePageInner({
   )
   const [deleteSubcollectionPath, setDeleteSubcollectionPath] = useState<string | null>(null)
   const [dialogProjectId, setDialogProjectId] = useState(projectId)
-  const [mainSection, setMainSection] = useState<'firestore' | 'auth'>('firestore')
   const [impExpJob, setImpExpJob] = useState<ScriptJobSnapshot | null>(null)
   const [impExpDraft, setImpExpDraft] = useState<ImpExpDraft>(() => createImpExpDraft(projectId))
   const [transportDraft, setTransportDraft] = useState<TransportDraft>(() => createTransportDraft())
@@ -240,7 +247,9 @@ function FirestorePageInner({
     [workspaceEntries]
   )
   const showProjectLabel = useMemo(() => {
-    const ids = new Set(tabs.filter((tab) => isCollectionTab(tab)).map((tab) => tab.projectId))
+    const ids = new Set(
+      tabs.filter((tab) => isCollectionTab(tab) || isAuthTab(tab)).map((tab) => tab.projectId)
+    )
     return ids.size > 1
   }, [tabs])
   const isReadOnlyProject = useCallback(
@@ -276,7 +285,9 @@ function FirestorePageInner({
 
     const loaded = new Set(loadedProjectIds)
     setTabs((current) => {
-      const next = current.filter((tab) => isWorkspaceToolTab(tab) || loaded.has(tab.projectId))
+      const next = current.filter(
+        (tab) => isWorkspaceToolTab(tab) || isEmptyTab(tab) || loaded.has(tab.projectId)
+      )
       if (next.length === current.length) {
         return current
       }
@@ -313,10 +324,6 @@ function FirestorePageInner({
   useEffect(() => {
     void loadRootCollections()
   }, [loadRootCollections])
-
-  useEffect(() => {
-    setMainSection('firestore')
-  }, [projectId])
 
   useEffect(() => {
     let cancelled = false
@@ -361,6 +368,28 @@ function FirestorePageInner({
     setCollectionDataReloadToken((token) => token + 1)
   }, [impExpJob, loadRootCollections, onWorkspaceChanged])
 
+  const updateTabSimpleState = useCallback(
+    (tabId: string, patch: Partial<WorkspaceTabSimpleState>): void => {
+      setTabs((current) =>
+        current.map((tab) =>
+          tab.id === tabId
+            ? {
+                ...tab,
+                simpleState: {
+                  pageIndex: 0,
+                  pageStartCursors: [null],
+                  table: null,
+                  ...tab.simpleState,
+                  ...patch
+                }
+              }
+            : tab
+        )
+      )
+    },
+    []
+  )
+
   const updateTab = useCallback((tabId: string, patch: Partial<WorkspaceTab>): void => {
     setTabs((current) => current.map((tab) => (tab.id === tabId ? { ...tab, ...patch } : tab)))
   }, [])
@@ -396,9 +425,10 @@ function FirestorePageInner({
         selectedDocumentPath?: string | null
         pane?: WorkspacePaneId
         projectId?: string
+        /** true = 今のタブはそのままにして、新しいタブで開く */
+        newTab?: boolean
       }
     ): void => {
-      setMainSection('firestore')
       const targetPane = options?.pane ?? (splitEnabled ? focusedPane : 'primary')
       const nextView = options?.view
       const nextDoc = options?.selectedDocumentPath
@@ -407,30 +437,22 @@ function FirestorePageInner({
       // setTabs の updater 内で onNavigate / setActiveId すると、まだ旧タブが
       // focused のまま App の view だけ simple になり、旧タブの view が上書きされる。
       // フォーカス切替とタブ更新を同バッチで行い、その後に navigate する。
-      const existingInPane = tabs.find(
-        (tab) =>
-          isCollectionTab(tab) &&
-          tab.projectId === tabProjectId &&
-          tab.collectionPath === collectionPath &&
-          tab.pane === targetPane
-      )
+      const activeId = targetPane === 'primary' ? primaryActiveId : secondaryActiveId
+      const activeTab = tabs.find((tab) => tab.id === activeId) ?? null
 
-      if (existingInPane) {
-        const resolvedView = nextView ?? existingInPane.view
-        if (targetPane === 'primary') {
-          setPrimaryActiveId(existingInPane.id)
-        } else {
-          setSecondaryActiveId(existingInPane.id)
-        }
+      // コレクション / 空タブ / Auth は中身を切り替える。ツール系タブは入力途中なので残す。
+      if (!options?.newTab && activeTab && isReplaceableTab(activeTab)) {
+        const resolvedView = nextView ?? (isCollectionTab(activeTab) ? activeTab.view : view)
         setFocusedPane(targetPane)
         setTabs((current) =>
           current.map((tab) =>
-            tab.id === existingInPane.id
-              ? {
-                  ...tab,
+            tab.id === activeTab.id
+              ? retargetCollectionTab(tab, {
+                  projectId: tabProjectId,
+                  collectionPath,
                   view: resolvedView,
-                  selectedDocumentPath: nextDoc !== undefined ? nextDoc : tab.selectedDocumentPath
-                }
+                  selectedDocumentPath: nextDoc
+                })
               : tab
           )
         )
@@ -454,13 +476,61 @@ function FirestorePageInner({
       setTabs((current) => [...current, created])
       onNavigate(created.view)
     },
-    [projectId, view, onNavigate, splitEnabled, focusedPane, tabs]
+    [
+      projectId,
+      view,
+      onNavigate,
+      splitEnabled,
+      focusedPane,
+      tabs,
+      primaryActiveId,
+      secondaryActiveId
+    ]
+  )
+
+  /** 左下の AUTH。今のタブを Auth に切り替える（newTab なら新しいタブで開く）。 */
+  const openAuth = useCallback(
+    (newTab = false): void => {
+      const targetPane = splitEnabled ? focusedPane : 'primary'
+      const activeId = targetPane === 'primary' ? primaryActiveId : secondaryActiveId
+      const activeTab = tabs.find((tab) => tab.id === activeId) ?? null
+      setFocusedPane(targetPane)
+
+      if (!newTab && activeTab && isReplaceableTab(activeTab)) {
+        setTabs((current) =>
+          current.map((tab) => (tab.id === activeTab.id ? retargetAuthTab(tab, projectId) : tab))
+        )
+        return
+      }
+
+      const created = createAuthTab({ projectId, pane: targetPane })
+      if (targetPane === 'primary') {
+        setPrimaryActiveId(created.id)
+      } else {
+        setSecondaryActiveId(created.id)
+      }
+      setTabs((current) => [...current, created])
+    },
+    [focusedPane, primaryActiveId, projectId, secondaryActiveId, splitEnabled, tabs]
+  )
+
+  /** ＋ボタン。空タブ（「コレクションを開いてください」）を開いてアクティブにする。 */
+  const openEmptyTab = useCallback(
+    (pane: WorkspacePaneId): void => {
+      const created = createEmptyTab({ projectId, pane })
+      if (pane === 'primary') {
+        setPrimaryActiveId(created.id)
+      } else {
+        setSecondaryActiveId(created.id)
+      }
+      setFocusedPane(pane)
+      setTabs((current) => [...current, created])
+    },
+    [projectId]
   )
 
   const openImpExp = useCallback(
     (intent?: ImpExpIntent): void => {
-      setMainSection('firestore')
-
       if (intent) {
         setImpExpDraft((current) =>
           applyImpExpIntent(current, intent, lastCollectionPathRef.current, rootCollections)
@@ -495,7 +565,6 @@ function FirestorePageInner({
 
   const openEmulatorImpExp = useCallback(
     (mode?: EmulatorPageMode): void => {
-      setMainSection('firestore')
       if (mode) {
         setEmulatorImpExpMode(mode)
       }
@@ -523,8 +592,6 @@ function FirestorePageInner({
 
   const openTransport = useCallback(
     (intent?: TransportIntent): void => {
-      setMainSection('firestore')
-
       if (intent) {
         setTransportDraft((current) =>
           applyTransportIntent(
@@ -559,8 +626,6 @@ function FirestorePageInner({
 
   const openDiff = useCallback(
     (intent?: DiffIntent): void => {
-      setMainSection('firestore')
-
       if (intent) {
         setDiffDraft((current) => applyDiffIntent(current, intent))
       }
@@ -599,20 +664,20 @@ function FirestorePageInner({
   }, [])
 
   const handleSelectCollection = useCallback(
-    (collectionPath: string): void => {
-      openCollection(collectionPath, { selectedDocumentPath: null })
+    (collectionPath: string, newTab = false): void => {
+      openCollection(collectionPath, { selectedDocumentPath: null, newTab })
     },
     [openCollection]
   )
 
   const handleSelectDocument = useCallback(
-    (documentPath: string): void => {
+    (documentPath: string, newTab = false): void => {
       const collectionPath = parentCollectionPath(documentPath)
       if (!collectionPath) {
         return
       }
 
-      openCollection(collectionPath, { selectedDocumentPath: documentPath })
+      openCollection(collectionPath, { selectedDocumentPath: documentPath, newTab })
     },
     [openCollection]
   )
@@ -798,17 +863,27 @@ function FirestorePageInner({
     (collectionPath: string, targetProjectId = dialogProjectId): void => {
       autocomplete.removeCollectionPaths(targetProjectId, [collectionPath])
       const prefix = `${collectionPath}/`
+      const parentDocument = parentDocumentPathOfSubcollection(collectionPath)
+      const isDeleted = (tab: WorkspaceTab): boolean =>
+        isCollectionTab(tab) &&
+        tab.projectId === targetProjectId &&
+        (tab.collectionPath === collectionPath || tab.collectionPath.startsWith(prefix))
 
       setTabs((current) => {
+        // 消えたコレクションを開いていたタブは、親ドキュメントのコレクションへ切り替える。
+        // ルートコレクションなら戻り先が無いので閉じる。
         const filtered = current
-          .filter(
-            (tab) =>
-              isWorkspaceToolTab(tab) ||
-              tab.projectId !== targetProjectId ||
-              (tab.collectionPath !== collectionPath && !tab.collectionPath.startsWith(prefix))
-          )
+          .filter((tab) => Boolean(parentDocument) || !isDeleted(tab))
           .map((tab) => {
-            if (tab.projectId !== targetProjectId) {
+            if (parentDocument && isDeleted(tab)) {
+              return retargetCollectionTab(tab, {
+                projectId: targetProjectId,
+                collectionPath: parentCollectionPath(parentDocument),
+                selectedDocumentPath: parentDocument
+              })
+            }
+
+            if (!isCollectionTab(tab) || tab.projectId !== targetProjectId) {
               return tab
             }
 
@@ -843,16 +918,8 @@ function FirestorePageInner({
         setTreeReloadToken((token) => token + 1)
         void loadRootCollections()
       }
-
-      const parentDocument = parentDocumentPathOfSubcollection(collectionPath)
-      if (parentDocument) {
-        openCollection(parentCollectionPath(parentDocument), {
-          selectedDocumentPath: parentDocument,
-          projectId: targetProjectId
-        })
-      }
     },
-    [autocomplete, dialogProjectId, loadRootCollections, openCollection, projectId]
+    [autocomplete, dialogProjectId, loadRootCollections, projectId]
   )
 
   const handleCollectionBecameEmpty = useCallback(
@@ -955,7 +1022,7 @@ function FirestorePageInner({
 
       setTabs((current) => {
         const remapped = current.map((tab) => {
-          if (isWorkspaceToolTab(tab) || tab.projectId !== dialogProjectId) {
+          if (!isCollectionTab(tab) || tab.projectId !== dialogProjectId) {
             return tab
           }
 
@@ -977,31 +1044,7 @@ function FirestorePageInner({
           }
         })
 
-        const deduped: WorkspaceTab[] = []
-        for (const tab of remapped) {
-          if (isWorkspaceToolTab(tab)) {
-            if (deduped.some((existing) => existing.kind === tab.kind)) {
-              continue
-            }
-            deduped.push(tab)
-            continue
-          }
-
-          if (
-            deduped.some(
-              (existing) =>
-                isCollectionTab(existing) &&
-                existing.projectId === tab.projectId &&
-                existing.pane === tab.pane &&
-                existing.collectionPath === tab.collectionPath
-            )
-          ) {
-            continue
-          }
-          deduped.push(tab)
-        }
-
-        return deduped
+        return remapped
       })
 
       if (dialogProjectId === projectId) {
@@ -1245,7 +1288,7 @@ function FirestorePageInner({
 
   // メニュー等の view 変更 → フォーカス中のコレクションタブへ
   useEffect(() => {
-    if (!focusedActiveId || !focusedTab || isWorkspaceToolTab(focusedTab)) {
+    if (!focusedActiveId || !focusedTab || !isCollectionTab(focusedTab)) {
       return
     }
 
@@ -1256,7 +1299,7 @@ function FirestorePageInner({
 
   // フォーカス切替時に App 側 view を同期（Imp/Exp は Simple/Query ではない）
   useEffect(() => {
-    if (!focusedTab || isWorkspaceToolTab(focusedTab)) {
+    if (!focusedTab || !isCollectionTab(focusedTab)) {
       return
     }
 
@@ -1271,8 +1314,6 @@ function FirestorePageInner({
       splitEnabled,
       focusedPane,
       setFocusedPane,
-      showFirestore: () => setMainSection('firestore'),
-      showAuth: () => setMainSection('auth'),
       openPalette: () => setPaletteOpen(true),
       closeActiveTab: () => {
         if (focusedActiveId) {
@@ -1354,28 +1395,19 @@ function FirestorePageInner({
 
   const handlePaneCollectionChange = useCallback(
     (tabId: string, collectionPath: string): void => {
-      const currentTab = tabs.find((tab) => tab.id === tabId)
-      if (!currentTab) {
-        return
-      }
-
-      const existingInPane = tabs.find(
-        (tab) =>
-          isCollectionTab(tab) &&
-          tab.projectId === currentTab.projectId &&
-          tab.collectionPath === collectionPath &&
-          tab.pane === currentTab.pane &&
-          tab.id !== tabId
+      setTabs((current) =>
+        current.map((tab) =>
+          tab.id === tabId
+            ? retargetCollectionTab(tab, {
+                projectId: tab.projectId,
+                collectionPath,
+                selectedDocumentPath: null
+              })
+            : tab
+        )
       )
-      if (existingInPane) {
-        activateInPane(existingInPane.id, existingInPane.pane)
-        updateTab(existingInPane.id, { selectedDocumentPath: null })
-        return
-      }
-
-      updateTab(tabId, { collectionPath, selectedDocumentPath: null })
     },
-    [tabs, updateTab, activateInPane]
+    []
   )
 
   const paletteItems = useMemo((): CommandPaletteItem[] => {
@@ -1558,6 +1590,7 @@ function FirestorePageInner({
           showProjectLabel={showProjectLabel}
           onActivate={(tabId) => activateInPane(tabId, pane)}
           onClose={handleCloseTab}
+          onNewTab={() => openEmptyTab(pane)}
           onDrop={(source, dest) => handleTabDrop(pane, source, dest)}
           onCreateGroup={(tabId) => handleCreateGroup(pane, tabId)}
           onJoinGroup={(tabId, groupId) => handleJoinGroup(pane, tabId, groupId)}
@@ -1570,8 +1603,24 @@ function FirestorePageInner({
         />
       </div>
 
-      {active ? (
+      {active && isEmptyTab(active) ? (
+        <div className="simple-main simple-main--empty">
+          <p className="simple-main__empty-title">{t('explorer.open_title')}</p>
+          <p className="simple-main__empty-hint">{t('explorer.open_hint')}</p>
+        </div>
+      ) : active && isAuthTab(active) ? (
+        <div key={active.id} className="workspace-pane">
+          <AuthUsersView
+            projectId={active.projectId}
+            readOnly={
+              connectionStatusForTab(status, active, workspaceEntries, writeBlockedReasons).readOnly
+            }
+          />
+        </div>
+      ) : active ? (
         <WorkspacePane
+          // タブごとに作り直す。中身の状態はタブ（simpleState / query*）から戻す
+          key={active.id}
           status={
             isWorkspaceToolTab(active)
               ? status
@@ -1641,7 +1690,13 @@ function FirestorePageInner({
           onCollectionBecameEmpty={(path) => void handleCollectionBecameEmpty(path, active.projectId)}
           onOpenDocumentPath={(path) => void handleOpenDocumentPath(path, active.projectId)}
           onQueryDraftChange={(patch) => updateTab(active.id, patch)}
+          onSimpleStateChange={(patch) => updateTabSimpleState(active.id, patch)}
         />
+      ) : !splitEnabled ? (
+        <div className="simple-main simple-main--empty">
+          <p className="simple-main__empty-title">{t('explorer.open_title')}</p>
+          <p className="simple-main__empty-hint">{t('explorer.open_hint')}</p>
+        </div>
       ) : (
         <div className="firestore-split__pane-empty">
           <p className="simple-main__empty-title">
@@ -1667,9 +1722,8 @@ function FirestorePageInner({
             unavailableReason={status.writeBlockedReason}
             activeCollectionPath={treeCollectionPath}
             selectedDocumentPath={treeDocumentPath}
-            mainSection={mainSection}
-            onSelectFirestore={() => setMainSection('firestore')}
-            onSelectAuth={() => setMainSection('auth')}
+            mainSection={focusedTab && isAuthTab(focusedTab) ? 'auth' : 'firestore'}
+            onSelectAuth={openAuth}
             onSelectCollection={handleSelectCollection}
             onSelectDocument={handleSelectDocument}
             onRenameCollection={handleRequestRenameCollection}
@@ -1691,14 +1745,7 @@ function FirestorePageInner({
         }
         main={
           <div className="firestore-main">
-            {mainSection === 'auth' ? (
-              <AuthUsersView projectId={projectId} readOnly={status.readOnly} />
-            ) : tabs.length === 0 ? (
-              <div className="simple-main simple-main--empty">
-                <p className="simple-main__empty-title">{t('explorer.open_title')}</p>
-                <p className="simple-main__empty-hint">{t('explorer.open_hint')}</p>
-              </div>
-            ) : splitEnabled ? (
+            {splitEnabled ? (
               <SplitPane
                 className="firestore-split"
                 orientation="horizontal"

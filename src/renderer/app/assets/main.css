@@ -419,6 +419,7 @@ code {
 .split-pane__pane > .app-layout__main,
 .split-pane__pane > .firestore-split__pane,
 .split-pane__pane > .query-editor,
+.split-pane__pane > .query-main__top,
 .split-pane__pane > .simple-main__workspace,
 .split-pane__pane > .simple-main__json,
 .split-pane__pane > .query-main__after-editor,
@@ -829,7 +830,24 @@ code {
 
 .tab-bar--empty {
   min-height: 0;
-  border-bottom: none;
+}
+
+.tab-bar__new {
+  flex-shrink: 0;
+  align-self: center;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ev-c-text-2);
+  padding: 2px 8px;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.tab-bar__new:hover {
+  background: var(--ev-c-gray-3);
+  color: inherit;
 }
 
 .tab-bar__tab {
@@ -2897,13 +2915,25 @@ code {
   cursor: pointer;
 }
 
+/* プレビューを開いて JSON が押し出されても、欄ごとスクロールして届くようにする */
 .document-json-panel {
   display: flex;
   flex-direction: column;
   gap: 8px;
   min-height: 0;
   height: 100%;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+/* JSON 以外は縮めない。JSON は残りを使い、狭いときも最低限の高さを残して欄ごとスクロールする */
+.document-json-panel > :not(.autocomplete-input):not(.document-json-panel__editor) {
+  flex-shrink: 0;
+}
+
+.firestore-main .document-json-panel > .document-json-panel__editor,
+.document-json-panel > .document-json-panel__editor {
+  min-height: 160px;
 }
 
 .document-json-panel__header {
@@ -2951,7 +2981,9 @@ code {
 
 .geopoint-preview__title {
   margin: 0;
-  font-size: 14px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
 }
 
 .geopoint-preview__label {
@@ -3033,6 +3065,7 @@ code {
   margin: 0;
   font-size: 12px;
   font-weight: 600;
+  cursor: pointer;
 }
 
 .image-preview__item {
@@ -3093,7 +3126,7 @@ code {
   display: flex;
   flex-direction: column;
   flex: 1;
-  min-height: 0;
+  min-height: 160px;
 }
 
 .connection-panel__loading {
@@ -3138,12 +3171,37 @@ code {
   overflow: hidden;
 }
 
+/* 上段。エディタだけが伸び、Saved と件数は下に固定 */
+.query-main__top {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow: hidden;
+}
+
+/* エディタを包む data-area 用の箱。中の .query-editor を残りの高さいっぱいに伸ばす */
+.query-main__editor {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.query-main__top > :not(.query-main__editor) {
+  flex-shrink: 0;
+}
+
+.query-main__after-editor {
+  display: flex;
+  flex-direction: column;
+}
+
 .query-main__split {
   flex: 1;
   min-height: 0;
 }
 
-.query-main__after-editor .saved-queries-bar {
+.query-main__top .saved-queries-bar {
   flex-shrink: 0;
 }
 

@@ -53,6 +53,7 @@ export const ja: MessageCatalog = {
   'tab.ungroup': 'グループを解除',
   'tab.close_group': 'グループを閉じる',
   'tab.group_color': '色',
+  'tab.new_tab': '新しいタブ',
   'menu.minimize': '最小化',
   'menu.zoom': 'ズーム',
   'menu.about': 'FireMint について',

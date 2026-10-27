@@ -542,27 +542,26 @@ function QueryView({
       <SplitPane
         className="query-main__split"
         orientation="vertical"
-        storageKey="query.editor"
-        defaultSize={200}
+        storageKey="query.top"
+        defaultSize={300}
         unit="px"
-        minFirst={96}
+        minFirst={180}
         minSecond={160}
-        ariaLabel="クエリエディタの高さ"
+        ariaLabel="クエリエディタと結果の境目"
         first={
-          <div data-area="settings" data-pane={pane} tabIndex={-1}>
-            <QueryEditor
-              projectId={projectId}
-              source={source}
-              loading={loading}
-              groupTab={groupTab}
-              onChange={(next) => onQueryDraftChange({ querySource: next })}
-              onSelectGroupTab={handleSelectGroupTab}
-              onRun={() => void handleRun()}
-            />
-          </div>
-        }
-        second={
-          <div className="query-main__after-editor">
+          // 上段: エディタ・Saved・実行結果の件数。下段: 結果テーブル（列設定 / フィルタから下）
+          <div className="query-main__top">
+            <div className="query-main__editor" data-area="settings" data-pane={pane} tabIndex={-1}>
+              <QueryEditor
+                projectId={projectId}
+                source={source}
+                loading={loading}
+                groupTab={groupTab}
+                onChange={(next) => onQueryDraftChange({ querySource: next })}
+                onSelectGroupTab={handleSelectGroupTab}
+                onRun={() => void handleRun()}
+              />
+            </div>
             <div data-area="settings" data-pane={pane} tabIndex={-1}>
               <SavedQueriesBar
                 queries={savedQueries}
@@ -579,6 +578,13 @@ function QueryView({
             {error && <p className="query-main__error">{error}</p>}
             {statusMessage && <p className="query-main__status">{statusMessage}</p>}
             {loading && <p className="query-main__loading">実行中...</p>}
+            {queryResultCount !== null && (
+              <div className="query-main__result-label">{queryResultCount} docs</div>
+            )}
+          </div>
+        }
+        second={
+          <div className="query-main__after-editor">
             {queryResultCount === null && !loading && (
               <p className="query-main__empty-hint">
                 Run で絞り込み → 行を選んで JSON を保存、またはチェックして一括。db / admin
@@ -598,7 +604,6 @@ function QueryView({
                 ariaLabel="JSON パネルの高さ"
                 first={
                   <div className="query-main__workspace" data-area="settings" data-pane={pane} tabIndex={-1}>
-                    <div className="query-main__result-label">{queryResultCount} docs</div>
                     <TableBulkSplit
                       table={
                     <DocumentTable

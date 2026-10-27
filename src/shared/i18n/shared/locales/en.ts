@@ -51,6 +51,7 @@ export const en: Record<string, string> = {
   'tab.ungroup': 'Ungroup',
   'tab.close_group': 'Close group',
   'tab.group_color': 'Color',
+  'tab.new_tab': 'New tab',
   'menu.minimize': 'Minimize',
   'menu.zoom': 'Zoom',
   'menu.about': 'About FireMint',

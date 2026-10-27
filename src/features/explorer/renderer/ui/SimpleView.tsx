@@ -12,7 +12,7 @@ import { isSubcollectionPath } from '@features/explorer/shared/tree'
 import { runDuplicateCollection } from '@features/explorer/renderer/duplicateCollection'
 import { useI18n } from '@shared/i18n/renderer/I18nProvider'
 import { useRegisterAppMenu } from '@shared/shell/AppMenuContext'
-import type { WorkspacePaneId } from '@shared/shell/workspace_tab'
+import type { WorkspacePaneId, WorkspaceTabSimpleState } from '@shared/shell/workspace_tab'
 import { confirmAction } from '@shared/ui/confirmAction'
 import DocumentJsonPanel from '@shared/ui/DocumentJsonPanel'
 import DocumentTable from '@shared/ui/DocumentTable'
@@ -46,6 +46,9 @@ type SimpleViewProps = {
   /** Split 時など、メニュー登録を行うのはフォーカス側のペインのみ */
   menuEnabled?: boolean
   onOpenImpExp?: (intent?: ImpExpIntent) => void
+  /** タブが覚えているページ位置と表の見た目。コレクションを開いたときに戻す */
+  simpleState?: WorkspaceTabSimpleState | null
+  onSimpleStateChange?: (patch: Partial<WorkspaceTabSimpleState>) => void
 }
 
 /**
@@ -73,7 +76,9 @@ function SimpleView({
   onCollectionBecameEmpty,
   onOpenDocumentPath,
   menuEnabled = true,
-  onOpenImpExp
+  onOpenImpExp,
+  simpleState = null,
+  onSimpleStateChange
 }: SimpleViewProps): React.JSX.Element {
   const { t } = useI18n()
   const projectId = status.projectId
@@ -101,6 +106,12 @@ function SimpleView({
   /** pageStartCursors[i] = ページ i を読むときの startAfterId（0 ページ目は null） */
   const pageStartCursorsRef = useRef<(string | null)[]>([null])
   const seekCanceledRef = useRef(false)
+  const simpleStateRef = useRef(simpleState)
+  simpleStateRef.current = simpleState
+  const onSimpleStateChangeRef = useRef(onSimpleStateChange)
+  onSimpleStateChangeRef.current = onSimpleStateChange
+  /** 最後に読み込んだコレクション。変わったときだけタブの状態を戻す */
+  const loadedCollectionPathRef = useRef<string | null>(null)
 
   const refreshTotalCount = useCallback(
     async (collectionPath: string): Promise<void> => {
@@ -160,6 +171,13 @@ function SimpleView({
         pageStartCursorsRef.current = nextCursors
         pageIndexRef.current = targetPage
         hasMoreRef.current = more
+        // 読込中にタブが別コレクションへ切り替わっていたら、その状態には書かない
+        if (loadedCollectionPathRef.current === collectionPath) {
+          onSimpleStateChangeRef.current?.({
+            pageIndex: targetPage,
+            pageStartCursors: nextCursors
+          })
+        }
 
         setDocuments(pageDocs)
         setHasMore(more)
@@ -218,6 +236,7 @@ function SimpleView({
 
   useEffect(() => {
     if (!activeCollectionPath) {
+      loadedCollectionPathRef.current = null
       setDocuments([])
       setBulkSelectedPaths(new Set())
       setPageIndex(0)
@@ -228,8 +247,37 @@ function SimpleView({
       return
     }
 
+    // 開き直したとき（タブ切替・Simple ⇄ Query・コレクション切替）は前のページへ戻す。
+    // 再読込（collectionDataReloadToken）は今まで通り 1 ページ目から。
+    const restored =
+      loadedCollectionPathRef.current !== activeCollectionPath ? simpleStateRef.current : null
+    loadedCollectionPathRef.current = activeCollectionPath
+
+    if (
+      restored &&
+      restored.pageIndex > 0 &&
+      restored.pageStartCursors[restored.pageIndex] !== undefined
+    ) {
+      const collectionPath = activeCollectionPath
+      pageStartCursorsRef.current = restored.pageStartCursors
+      pageIndexRef.current = restored.pageIndex
+      void refreshTotalCount(collectionPath)
+      void loadDocumentsPage(collectionPath, restored.pageIndex).then((docs) => {
+        if (!docs) {
+          void resetAndLoadFirstPage(collectionPath)
+        }
+      })
+      return
+    }
+
     void resetAndLoadFirstPage(activeCollectionPath)
-  }, [activeCollectionPath, collectionDataReloadToken, resetAndLoadFirstPage])
+  }, [
+    activeCollectionPath,
+    collectionDataReloadToken,
+    loadDocumentsPage,
+    refreshTotalCount,
+    resetAndLoadFirstPage
+  ])
 
   useEffect(() => {
     if (!selectedDocumentPath) {
@@ -782,6 +830,8 @@ function SimpleView({
               selectedDocumentPath={selectedDocumentPath}
               tableKey={activeCollectionPath}
               projectId={projectId}
+              initialViewState={simpleState?.table ?? null}
+              onViewStateChange={(table) => onSimpleStateChange?.({ table })}
               selectable={!readOnly}
               bulkSelectedPaths={bulkSelectedPaths}
               onBulkToggle={handleBulkToggle}

@@ -17,6 +17,8 @@ type CollectionTreeProps = {
   selectedDocumentPath: string | null
   onSelectCollection: (collectionPath: string) => void
   onSelectDocument: (documentPath: string) => void
+  /** 右クリック「新しいタブで開く」/ Ctrl+クリック / 中クリック */
+  onOpenInNewTab?: (path: string, kind: TreeNodeKind) => void
   onRenameCollection?: (collectionPath: string) => void
   onDuplicateCollection?: (collectionPath: string) => void
   onDeleteCollection?: (collectionPath: string) => void
@@ -56,6 +58,7 @@ function CollectionTree({
   selectedDocumentPath,
   onSelectCollection,
   onSelectDocument,
+  onOpenInNewTab,
   onRenameCollection,
   onDuplicateCollection,
   onDeleteCollection,
@@ -351,12 +354,17 @@ function CollectionTree({
     await ensureExpandedWithChildren(node.path, node.kind)
   }
 
-  const handleSelect = (node: TreeNode): void => {
+  const handleSelect = (node: TreeNode, event?: React.MouseEvent): void => {
     if (disabled) {
       return
     }
 
     setContextMenu(null)
+
+    if (event && (event.ctrlKey || event.metaKey) && onOpenInNewTab) {
+      onOpenInNewTab(node.path, node.kind)
+      return
+    }
 
     if (node.kind === 'collection') {
       onSelectCollection(node.path)
@@ -382,21 +390,11 @@ function CollectionTree({
     event.preventDefault()
     event.stopPropagation()
 
-    if (disabled || (!canRename && !canManageSubcollections)) {
+    // read-only でも「新しいタブで開く」は出す。右クリックだけでは今のタブを切り替えない。
+    if (disabled) {
       return
     }
 
-    if (
-      !onRenameCollection &&
-      !onDuplicateCollection &&
-      !onDeleteCollection &&
-      !onCreateDocument &&
-      !onFieldBulk
-    ) {
-      return
-    }
-
-    onSelectCollection(collectionPath)
     setContextMenu({
       x: event.clientX,
       y: event.clientY,
@@ -409,18 +407,10 @@ function CollectionTree({
     event.preventDefault()
     event.stopPropagation()
 
-    if (
-      disabled ||
-      (!canRename && !canManageSubcollections)
-    ) {
+    if (disabled) {
       return
     }
 
-    if (!onDuplicateDocument && !onDeleteDocument && !onCreateSubcollection) {
-      return
-    }
-
-    onSelectDocument(documentPath)
     setContextMenu({
       x: event.clientX,
       y: event.clientY,
@@ -485,7 +475,14 @@ function CollectionTree({
             className="collection-tree__label"
             tabIndex={node.kind === 'collection' ? undefined : -1}
             data-tree-active={isActive && node.kind === 'collection' ? 'true' : undefined}
-            onClick={() => handleSelect(node)}
+            onClick={(event) => handleSelect(node, event)}
+            onAuxClick={(event) => {
+              if (event.button === 1 && !disabled && onOpenInNewTab) {
+                event.preventDefault()
+                setContextMenu(null)
+                onOpenInNewTab(node.path, node.kind)
+              }
+            }}
             onKeyDown={(event) => {
               if (node.kind !== 'collection') {
                 return
@@ -549,6 +546,8 @@ function CollectionTree({
     )
   }
 
+  const canWrite = canRename || canManageSubcollections
+
   const rootNodes: TreeNode[] = rootCollections.map((name) => ({
     kind: 'collection',
     name,
@@ -575,7 +574,25 @@ function CollectionTree({
           role="menu"
           onClick={(event) => event.stopPropagation()}
         >
-          {contextMenu.kind === 'document' ? (
+          {onOpenInNewTab ? (
+            <button
+              type="button"
+              className="collection-tree__context-item"
+              role="menuitem"
+              onClick={(event) => {
+                event.stopPropagation()
+                const path =
+                  contextMenu.kind === 'document'
+                    ? contextMenu.documentPath
+                    : contextMenu.collectionPath
+                setContextMenu(null)
+                onOpenInNewTab(path, contextMenu.kind)
+              }}
+            >
+              新しいタブで開く
+            </button>
+          ) : null}
+          {!canWrite ? null : contextMenu.kind === 'document' ? (
             <>
               <div className="collection-tree__context-header">サブコレクション</div>
               <button

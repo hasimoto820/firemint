@@ -29,6 +29,14 @@ export type TableFilterClause = {
   value: string
 }
 
+/** 表の見た目（列の順番・非表示・並び替え・フィルタ）。タブに覚えさせて戻すときに使う。 */
+export type DocumentTableViewState = {
+  columnOrder: string[]
+  hiddenColumns: string[]
+  sort: SortState
+  filterClauses: TableFilterClause[]
+}
+
 export const TABLE_FILTER_OPERATORS: { value: TableFilterOperator; label: string }[] = [
   { value: '==', label: '==' },
   { value: '!=', label: '!=' },

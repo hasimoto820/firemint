@@ -14,8 +14,9 @@ function GeopointPreview({ points }: GeopointPreviewProps): React.JSX.Element | 
   }
 
   return (
-    <section className="geopoint-preview">
-      <h3 className="geopoint-preview__title">Geopoint</h3>
+    // 地図は高さを取るので、最初は閉じておき JSON を先に見せる
+    <details className="geopoint-preview">
+      <summary className="geopoint-preview__title">Geopoint ({points.length})</summary>
       {points.map((point) => (
         <div key={point.field} className="geopoint-preview__item">
           <p className="geopoint-preview__label">
@@ -36,7 +37,7 @@ function GeopointPreview({ points }: GeopointPreviewProps): React.JSX.Element | 
           />
         </div>
       ))}
-    </section>
+    </details>
   )
 }
 

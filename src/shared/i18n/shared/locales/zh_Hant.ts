@@ -53,6 +53,7 @@ export const zhHant: MessageCatalog = {
   'tab.ungroup': '解散群組',
   'tab.close_group': '關閉群組',
   'tab.group_color': '顏色',
+  'tab.new_tab': '新分頁',
   'menu.minimize': '最小化',
   'menu.zoom': '縮放',
   'menu.about': '關於 FireMint',

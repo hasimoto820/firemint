@@ -16,8 +16,6 @@ export type AreaFocusHost = {
   splitEnabled: boolean
   focusedPane: WorkspacePaneId
   setFocusedPane: (pane: WorkspacePaneId) => void
-  showFirestore: () => void
-  showAuth: () => void
   openPalette: () => void
   closeActiveTab: () => void
   hasPageTabs: (pane: WorkspacePaneId) => boolean
@@ -220,7 +218,6 @@ function landPageTabs(pane: WorkspacePaneId): boolean {
     return false
   }
 
-  host.showFirestore()
   host.setFocusedPane(pane)
   afterPaint(() => {
     focusNamedArea('page_tabs', pane)
@@ -244,13 +241,8 @@ function landWorkArea(area: 'settings' | 'results'): boolean {
   return true
 }
 
+// Auth はタブになったので、左側へのフォーカス移動では右側を切り替えない
 function landLeft(area: 'projects' | 'collections' | 'auth'): boolean {
-  if (area === 'auth') {
-    host?.showAuth()
-  } else {
-    host?.showFirestore()
-  }
-
   afterPaint(() => {
     focusNamedArea(area)
   })

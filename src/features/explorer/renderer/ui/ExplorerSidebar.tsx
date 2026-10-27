@@ -10,10 +10,10 @@ type ExplorerSidebarProps = {
   activeCollectionPath: string | null
   selectedDocumentPath: string | null
   mainSection: 'firestore' | 'auth'
-  onSelectFirestore: () => void
-  onSelectAuth: () => void
-  onSelectCollection: (collectionPath: string) => void
-  onSelectDocument: (documentPath: string) => void
+  /** newTab = Ctrl+クリック / 中クリック */
+  onSelectAuth: (newTab?: boolean) => void
+  onSelectCollection: (collectionPath: string, newTab?: boolean) => void
+  onSelectDocument: (documentPath: string, newTab?: boolean) => void
   onRenameCollection?: (collectionPath: string) => void
   onDuplicateCollection?: (collectionPath: string) => void
   onDeleteCollection?: (collectionPath: string) => void
@@ -42,7 +42,6 @@ function ExplorerSidebar({
   activeCollectionPath,
   selectedDocumentPath,
   mainSection,
-  onSelectFirestore,
   onSelectAuth,
   onSelectCollection,
   onSelectDocument,
@@ -84,12 +83,17 @@ function ExplorerSidebar({
                 mainSection === 'firestore' ? selectedDocumentPath : null
               }
               onSelectCollection={(collectionPath) => {
-                onSelectFirestore()
                 onSelectCollection(collectionPath)
               }}
               onSelectDocument={(documentPath) => {
-                onSelectFirestore()
                 onSelectDocument(documentPath)
+              }}
+              onOpenInNewTab={(path, kind) => {
+                if (kind === 'collection') {
+                  onSelectCollection(path, true)
+                } else {
+                  onSelectDocument(path, true)
+                }
               }}
               onRenameCollection={onRenameCollection}
               onDuplicateCollection={onDuplicateCollection}
