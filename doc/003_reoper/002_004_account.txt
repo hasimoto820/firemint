@@ -1,0 +1,298 @@
+
+account
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+
+
+
+
+
+
+
+================================================================================
+未策定
+================================================================================
+
+
+
+デスクトップで新しく決めること
+
+
+
+
+
+1. FireMint へのログイン（Firebase Auth）
+モバイルは、初回起動のときに匿名で始めて、あとで Google に昇格するか、既存の uid に合流します。デスクトップも同じ流れにするかを決めます。
+
+Electron には Android の Google ログインの仕組みが無いので、Google ログインのやり方も決める必要があります。今の Firestore 用のログインと同じく、ブラウザでログインして戻ってくる形が考えられます。
+
+→　モバイルと同じ。初めて起動した時に匿名ユーザーを作り、あとで Google に昇格するか、既存の uid に合流する。
+　　基本ルール 0〜6（003_001_plan）をそのまま使う。
+　　Google ログインは、ブラウザでログインしてアプリに戻る形。
+
+
+
+
+2. deviceId（トライアルの起点）
+Android ID の代わりになる値を何にするかを決めます。
+
+→　Windows の MachineGuid を使う（関数に渡す時の名前は deviceId）。
+
+
+
+
+自分で作った番号をファイルに保存する場合：そのファイルを消せば、トライアルをやり直せます。
+PC の固有の番号（Windows の MachineGuid など）を使う場合：再インストールしても同じ値です。
+
+モバイルの「再インストールしてもトライアルは続く」に合わせるかどうかが分かれ目です。
+
+→　モバイルと同じ。トライアルは端末ごと。
+　　サーバーには、ハッシュ（SHA-256）にして devices のドキュメントID として持つ。生の値は保存しない。
+
+
+
+
+3. 端末に置くキャッシュ
+モバイルの SQLite（uid / accountId / この端末の firstUseDate）に当たるものを、どこに置くかを決めます。
+
+→
+C:\Users\<ユーザー名>\AppData\Roaming\FireMint\
+プロジェクトの一覧（workspaces.json）や Google の OAuth の設定　これらも移動。
+
+
+
+
+4. Stripe の購入の流れと、Webhook をどこで受けるか
+Webhook を受ける関数は、モバイルと同じ Firebase プロジェクト（firemint-e801f）の Cloud Functions に置くことになります。
+注意点として、デスクトップのリポジトリから関数をデプロイすると、モバイルのリポジトリの関数が消されるおそれがあります。
+それを避ける方法（Firebase の「codebase」の分け方）を決める必要があります。
+
+→　
+codebase を windows にして、モバイル（android）と分ける。モバイル側は変えない。
+関数の名前の頭に windows_ を付ける。
+モバイル側の変更が必要になるなら、変更はモバイル側で行う。
+デスクトップ側の作業で作成、変更が許されるのは、　windows_ のみ。
+
+
+
+5. subscriptions/{ID} の ID
+Stripe の subscription の ID（sub_…）を使うのが自然です。
+
+→　賛成
+
+
+
+
+6. 解約と、データ削除のときの Stripe 解約
+解約の窓口（Stripe の Customer Portal にするか）と、誰が操作できるかを決めます。
+データ削除の処理（deleteAccount）はモバイルのリポジトリにあるので、そこから Stripe の解約をどう呼ぶかも決めます。
+
+→　公式webページに、解約、データ削除の項目を設置。
+デスクトップアプリ内には、公式ページへのリンクを設置。
+
+
+
+
+
+
+
+7. 再ログインしても、つないでいるプロジェクトの認証が古いまま
+
+→　再ログインで繋ぎ直す
+
+
+
+
+
+
+
+
+
+
+
+8. トライアルの起点（firstUseDate）をどこに置くか
+
+→　モバイルと同じ。firestore:devices/{MachineGuid のハッシュ}.firstUseDate
+　　Google ログインすると、課金の状態（account）を引き継ぐ。課金が切れたら、その PC の firstUseDate で判定する。
+　　データ削除では、devices に期限（expireAt）を入れるだけで消さない。トライアルはリセットされない。
+
+
+
+
+
+9. 割り切り
+
+→　MachineGuid の書き換え・Windows の入れ直し・別の PC では、トライアルを使い直せる。対策しない。
+　　（モバイルの「端末の初期化」と同じ扱い）
+　　PC の中身を丸ごと複製して配った場合などに、別の PC で MachineGuid が同じになり、トライアルを共有することがある。対策しない。
+
+
+
+10. FireMint へのログインに使う OAuth クライアント：Firestore 用のログインとは別に、どのクライアントで Firebase Auth にログインするかです。
+モバイルでは、firemint-m の Web クライアントを使っています。
+
+→　firemint-m にデスクトップ用のクライアントを1つ作り、Firebase のセーフリストに登録する。
+　　FireMint へのログインと Firestore 用のログイン（11）は、このクライアントを共用する。
+
+
+
+
+11. Google の認証の期限が1週間
+デスクトップが使っている OAuth クライアントは、firemint-m でも firemint-e801f でもない、別のプロジェクト（番号 415032174806）のものです。
+そのプロジェクトがまだ「テスト中」の状態だと、Google の決まりで、ログインの有効期限が7日になります。おそらくこれが原因です。
+
+直すには、審査を通した firemint-m にデスクトップ用のクライアントを作り、そちらに移ります。
+その場合、権限の範囲（デスクトップは cloud-platform、モバイルの審査は datastore）の整理も要ります。
+
+→　Firestore 用のログインも、10 で作るクライアントを使う。
+　　権限はモバイルと同じ（datastore / identitytoolkit / service.management）。cloud-platform は使わない。
+　　プロジェクトの一覧は取得しない。モバイルと同じく、projectId を入力して繋ぐ。
+
+
+
+
+
+
+
+12. firebase functions 
+registerDevice これを、windows版で再作成。
+windows_registerDevice
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+================================================================================
+未策定 詳細
+================================================================================
+
+
+＊　設定ファイル類は開発中は、config/ 以下に置いているが、本番に向け、全てC:\users\.... へ移動
+
+
+C:\users\.... へ設置
+ファイル	                         中身
+workspaces.json	                    プロジェクトの一覧
+settings.json	                    設定
+saved_queries.json	                保存したクエリ
+google_profiles.json	            Google アカウントの表示名など
+google_oauth_tokens.json	        Google のログイン情報（トークン）（暗号化）
+extra_ca.pem	                    追加の証明書（置いた人だけ）
+これから足すアカウントのキャッシュ	   uid・accountId など
+
+アプリと同時に配布。C:\users\.... へ設置しない。
+ファイル	                        中身
+google_oauth.json	                OAuth クライアントの ID と秘密の値。
+
+
+
+
+
+
+
+
+
+
+================================================================================
+Stripe
+================================================================================
+
+支払いの失敗などで起きることは、Google Play・Stripe それぞれの仕様に従う。FireMint は今の状態を記録するだけ。
+lastNotificationType の値は、モバイル版と同じ。詳細は 002_005_flow.txt の C。
+
+Stripe の通知	                いつ来るか	                                                subscriptions への書き方
+checkout.session.completed	    初めての購入が終わった	                                     ドキュメントを作る。expiryTime ＝ 今の請求期間の終わり。PURCHASED
+invoice.paid	                毎月の更新の支払いが成功した	                              expiryTime を次の期間の終わりに延ばす。PURCHASED
+invoice.payment_failed	        更新の支払いが失敗した（カードの期限切れなど）	               記録だけ（IN_GRACE_PERIOD）。Stripe は 7 日かけて引き落としをやり直す。その間は使える
+customer.subscription.updated	解約の予約など、状態が変わった	                              解約の予約なら記録だけ（CANCELED）。期限までは使える
+customer.subscription.deleted	契約が本当に終わった（期限が来た、やり直しも全部失敗した）	     expiryTime ＝ 終わった時刻。CANCELED
+charge.refunded	                返金した	                                                expiryTime ＝ 今。VOIDED_FULL_REFUND / VOIDED_PARTIAL_REFUND。Stripe の契約もすぐ終わらせる
+charge.dispute.created	        チャージバック（カード会社経由の取り消し）	                    expiryTime ＝ 今。VOIDED_FULL_REFUND。Stripe の契約もすぐ終わらせる
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+================================================================================
+実装　順序
+================================================================================
+
+1. firemint-m にデスクトップ用の OAuth クライアントを作る（手作業。手順は私が案内します）
+Google ログインに必要なので、これが最初です。
+
+
+
+2. 起動〜ログイン〜トライアルを実装する
+windows_registerDevice
+匿名ユーザーの作成と Google ログイン
+キャッシュ
+AppData への移動
+
+Stripe が無くても作れます。
+
+
+
+
+3. Stripe のコンソールで設定する（テストモード）
+商品と価格
+支払いのやり直し：1週間。最後まで失敗したらキャンセル
+Customer Portal
+Webhook の受け口
+
+
+
+4. 課金・Webhook・解約・データ削除を実装する
+
+
+
+5. モバイル側を直す（002_100）
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

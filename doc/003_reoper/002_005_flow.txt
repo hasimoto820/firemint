@@ -1,0 +1,289 @@
+
+flow
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+デスクトップ版の、firemint アカウント（FireMint の契約・課金）の流れ。
+決定事項は 002_004_account.txt。モバイル版の流れは doc/firemint_mobile/doc/003_account/003_002_flow.txt。
+デスクトップ版の流れは、モバイル版と同じ。ここには、デスクトップ版で違うところを書く。
+「未策定 A」などは、末尾の「未策定」の項目。
+
+
+
+
+================================================================================
+要点
+================================================================================
+
+• モバイル版の基本ルール 0〜6（003_001_plan）を、そのまま使う。
+  初めて起動した時に匿名ユーザーを作る。Google でログインすると、昇格するか、既存の uid に合流する。
+• 端末の識別（deviceId）は、Windows の MachineGuid。
+  サーバーには、ハッシュ（SHA-256）にして devices のドキュメントID として持つ。生の値は保存しない。
+• トライアルは端末ごと（devices/{deviceIdHash}.firstUseDate）。
+  課金は account ごと。Google でログインすると、課金の状態を引き継ぐ。
+  課金が切れたら、その PC の firstUseDate で判定する。
+• Google ログインの OAuth クライアントは、firemint-m のデスクトップ用クライアント
+  （Firebase のセーフリストに登録）。firebase アカウント（Firestore 用のログイン）と共用する。
+• 課金は Stripe。subscriptions/{Stripe の subscription ID}（provider = "Stripe"）。
+• 解約とデータ削除は、公式の Web ページで行う。アプリには、そのページへのリンクを置く。
+• デスクトップ版の Cloud Functions は、codebase を windows にし、名前の頭に windows_ を付ける。
+• 端末に置くもの（キャッシュ・設定）は、C:\Users\<ユーザー名>\AppData\Roaming\FireMint\ の JSON。
+
+
+
+
+================================================================================
+フロー　　■ 起動時の判定順
+================================================================================
+
+モバイル版「起動時の判定順」と同じ（関数は未策定 A）。
+
+① Firebase Auth に、ログイン中の uid があるか
+   ├─ ある（有効） → その uid で確定。②へ
+   └─ 無い → 匿名ユーザーを作る。②へ
+
+② キャッシュに、この uid の写し（この PC の firstUseDate を含む）があるか
+   ├─ ある → 終わり
+   └─ 無い → ③へ
+
+③ 端末を登録する（deviceId = MachineGuid を渡す）
+   ・devices/{deviceIdHash} が無ければ、firstUseDate = 今 で作る。あれば、日付はそのまま
+   ・devices に期限（expireAt）が入っていれば消す
+   ・users/{uid} が無ければ作る（platform = "windows"）。users/{uid}/devices に、この PC を足す
+   ・firstUseDate を返す。アプリは、キャッシュに写す
+
+④ Google でログイン（ユーザーの操作）
+   モバイル版と同じ。未使用の Google なら昇格、既に別の uid に紐づいていれば合流。
+   続けて joinAccount → 無ければ createAccount。
+
+キャッシュ（C:\Users\<ユーザー名>\AppData\Roaming\FireMint\ の JSON）:
+   uid / accountId / この PC の firstUseDate の写し。
+   uid の正は Firebase Auth。食い違えば捨てる。
+
+
+
+
+================================================================================
+フロー　　■ Google ログイン
+================================================================================
+
+アプリがブラウザを開く（firemint-m のデスクトップ用クライアント。求める権限は openid / email）
+↓
+ユーザーが、ブラウザで Google にログインする
+↓
+ブラウザから、アプリ（127.0.0.1 の決まった口）に戻る
+↓
+Google の ID トークンで、Firebase Auth の匿名ユーザーに Google を紐付ける（昇格）
+既に別の uid に紐づいている Google なら、モバイル版と同じく合流する
+
+firebase アカウント（Firestore 用のログイン）は、これとは別に行う。
+同じ Google アカウントでも、違う Google アカウントでもよい。
+
+
+
+
+================================================================================
+フロー　　■ 利用状態の判定
+================================================================================
+
+モバイル版「利用状態の判定」と同じ。
+
+accountId に紐づく最新の subscription が有効？
+├─ YES → subscribed → 利用可能
+└─ NO  → この PC の firstUseDate + 60日以内？
+          ├─ YES → trial → 利用可能
+          └─ NO  → expired → 利用不可（何ができなくなるかは、未策定 E）
+
+※ 課金（subscribed）は account 単位で、モバイル版と共有する。
+　 Google Play で買っても、Stripe で買っても、両方で使える。
+※ 画面の文言は「この PC のトライアル 残り○日」。
+
+
+
+
+================================================================================
+フロー　　■ デスクトップで課金
+================================================================================
+
+前提: 購入できるのは、Google ログイン済みの owner だけ（モバイル版と同じ）。
+
+ユーザーが購入する（アプリか Web ページか。未策定 B）
+↓
+Stripe Checkout で購入完了
+↓
+Stripe の Webhook を、windows_ の関数で受ける（受ける通知の種類は、未策定 C）
+↓
+subscriptions/{Stripe の subscription ID} を作る・更新する
+├─ accountId     ← 購入した owner の accountId（Stripe との紐付けは、未策定 D）
+├─ provider      = "Stripe"
+├─ expiryTime    ← 今の請求期間の終わり
+├─ lastNotificationType ← 直近の通知の種類
+├─ createdAt
+└─ updatedAt
+↓
+この accountId の全 member が、Android / デスクトップの両方で利用可能
+
+
+
+
+================================================================================
+フロー　　■ 解約
+================================================================================
+
+アプリの「解約」→ 公式の Web ページを開く
+↓
+Web ページで Google ログイン（owner 本人か確かめる）
+↓
+Stripe の Customer Portal で解約する
+↓
+Webhook で、subscriptions の lastNotificationType を更新する
+（expiryTime は変えない。期限まで使える。モバイル版の CANCELED と同じ考え方）
+
+
+
+
+================================================================================
+フロー　　■ データ削除
+================================================================================
+
+アプリの「データ削除」→ 公式の Web ページを開く
+↓
+Web ページで Google ログイン
+↓
+中身は、モバイル版「データ削除」の owner / member / 未所属の 3 分岐と同じ。
+owner の時は、次の順番で行う（呼ぶ関数は、未策定 I）。
+  1. Google Play の課金が続いている → 削除を断る。Google Play には触らない。Android アプリでの操作を案内する
+     （課金が続いている契約は、買った側だけが権利を持つ）
+  2. Stripe の課金が続いている → Stripe を解約する
+     解約の結果が canceled なら 3 へ。失敗したら、何も消さずに止める（モバイル版の Google Play の解約と同じ）
+  3. FireMint 側のデータ（Firestore）を消す
+  4. そのあとに届く Stripe の通知（customer.subscription.deleted など）は、
+     subscriptions のドキュメントが無いので何もしない（D の決まり）
+devices には期限（expireAt）を入れるだけで消さない。トライアルはリセットされない。
+↓
+アプリ側の後始末（次にアプリを起動した時）
+  ・Firebase Auth のセッションが無効になっているので、①で新しい匿名ユーザーを作る
+  ・キャッシュは、uid が合わないので捨てる
+  ・トライアルは、この PC の日付のまま続く
+  ・firebase アカウント（Firestore 用のログイン）のセッションを消すかは、未策定 H
+
+
+
+
+================================================================================
+未策定
+================================================================================
+
+A. 関数（discardAnonymous / joinAccount / respondToInvite / createAccount /
+   addMember / removeMember）は、モバイル版のもの（codebase android）を、デスクトップからも呼ぶか。
+
+→　モバイルの関数を、デスクトップからもそのまま使う。モバイルの関数は変えない。
+変える必要が出たら、windows_ の関数を新しく作る。
+
+
+
+B. 購入の入口は、アプリの中か、公式の Web ページか。
+
+→　アプリ内
+
+
+
+
+C. Stripe の Webhook で受ける通知の種類と、expiryTime / lastNotificationType への書き方。
+   （購入完了・更新の支払い・支払いの失敗・解約・返金など）
+
+→　支払いの失敗などで起きることは、Google Play・Stripe それぞれの仕様に従う。
+　　FireMint は、通知が来たら Stripe からその契約の今の状態を取り直して記録するだけ（D の決まり）。
+　　lastNotificationType の値は、モバイル版が書いている値と同じにする。
+
+　　場面　　　　　　　　　　　受ける通知　　　　　　　　　　　expiryTime　　　　　　　　　lastNotificationType
+　　購入完了　　　　　　　　　checkout.session.completed　　　今の請求期間の終わり　　　　PURCHASED
+　　毎月の更新　　　　　　　　invoice.paid　　　　　　　　　　新しい請求期間の終わり　　　PURCHASED
+　　支払いの失敗　　　　　　　invoice.payment_failed　　　　　変えない　　　　　　　　　　IN_GRACE_PERIOD（記録だけ。ユーザーは使える）
+　　解約の予約　　　　　　　　customer.subscription.updated　変えない（期限まで使える）　CANCELED
+　　契約が本当に終わった　　　customer.subscription.deleted　終わった時刻　　　　　　　　CANCELED
+　　（期限が来た・やり直しが全部失敗）
+　　返金　　　　　　　　　　　charge.refunded　　　　　　　　今　　　　　　　　　　　　　VOIDED_FULL_REFUND / VOIDED_PARTIAL_REFUND
+　　チャージバック　　　　　　charge.dispute.created　　　　　今　　　　　　　　　　　　　VOIDED_FULL_REFUND
+
+　　モバイル版との違い（Stripe の仕様による）:
+　　・支払いの失敗で、expiryTime を延ばさない。Stripe は期限を延ばさない。使えるかは IN_GRACE_PERIOD で決まる。
+　　・ON_HOLD は無い。やり直しが全部失敗したら、契約を終わらせるため。
+
+　　・支払いのやり直し期間は、Google Play の猶予期間と同じ 7 日（Stripe の設定は「1週間」）。
+　　・やり直しが全部失敗したら、Stripe の契約を終わらせる（Stripe の設定は「サブスクリプションをキャンセル」）。
+　　・返金・チャージバックは、全額・一部を問わず、すぐ使えなくする。Stripe の契約も、すぐに終わらせる
+　　　（終わらせないと、次の月にまた引き落とされ、使える状態に戻ってしまう）。
+
+
+
+
+D. Stripe の顧客と accountId の紐付け。
+
+→　次の 2 つを両方使う。
+　　・メモ欄（Stripe の metadata）に accountId を書く
+　　　　購入画面（Checkout）を作る時に、windows_ の関数が、契約のメモ欄に accountId を書いておく。
+　　　　Webhook が届いた時に、ここから accountId を読み、subscriptions/{subscription ID}.accountId に書く。
+　　・Stripe の顧客の ID（cus_…）を、accounts/{accountId}.stripeCustomerId に保存する
+　　　　解約の画面（Customer Portal）を開く時と、2 回目の購入で同じ顧客を使う時に使う。
+
+　　漏れを防ぐ決まり:
+　　・通知の中身は使わない。通知が来たら、Stripe からその契約の今の状態を取り直して書く。
+　　　（通知の順番の入れ替わり・同じ通知の 2 回目・メモ欄が入っていない通知に、これで対応する）
+　　・Webhook は、Stripe の署名を確かめて、本物だけを受け付ける。
+　　・購入画面を作る前に、その account が課金中なら断る（Google Play で課金中も含む）。
+　　・Customer Portal からは、新しい契約を追加できない設定にする。
+　　・subscriptions のドキュメントを作るのは、購入完了（checkout.session.completed）の時だけ。
+　　　ほかの通知は、ドキュメントがある時だけ書く。無ければ何もしない
+　　　（データ削除のあとに届いた通知で、消したデータを作り直さないため）。
+
+
+
+
+E. トライアルが切れた時（expired）に、何ができなくなるか。
+   モバイル版は、認証・プロジェクト一覧・インポート/エクスポート・スニペットに進めない。
+
+→　ヘッダーメニュー(File, Edit, View)が押せない。
+プラス、左ウィンドウを
+・グレー一色
+・操作不能
+
+
+
+
+
+
+F. メンバーの招待と管理（2つ目の Google アカウントの追加・脱退）は、アプリの中か、Web ページか。
+
+→　アプリ内
+
+
+
+
+H. データ削除の後、アプリに残っている firebase アカウントのセッション・プロジェクトの一覧・設定を消すか。
+
+→　webページでの削除だよね。じゃあ、わざわざユーザーのアプリに向かって削除しない。消すのはサーバー側だけ。
+
+
+
+
+I. データ削除の Web ページから呼ぶ関数。
+   モバイル版の deleteAccount に Stripe の解約を足すか、windows_ の関数を別に作るか。
+
+→　windows_を作る。
+　　Google Play の課金が続いている owner の削除は断る（「データ削除」）。
+
+
+
+
+J. オフラインの時の動き。
+   モバイル版は、キャッシュを信じて使い続ける。
+
+→　同じ。キャッシュを信じる。
+
+
+
+
+
+
+

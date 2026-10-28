@@ -192,7 +192,7 @@ member → 便宜的な呼び名。member 専用のトップレベルのコレ�
 users/{uid}
     ├─ email
     ├─ name
-    ├─ platform(android / desktop)
+    ├─ platform(android / windows)
     └─ accountId           ← 現在紐付いているaccount
 
 users/{uid}/devices/{deviceIdHash}   ← この人が使っている端末の一覧
