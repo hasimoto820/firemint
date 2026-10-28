@@ -139,14 +139,14 @@ function EmulatorPage({
   const jobRunning = job?.status === 'running'
   /** つないでいる Emulator のプロジェクト */
   const [emulatorEntries, setEmulatorEntries] = useState<WorkspaceEntry[]>([])
-  /** インポート先に出すもの。中にデータがある（ルートのコレクションがある）プロジェクトだけ */
-  const [importableEntries, setImportableEntries] = useState<WorkspaceEntry[]>([])
-  /** エクスポートするプロジェクト。null は左の一覧で選んでいるもの（Emulator でなければ先頭） */
+  /** インポート先・エクスポートに出すもの。中にデータがある（ルートのコレクションがある）プロジェクトだけ */
+  const [entriesWithData, setEntriesWithData] = useState<WorkspaceEntry[]>([])
+  /** エクスポートするプロジェクト。null は左の一覧で選んでいるもの（データが無ければ先頭） */
   const [exportProjectId, setExportProjectId] = useState<string | null>(null)
   const poolId =
-    emulatorEntries.find((entry) => entry.id === exportProjectId)?.id ??
-    emulatorEntries.find((entry) => entry.id === destinationPoolId)?.id ??
-    emulatorEntries[0]?.id ??
+    entriesWithData.find((entry) => entry.id === exportProjectId)?.id ??
+    entriesWithData.find((entry) => entry.id === destinationPoolId)?.id ??
+    entriesWithData[0]?.id ??
     null
   /** インポート先。NEW_TARGET は新規 ID */
   const [importTarget, setImportTarget] = useState<string>(NEW_TARGET)
@@ -243,7 +243,7 @@ function EmulatorPage({
         }
       }
       if (!cancelled) {
-        setImportableEntries(withData)
+        setEntriesWithData(withData)
       }
     })()
 
@@ -365,7 +365,7 @@ function EmulatorPage({
   const sourceProjectId = fileInfo?.sourceProjectId ?? null
   const trimmedNewProjectId = newProjectId.trim()
   /** 選んだプロジェクトが空になって一覧から消えた時は、新規 ID */
-  const selectedImportTarget = importableEntries.some((entry) => entry.id === importTarget)
+  const selectedImportTarget = entriesWithData.some((entry) => entry.id === importTarget)
     ? importTarget
     : NEW_TARGET
   /** 新規 ID に、もうある ID を入れた時は、そのプロジェクトに入れる */
@@ -373,7 +373,7 @@ function EmulatorPage({
     selectedImportTarget === NEW_TARGET
       ? (emulatorEntries.find((entry) => emulatorProjectName(entry) === trimmedNewProjectId) ??
         null)
-      : (importableEntries.find((entry) => entry.id === selectedImportTarget) ?? null)
+      : (entriesWithData.find((entry) => entry.id === selectedImportTarget) ?? null)
   const importTargetName = importEntry ? emulatorProjectName(importEntry) : trimmedNewProjectId
   const newProjectIdError =
     !importEntry && trimmedNewProjectId && !EMULATOR_PROJECT_ID_PATTERN.test(trimmedNewProjectId)
@@ -415,7 +415,7 @@ function EmulatorPage({
       // 選んでいない時は、エクスポート元と同じ ID があればそれ、無ければ新規 ID（値はエクスポート元）
       if (!importTargetChosen) {
         const source = info.data.sourceProjectId
-        const match = importableEntries.find((entry) => emulatorProjectName(entry) === source)
+        const match = entriesWithData.find((entry) => emulatorProjectName(entry) === source)
         setImportTarget(match ? match.id : NEW_TARGET)
         if (source) {
           setNewProjectId(source)
@@ -543,7 +543,7 @@ function EmulatorPage({
 
   const handleExport = async (): Promise<void> => {
     if (!poolId) {
-      setError(t('emulator.no_destination'))
+      setError('データのあるプロジェクトがありません')
       return
     }
 
@@ -698,7 +698,7 @@ function EmulatorPage({
                       }}
                     >
                       <option value={NEW_TARGET}>新規 ID</option>
-                      {importableEntries.map((entry) => (
+                      {entriesWithData.map((entry) => (
                         <option key={entry.id} value={entry.id}>
                           {emulatorOptionLabel(entry)}
                         </option>
@@ -787,13 +787,13 @@ function EmulatorPage({
                   <select
                     className="bulk-actions__input"
                     value={poolId ?? ''}
-                    disabled={formDisabled || emulatorEntries.length === 0}
+                    disabled={formDisabled || entriesWithData.length === 0}
                     onChange={(event) => setExportProjectId(event.target.value)}
                   >
-                    {emulatorEntries.length === 0 && (
-                      <option value="">{t('emulator.no_destination')}</option>
+                    {entriesWithData.length === 0 && (
+                      <option value="">データのあるプロジェクトがありません</option>
                     )}
-                    {emulatorEntries.map((entry) => (
+                    {entriesWithData.map((entry) => (
                       <option key={entry.id} value={entry.id}>
                         {emulatorOptionLabel(entry)}
                       </option>

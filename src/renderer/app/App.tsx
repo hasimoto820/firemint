@@ -77,6 +77,11 @@ function App(): React.JSX.Element {
       }
 
       if (result.data.length === 1) {
+        // ID が分からない時は、どの ID にデータがあるか分からないので、つながない
+        if (!result.data[0].projectId) {
+          return
+        }
+
         // 起動時の自動検出は、接続して一覧に載せるだけ。選ぶのはユーザー
         const connected = await window.api.connection.connectEmulator({
           host: result.data[0].firestoreHost,
@@ -87,6 +92,7 @@ function App(): React.JSX.Element {
           return
         }
 
+        // 空でも出す。Emulator の画面は、この行を選んで開く
         await handleWorkspaceChanged()
         return
       }

@@ -168,7 +168,8 @@ export async function discoverEmulators(): Promise<DiscoverEmulatorsResult> {
   logInfo('emulator', 'discover start')
 
   try {
-    const seeds = [...defaultHubTargets(), ...(await locatorHubs())]
+    // ID が分かる Emulator のファイルを先に見る。同じ場所なら、先に見た方（ID つき）を使う
+    const seeds = [...(await locatorHubs()), ...defaultHubTargets()]
     const seenHub = new Set<string>()
     const results: DiscoveredEmulator[] = []
 
