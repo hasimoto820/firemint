@@ -399,6 +399,7 @@ https://dashboard.stripe.com/acct_1U5lxsLx1ft5ni7R/test/apikeys
 1. 開発用クライアントをセーフリストに足す（手作業、1分）
 今のデスクトップのクライアント（415032174806）の ID を、Firebase のセーフリストに足します。FireMint へのログインを試すのに必要です。
 
+→　OK
 
 
 
@@ -427,6 +428,12 @@ google_oauth_tokens.json
 ================================================================================
 3. 関数の土台と windows_registerDevice（実装）
 デスクトップのリポジトリに functions/ を作り、codebase を windows にします。最初の関数として、windows_registerDevice を作ります。
+
+
+
+
+
+
 
 
 ================================================================================
