@@ -5,6 +5,7 @@ out
 .eslintcache
 *.log*
 *firebase-adminsdk*.json
+*client_secret*.apps.googleusercontent.com.json
 hosting/node_modules
 hosting/dist
 hosting/.firebase

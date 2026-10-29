@@ -1,3 +1,4 @@
+import { app } from 'electron'
 import { mkdir, readFile, writeFile } from 'fs/promises'
 import { dirname, join } from 'path'
 import {
@@ -11,7 +12,7 @@ import type { Locale } from '@shared/i18n/shared/types'
 const STORE_FILE_NAME = 'settings.json'
 
 function getStorePath(): string {
-  return join(process.cwd(), 'config', STORE_FILE_NAME)
+  return join(app.getPath('userData'), STORE_FILE_NAME)
 }
 
 export async function loadSettings(): Promise<AppSettings> {

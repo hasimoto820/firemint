@@ -1,3 +1,4 @@
+import { app } from 'electron'
 import { mkdir, readFile, writeFile } from 'fs/promises'
 import { dirname, join } from 'path'
 import { logInfo } from '@shared/logging/logger'
@@ -27,7 +28,7 @@ const EMPTY_STORE: GoogleProfileStoreFile = {
 }
 
 function getStorePath(): string {
-  return join(process.cwd(), 'config', 'google_profiles.json')
+  return join(app.getPath('userData'), 'google_profiles.json')
 }
 
 function normalizeKey(accountKey: string): string {

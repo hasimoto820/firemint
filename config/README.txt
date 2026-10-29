@@ -1,6 +1,11 @@
 config/
 
-  ローカル設定置き場（Git 対象外の秘密情報を含む）。
+  開発中の google_oauth.json の置き場（Git 対象外）。
+  配布版では、google_oauth.json をアプリと同時に配布する（electron-builder の extraResources）。
+
+  google_oauth.json 以外のファイルは、ここではなく
+  C:\Users\<ユーザー名>\AppData\Roaming\firemint\ に置く（Electron の userData）。
+  開発中も配布版も同じ場所。
 
 --------------------------------------------------------------------------------
 workspaces.json

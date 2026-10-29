@@ -1,3 +1,4 @@
+import { app } from 'electron'
 import { mkdir, readFile, writeFile } from 'fs/promises'
 import { dirname, join } from 'path'
 import type { SavedQueriesStore } from '@features/query/shared/types'
@@ -10,7 +11,7 @@ const EMPTY_STORE: SavedQueriesStore = {
 }
 
 function getStorePath(): string {
-  return join(process.cwd(), 'config', STORE_FILE_NAME)
+  return join(app.getPath('userData'), STORE_FILE_NAME)
 }
 
 export async function loadSavedQueriesStore(): Promise<SavedQueriesStore> {

@@ -1,3 +1,4 @@
+import { app } from 'electron'
 import { mkdir, readFile, writeFile } from 'fs/promises'
 import { dirname, join } from 'path'
 import {
@@ -16,7 +17,7 @@ const EMPTY_STORE: WorkspaceStore = {
 }
 
 function getStorePath(): string {
-  return join(process.cwd(), 'config', STORE_FILE_NAME)
+  return join(app.getPath('userData'), STORE_FILE_NAME)
 }
 
 function normalizeEntry(raw: Partial<WorkspaceEntry> & { id?: string }): WorkspaceEntry | null {

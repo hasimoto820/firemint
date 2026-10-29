@@ -1,4 +1,4 @@
-import { safeStorage } from 'electron'
+import { app, safeStorage } from 'electron'
 import { mkdir, readFile, writeFile } from 'fs/promises'
 import { dirname, join } from 'path'
 import { logInfo, logWarn } from '@shared/logging/logger'
@@ -21,7 +21,7 @@ const EMPTY_STORE: TokenStoreFile = {
 }
 
 function getStorePath(): string {
-  return join(process.cwd(), 'config', 'google_oauth_tokens.json')
+  return join(app.getPath('userData'), 'google_oauth_tokens.json')
 }
 
 function encodeToken(refreshToken: string): { value: string; encrypted: boolean } {

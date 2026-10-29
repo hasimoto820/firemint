@@ -1,3 +1,4 @@
+import { app } from 'electron'
 import { readFile } from 'fs/promises'
 import { join } from 'path'
 import { logInfo } from '@shared/logging/logger'
@@ -7,8 +8,11 @@ export type GoogleOAuthConfig = {
   clientSecret: string
 }
 
+// アプリと同時に配布する（electron-builder の extraResources）。開発中は config/ から読む。
 function getConfigPath(): string {
-  return join(process.cwd(), 'config', 'google_oauth.json')
+  return app.isPackaged
+    ? join(process.resourcesPath, 'google_oauth.json')
+    : join(process.cwd(), 'config', 'google_oauth.json')
 }
 
 export async function loadGoogleOAuthConfig(): Promise<GoogleOAuthConfig> {
