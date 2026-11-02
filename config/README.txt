@@ -34,7 +34,6 @@ google_oauth.json（Phase 12）
     2. API とサービス → 認証情報 → OAuth クライアント ID を作成
     3. アプリケーションの種類: デスクトップアプリ
     4. Client ID / Client Secret を上記 JSON に書く
-    5. Cloud Resource Manager API を有効化する（プロジェクト一覧用）
 
   代わりに環境変数でも可:
     FIREMINT_GOOGLE_CLIENT_ID

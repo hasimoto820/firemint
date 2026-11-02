@@ -2,7 +2,6 @@ import type {
   ConnectResult,
   ConnectionStatus,
   EmulatorConnectInput,
-  GoogleConnectAccountInput,
   GoogleConnectProjectInput,
   GoogleSignInResult
 } from '@features/connection/shared/types'
@@ -158,7 +157,6 @@ export type ConnectionIpcApi = {
   googleSignIn: () => Promise<GoogleSignInResult>
   googleCancelSignIn: () => Promise<void>
   googleConnectProject: (input: GoogleConnectProjectInput) => Promise<ConnectResult>
-  googleConnectAccount: (input: GoogleConnectAccountInput) => Promise<ConnectResult>
   connectEmulator: (input: EmulatorConnectInput) => Promise<ConnectResult>
   disconnect: () => Promise<void>
   getStatus: () => Promise<ConnectionStatus | null>

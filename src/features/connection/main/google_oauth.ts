@@ -4,10 +4,12 @@ import { OAuth2Client } from 'google-auth-library'
 import { logInfo } from '@shared/logging/logger'
 import type { GoogleOAuthConfig } from './google_oauth_config'
 
+// Firestore と Authentication の操作に要るものだけ（002_004 の 11）
 const SCOPES = [
   'openid',
   'email',
-  'https://www.googleapis.com/auth/cloud-platform'
+  'https://www.googleapis.com/auth/datastore',
+  'https://www.googleapis.com/auth/identitytoolkit'
 ]
 
 export type GoogleOAuthSession = {
@@ -15,11 +17,6 @@ export type GoogleOAuthSession = {
   accountKey: string
   refreshToken: string
   accessToken: string
-}
-
-export type GoogleCloudProject = {
-  projectId: string
-  displayName: string
 }
 
 function getFreePort(): Promise<number> {
@@ -218,49 +215,6 @@ export async function runGoogleOAuthLogin(config: GoogleOAuthConfig): Promise<{
       finish(new Error('Google 認証がタイムアウトしました（5分）'))
     }, 5 * 60 * 1000)
   })
-}
-
-export async function listGoogleCloudProjects(accessToken: string): Promise<GoogleCloudProject[]> {
-  const projects: GoogleCloudProject[] = []
-  let pageToken: string | undefined
-
-  do {
-    const url = new URL('https://cloudresourcemanager.googleapis.com/v1/projects')
-    url.searchParams.set('filter', 'lifecycleState:ACTIVE')
-    url.searchParams.set('pageSize', '100')
-
-    if (pageToken) {
-      url.searchParams.set('pageToken', pageToken)
-    }
-
-    let data: {
-      projects?: Array<{ projectId?: string; name?: string }>
-      nextPageToken?: string
-    }
-
-    try {
-      data = await googleApiGet(accessToken, url.toString())
-    } catch (error) {
-      const detail = error instanceof Error ? error.message : String(error)
-      throw new Error(`プロジェクト一覧の取得に失敗しました: ${detail}`)
-    }
-
-    for (const project of data.projects ?? []) {
-      if (!project.projectId) {
-        continue
-      }
-
-      projects.push({
-        projectId: project.projectId,
-        displayName: project.name ?? project.projectId
-      })
-    }
-
-    pageToken = data.nextPageToken
-  } while (pageToken)
-
-  projects.sort((left, right) => left.projectId.localeCompare(right.projectId))
-  return projects
 }
 
 export async function refreshGoogleAccessToken(

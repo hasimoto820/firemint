@@ -246,6 +246,9 @@ export async function addGoogleEntryAndLoad(
 ): Promise<WorkspaceResult<WorkspaceEntry>> {
   try {
     const existing = getWorkspaceEntry(input.projectId)
+    // 以前のプロファイル（label / color / readOnly）があれば復元する
+    const profile = await loadGoogleAccountProfile(input.accountKey)
+    const pref = profile?.projects[input.projectId]
     await connectGoogleProject({
       projectId: input.projectId,
       accountKey: input.accountKey,
@@ -254,16 +257,16 @@ export async function addGoogleEntryAndLoad(
 
     const entry: WorkspaceEntry = {
       id: input.projectId,
-      label: input.label?.trim() || existing?.label || input.projectId,
+      label: input.label?.trim() || existing?.label || pref?.label?.trim() || input.projectId,
       color: defaultWorkspaceEntryColor('google', {
-        existing: existing?.color,
+        existing: existing?.color ?? pref?.color,
         override: input.color
       }),
       authType: 'google',
       serviceAccountPath: '',
       googleAccountEmail: input.accountEmail,
       googleAccountKey: input.accountKey,
-      readOnly: input.readOnly ?? existing?.readOnly ?? false
+      readOnly: input.readOnly ?? existing?.readOnly ?? pref?.readOnly ?? false
     }
 
     upsertEntry(entry)
@@ -460,104 +463,6 @@ export async function unloadGoogleAccountConnections(
     await persistStore()
 
     return { ok: true, data: { unloadedProjectIds } }
-  } catch (error) {
-    return toWorkspaceError(error)
-  }
-}
-
-/**
- * Google アカウントのプロジェクトを一括で取扱い名簿へ載せ、接続もできるだけ開く。
- * 以前のプロファイル（label / color / readOnly / lastFocused）があれば復元する。
- */
-export async function importGoogleAccountProjects(input: {
-  accountKey: string
-  accountEmail: string
-  projects: Array<{ projectId: string; displayName: string }>
-}): Promise<WorkspaceResult<{ focusedProjectId: string | null; count: number }>> {
-  try {
-    if (input.projects.length === 0) {
-      return { ok: false, error: '取り込めるプロジェクトがありません' }
-    }
-
-    const profile = await loadGoogleAccountProfile(input.accountKey)
-
-    // 同じアカウントの古い取扱い分はいったん外す（プロファイルは import で上書き復元）
-    // 接続そのものは loadProject → connection.connectWorkspaceEntry に任せる。
-    store.entries = store.entries.filter(
-      (entry) => !(entry.authType === 'google' && entry.googleAccountKey === input.accountKey)
-    )
-
-    for (const project of input.projects) {
-      const pref = profile?.projects[project.projectId]
-      const entry: WorkspaceEntry = {
-        id: project.projectId,
-        label: pref?.label?.trim() || project.displayName || project.projectId,
-        color: defaultWorkspaceEntryColor('google', { existing: pref?.color }),
-        authType: 'google',
-        serviceAccountPath: '',
-        googleAccountEmail: input.accountEmail,
-        googleAccountKey: input.accountKey,
-        readOnly: pref?.readOnly ?? false
-      }
-      upsertEntry(entry)
-    }
-
-    const preferredFocus =
-      (profile?.lastFocusedProjectId &&
-      input.projects.some((project) => project.projectId === profile.lastFocusedProjectId)
-        ? profile.lastFocusedProjectId
-        : null) ??
-      input.projects[0]?.projectId ??
-      null
-
-    await persistStore()
-
-    // 一括で開く: 権限のあるプロジェクトをできるだけ接続プールへ載せる
-    for (const project of input.projects) {
-      const loadResult = await loadProject(project.projectId)
-
-      if (!loadResult.ok) {
-        logError(
-          'workspace',
-          `google bulk load skipped project=${project.projectId}: ${loadResult.error}`
-        )
-      }
-    }
-
-    if (!preferredFocus) {
-      return { ok: true, data: { focusedProjectId: null, count: input.projects.length } }
-    }
-
-    const focusCandidates = [
-      preferredFocus,
-      ...input.projects.map((project) => project.projectId).filter((id) => id !== preferredFocus)
-    ]
-
-    for (const candidateId of focusCandidates) {
-      if (!isFirestoreConnected(candidateId)) {
-        continue
-      }
-
-      const focusResult = await setFocusedProject(candidateId)
-
-      if (focusResult.ok) {
-        await rememberGoogleProjectProfile(input.accountKey, input.accountEmail, candidateId, {
-          lastFocused: true
-        })
-        return {
-          ok: true,
-          data: { focusedProjectId: candidateId, count: input.projects.length }
-        }
-      }
-    }
-
-    store.focusedProjectId = null
-    syncFocusedFromStore()
-    await persistStore()
-    return {
-      ok: true,
-      data: { focusedProjectId: null, count: input.projects.length }
-    }
   } catch (error) {
     return toWorkspaceError(error)
   }

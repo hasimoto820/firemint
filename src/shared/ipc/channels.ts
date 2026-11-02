@@ -13,7 +13,6 @@ export const IPC_CHANNELS = {
   CONNECTION_GOOGLE_SIGN_IN: 'connection:google_sign_in',
   CONNECTION_GOOGLE_CANCEL_SIGN_IN: 'connection:google_cancel_sign_in',
   CONNECTION_GOOGLE_CONNECT_PROJECT: 'connection:google_connect_project',
-  CONNECTION_GOOGLE_CONNECT_ACCOUNT: 'connection:google_connect_account',
   CONNECTION_EMULATOR_CONNECT: 'connection:emulator_connect',
   EMULATOR_IMPORT_PROJECT_ZIP: 'emulator:import_project_zip',
   EMULATOR_DELETE_PROJECT: 'emulator:delete_project',

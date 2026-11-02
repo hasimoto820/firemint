@@ -26,8 +26,6 @@ const api: IpcApi = {
     googleCancelSignIn: () => ipcRenderer.invoke(IPC_CHANNELS.CONNECTION_GOOGLE_CANCEL_SIGN_IN),
     googleConnectProject: (input) =>
       ipcRenderer.invoke(IPC_CHANNELS.CONNECTION_GOOGLE_CONNECT_PROJECT, input),
-    googleConnectAccount: (input) =>
-      ipcRenderer.invoke(IPC_CHANNELS.CONNECTION_GOOGLE_CONNECT_ACCOUNT, input),
     connectEmulator: (input) => ipcRenderer.invoke(IPC_CHANNELS.CONNECTION_EMULATOR_CONNECT, input),
     disconnect: () => ipcRenderer.invoke(IPC_CHANNELS.CONNECTION_DISCONNECT),
     getStatus: () => ipcRenderer.invoke(IPC_CHANNELS.CONNECTION_GET_STATUS)

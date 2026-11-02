@@ -12,7 +12,6 @@ import {
   addGoogleEntryAndLoad,
   getFocusedConnectionInfo,
   getWorkspaceEntry,
-  importGoogleAccountProjects,
   unloadProject
 } from '@features/workspace/main/service'
 import { getFocusedProjectId } from '@shared/firestore/focused'
@@ -20,7 +19,6 @@ import type {
   ConnectResult,
   ConnectionStatus,
   EmulatorConnectInput,
-  GoogleConnectAccountInput,
   GoogleConnectProjectInput,
   GoogleSignInResult
 } from '@features/connection/shared/types'
@@ -28,7 +26,6 @@ import { loadGoogleOAuthConfig } from './google_oauth_config'
 import {
   cancelGoogleOAuthLogin,
   GOOGLE_OAUTH_CANCELED_MESSAGE,
-  listGoogleCloudProjects,
   runGoogleOAuthLogin
 } from './google_oauth'
 import { saveGoogleRefreshToken } from './google_token_store'
@@ -200,13 +197,11 @@ export async function signInWithGoogle(): Promise<GoogleSignInResult> {
     const config = await loadGoogleOAuthConfig()
     const tokens = await runGoogleOAuthLogin(config)
     const accountKey = await saveGoogleRefreshToken(tokens.email, tokens.refreshToken)
-    const projects = await listGoogleCloudProjects(tokens.accessToken)
 
     return {
       ok: true,
       accountKey,
-      email: tokens.email,
-      projects
+      email: tokens.email
     }
   } catch (error) {
     const message = formatConnectionError(error)
@@ -261,64 +256,6 @@ export async function connectWithGoogleProject(
     }
   } catch (error) {
     logError('connection', `google connect failed in ${Date.now() - startedAt}ms`, error)
-    return {
-      ok: false,
-      error: formatConnectionError(error)
-    }
-  }
-}
-
-export async function connectWithGoogleAccount(
-  input: GoogleConnectAccountInput
-): Promise<ConnectResult> {
-  const startedAt = Date.now()
-  logInfo(
-    'connection',
-    `google account import start account=${input.accountEmail} projects=${input.projects.length}`
-  )
-
-  try {
-    const importResult = await importGoogleAccountProjects({
-      accountKey: input.accountKey,
-      accountEmail: input.accountEmail,
-      projects: input.projects
-    })
-
-    if (!importResult.ok) {
-      return { ok: false, error: importResult.error }
-    }
-
-    const focusedProjectId = importResult.data.focusedProjectId
-
-    if (!focusedProjectId) {
-      logInfo(
-        'connection',
-        `google account import registered=${importResult.data.count} but no project could be focused`
-      )
-      return {
-        ok: false,
-        error:
-          'プロジェクトは一覧に登録しましたが、Firestore に接続できるものがありません。Firestore が有効なプロジェクトを一覧から選んでください。'
-      }
-    }
-
-    const rootCollections = await listRootCollectionsWithTimeout(focusedProjectId)
-    const info = getConnectionInfo(focusedProjectId)
-
-    logInfo(
-      'connection',
-      `google account import success in ${Date.now() - startedAt}ms count=${importResult.data.count} focused=${focusedProjectId}`
-    )
-
-    return {
-      ok: true,
-      projectId: focusedProjectId,
-      clientEmail: info?.clientEmail ?? input.accountEmail,
-      rootCollections,
-      authType: 'google'
-    }
-  } catch (error) {
-    logError('connection', `google account import failed in ${Date.now() - startedAt}ms`, error)
     return {
       ok: false,
       error: formatConnectionError(error)

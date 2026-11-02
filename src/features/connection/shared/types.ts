@@ -36,7 +36,6 @@ export type GoogleSignInResult =
       ok: true
       accountKey: string
       email: string
-      projects: Array<{ projectId: string; displayName: string }>
     }
   | {
       ok: false
@@ -49,8 +48,3 @@ export type GoogleConnectProjectInput = {
   projectId: string
 }
 
-export type GoogleConnectAccountInput = {
-  accountKey: string
-  accountEmail: string
-  projects: Array<{ projectId: string; displayName: string }>
-}

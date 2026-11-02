@@ -146,7 +146,8 @@ Stripe の subscription の ID（sub_…）を使うのが自然です。
 その場合、権限の範囲（デスクトップは cloud-platform、モバイルの審査は datastore）の整理も要ります。
 
 →　Firestore 用のログインも、10 で作るクライアントを使う。
-　　権限はモバイルと同じ（datastore / identitytoolkit / service.management）。cloud-platform は使わない。
+　　権限は datastore / identitytoolkit（と openid / email）。cloud-platform は使わない。
+　　service.management はデスクトップでは使わないので求めない。
 　　プロジェクトの一覧は取得しない。モバイルと同じく、projectId を入力して繋ぐ。
 
 

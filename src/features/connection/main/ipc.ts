@@ -3,13 +3,11 @@ import { IPC_CHANNELS } from '@shared/ipc/channels'
 import { logInfo } from '@shared/logging/logger'
 import type {
   EmulatorConnectInput,
-  GoogleConnectAccountInput,
   GoogleConnectProjectInput
 } from '@features/connection/shared/types'
 import {
   cancelGoogleSignIn,
   connectWithEmulator,
-  connectWithGoogleAccount,
   connectWithGoogleProject,
   connectWithServiceAccountFile,
   disconnectFromFirestore,
@@ -62,17 +60,6 @@ export function registerConnectionHandlers(): void {
     async (_event, input: GoogleConnectProjectInput) => {
       logInfo('ipc:connection', `googleConnectProject invoked project=${input.projectId}`)
       return connectWithGoogleProject(input)
-    }
-  )
-
-  ipcMain.handle(
-    IPC_CHANNELS.CONNECTION_GOOGLE_CONNECT_ACCOUNT,
-    async (_event, input: GoogleConnectAccountInput) => {
-      logInfo(
-        'ipc:connection',
-        `googleConnectAccount invoked account=${input.accountEmail} projects=${input.projects.length}`
-      )
-      return connectWithGoogleAccount(input)
     }
   )
 
