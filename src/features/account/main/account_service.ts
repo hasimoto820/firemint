@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, net } from 'electron'
+import { app, BrowserWindow, dialog, net, shell } from 'electron'
 import { translate } from '@shared/i18n/shared/translate'
 import { logInfo, logWarn } from '@shared/logging/logger'
 import { getSettings } from '@shared/settings/main/service'
@@ -6,6 +6,7 @@ import { IPC_CHANNELS } from '@shared/ipc/channels'
 import {
   computeEntitlement,
   computeTrialDaysLeft,
+  type AccountPurchaseResult,
   type AccountSignInResult,
   type AccountStatus,
   type LatestSubscription
@@ -34,6 +35,9 @@ import { readMachineGuid } from './machine_guid'
 
 // 有効期限の少し前に更新する
 const TOKEN_REFRESH_MARGIN_MS = 60 * 1000
+// ウィンドウに戻るたびに読みに行かない
+const REFRESH_INTERVAL_MS = 15 * 1000
+const CHECKOUT_URL_PREFIX = 'https://checkout.stripe.com/'
 
 type IdTokenClaims = { email?: string; name?: string }
 
@@ -41,6 +45,8 @@ let currentTokens: FirebaseTokens | null = null
 let currentEmail: string | null = null
 let currentCache: AccountCache | null = null
 let inviteCheckInflight: Promise<void> | null = null
+let currentIsOwner = false
+let lastRefreshAt = 0
 
 function readClaims(idToken: string): IdTokenClaims {
   const payload = idToken.split('.')[1] ?? ''
@@ -176,8 +182,49 @@ async function refreshLatestSubscription(): Promise<void> {
       : null
     currentCache = { ...currentCache, latestSubscription }
     await saveAccountCache(currentCache)
+    currentIsOwner = currentCache.accountId
+      ? (await fetchAccountOwnerUid(currentCache.accountId)) === currentTokens?.uid
+      : false
   } catch (error) {
     logWarn('account', 'subscription refresh failed; using cache', error)
+  }
+}
+
+/** accounts/{accountId}.ownerUid を読む（モバイル版の fetchAccountOwnerUid と同じ）。 */
+async function fetchAccountOwnerUid(accountId: string): Promise<string | null> {
+  const response = await net.fetch(
+    `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/accounts/${accountId}`,
+    { headers: { Authorization: `Bearer ${await getIdToken()}` } }
+  )
+  if (!response.ok) {
+    throw new Error(`fetchAccountOwnerUid failed: HTTP ${response.status}`)
+  }
+  const body = (await response.json()) as { fields?: { ownerUid?: { stringValue?: string } } }
+  return body.fields?.ownerUid?.stringValue ?? null
+}
+
+/** 契約を読み直す。購入した後にブラウザからアプリへ戻った時など。 */
+export async function refreshAccount(): Promise<void> {
+  if (!currentTokens || Date.now() - lastRefreshAt < REFRESH_INTERVAL_MS) {
+    return
+  }
+  lastRefreshAt = Date.now()
+  await refreshLatestSubscription()
+  notifyStatusChanged()
+}
+
+/** Stripe の購入画面をブラウザで開く。 */
+export async function purchaseSubscription(): Promise<AccountPurchaseResult> {
+  try {
+    const { url } = await callFunction<{ url: string }>('windows_createCheckoutSession')
+    if (!url.startsWith(CHECKOUT_URL_PREFIX)) {
+      throw new Error('購入画面の URL が正しくありません')
+    }
+    await shell.openExternal(url)
+    return { ok: true }
+  } catch (error) {
+    logWarn('account', 'purchase failed', error)
+    return { ok: false, error: error instanceof Error ? error.message : '購入できませんでした' }
   }
 }
 
@@ -366,6 +413,7 @@ export async function signOutOfAccount(): Promise<AccountStatus> {
   currentTokens = null
   currentEmail = null
   currentCache = null
+  currentIsOwner = false
   logInfo('account', 'signed out')
 
   try {
@@ -388,7 +436,8 @@ export function getAccountStatus(): AccountStatus {
     accountId: currentCache?.accountId ?? null,
     firstUseDate,
     entitlement: computeEntitlement(firstUseDate, currentCache?.latestSubscription ?? null, now),
-    trialDaysLeft: firstUseDate === null ? null : computeTrialDaysLeft(firstUseDate, now)
+    trialDaysLeft: firstUseDate === null ? null : computeTrialDaysLeft(firstUseDate, now),
+    isOwner: currentIsOwner
   }
 }
 

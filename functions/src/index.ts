@@ -6,3 +6,5 @@ import { setGlobalOptions } from "firebase-functions/v2";
 setGlobalOptions({ region: "asia-northeast1" });
 
 export { windows_registerDevice } from "./account/windows_registerDevice";
+export { windows_stripeWebhook } from "./billing/windows_stripeWebhook";
+export { windows_createCheckoutSession } from "./billing/windows_createCheckoutSession";

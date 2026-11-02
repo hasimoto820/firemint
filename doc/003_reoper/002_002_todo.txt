@@ -6,6 +6,72 @@ todo
 
 
 
+================================================================================
+アカウント・課金　再開メモ（2026-11-02 時点）
+================================================================================
+
+＊　今は何を待っているか
+　Google の OAuth 審査（firemint-m）。2026-10-29 に申請した。最大 4〜6 週間。
+　連絡は carepanda886@gmail.com に来る。
+　状態の確認: https://console.cloud.google.com/auth/verification?project=firemint-m
+
+
+＊　仕様の置き場所
+　002_004_account.txt　決定事項、Stripe の設定、「審査中」「審査中　作業」
+　002_005_flow.txt　　 流れ
+　002_006_webhook.txt　Webhook の不変条件と状態遷移表
+　002_100_mobile.txt　 モバイル側の修正
+　CLAUDE.md（リポジトリ直下）　テストのモード切り替え、デプロイの手順
+
+
+＊　完了したもの
+　・設定ファイルを AppData に移動
+　・匿名ユーザー、端末の登録（windows_registerDevice）、トライアルの判定
+　・Google ログイン（昇格・合流）、ログアウト
+　・期限切れの時の画面（メニュー・左右のウィンドウ・ショートカットを止める）
+　・起動のたびにサーバーの日付を取り直す（キャッシュの書き換え対策）
+　・Firestore 用ログインの権限を変更（datastore / identitytoolkit）、projectId の入力
+　・Stripe サンドボックスの設定（商品・価格・再試行・Customer Portal・Webhook の登録）
+　・Webhook（windows_stripeWebhook）と購入（windows_createCheckoutSession）
+　　サンドボックスのテスト用カードで購入し、「契約中」になることまで確認した
+
+
+＊　審査中にしないこと
+　・firemint-m に OAuth クライアントを足さない
+　・hosting/ をデプロイしない（審査の対象のサイトが丸ごと置き換わる）
+
+
+＊　審査中でも試せること（まだ確認していない）
+　Stripe のダッシュボードから、テスト契約（pandaas886）を操作して、Webhook の動きを確かめる。
+　・解約の予約 → CANCELED。期限までは使える
+　・解約の取り消し → PURCHASED に戻る
+　・返金 → VOIDED_。すぐ使えなくなり、Stripe の契約も終わる
+　・支払いの失敗 → IN_GRACE_PERIOD。全部失敗したら使えなくなる
+
+
+＊　審査が通ったら、この順番で
+　1. firemint-m に Windows 用の OAuth クライアント（種類: デスクトップ アプリ）を作る
+　　 追加の審査（Windows の動画）が要るかは、未確認。ここで確かめる
+　2. その ID を Firebase のセーフリストに足す。config/google_oauth.json を差し替える
+　3. 公式サイトの改修（下の「Stripe リダイレクト先の変更」）。Windows 版の内容を足す
+　4. 支払い完了のページを作り、windows_createCheckoutSession の戻り先を変える
+　5. 解約の Web ページと windows_createPortalSession を作る
+　6. データ削除の Web ページと windows_ の関数を作る（002_005「データ削除」の順番）
+　7. 顧客を消した後に返金できるかを、サンドボックスで試す。できなければ、顧客を消す決定を見直す
+　8. 招待の「参加しますか？」を試す（Android から招待を送る）
+
+
+＊　本番に出す前に
+　・モバイル側の修正（002_100_mobile.txt）
+　・Stripe の本番環境に、同じ設定を作り直す（002_004「Stripe の設定」）
+　　差し替えるもの: STRIPE_SECRET_KEY、STRIPE_WEBHOOK_SECRET、functions/.env.firemint-e801f の価格の ID
+　・法律とお金まわり（下の「Stripe で直接売るときの、法律とお金まわり」）
+　・service.management が審査に入っていない（モバイルは求めている）。審査の連絡で聞かれたら対応する
+
+
+
+
+
 
 
 
@@ -156,7 +222,14 @@ Google Play で売るときは、Google が売り手として代わりにやっ�
 
 
 
+＊　Stripe リダイレクト先の変更
 
+google審査に絡む為、審査終了後に、以下を修正
+
+
+現在は、モバイル版のランディングページになっている。
+・デスクトップ共用にランディングページ自体の改修
+・stripeの成功ページの設置
 
 
 

@@ -108,7 +108,11 @@ import type {
   SetAuthUsersDisabledInput,
   UpdateAuthUserInput
 } from '@features/auth_users/shared/types'
-import type { AccountSignInResult, AccountStatus } from '@features/account/shared/types'
+import type {
+  AccountPurchaseResult,
+  AccountSignInResult,
+  AccountStatus
+} from '@features/account/shared/types'
 
 import type { AppSettings, Theme } from '@shared/settings/shared/types'
 import type { Locale } from '@shared/i18n/shared/types'
@@ -304,6 +308,8 @@ export type AccountIpcApi = {
   googleSignIn: () => Promise<AccountSignInResult>
   googleCancelSignIn: () => Promise<void>
   signOut: () => Promise<AccountStatus>
+  refresh: () => Promise<void>
+  purchase: () => Promise<AccountPurchaseResult>
   onChanged: (listener: (status: AccountStatus) => void) => () => void
 }
 

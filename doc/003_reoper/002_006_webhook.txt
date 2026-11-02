@@ -1,0 +1,143 @@
+
+webhook
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+Stripe の通知（Webhook）を受けて、subscriptions/{Stripe の subscription ID} に何を書くか。
+関数は windows_stripeWebhook（codebase windows）。
+
+
+
+
+================================================================================
+不変条件
+================================================================================
+
+何が起きても、崩れてはいけない決まり。
+
+1. subscriptions のドキュメントを作るのは、checkout.session.completed の時だけ。
+   ほかの通知は、ドキュメントがある時だけ書く。無ければ何もしない。
+   （データ削除のあとに届いた通知で、消したデータを作り直さない）
+
+2. Firestore には、Stripe の今の状態を写す。通知の中身は使わない。
+   通知が来たら、Stripe からその契約を取り直して書く。
+   （通知の順番の入れ替わり・同じ通知の 2 回目でも、結果は同じになる）
+
+3. 返金・チャージバックで VOIDED_ になったドキュメントは、以後の通知で書き換えない。
+   （そのあとに届く通知で、使える状態に戻らない）
+
+4. 署名を確かめて、本物の通知だけを受け付ける。署名が合わなければ 400 を返す。
+
+5. 一時的な失敗（Stripe や Firestore に繋がらない）は 500 を返す。Stripe がやり直す。
+   処理の必要が無い通知は 200 を返す。
+
+6. Stripe を操作してから Firestore を消す。解約に失敗したら、何も消さない。
+
+7. 課金が続いている Google Play の契約には触らない。
+
+
+
+
+================================================================================
+Stripe の状態 → 書く値
+================================================================================
+
+通知の種類に関わらず、取り直した契約の状態で決める（不変条件 2）。
+
+Stripe の状態                         expiryTime              lastNotificationType
+active（解約の予約なし）              今の請求期間の終わり    PURCHASED
+active（解約の予約あり）              今の請求期間の終わり    CANCELED
+past_due（支払いのやり直し中）        変えない                IN_GRACE_PERIOD
+canceled（契約が終わった）            終わった時刻            CANCELED
+上記以外                              変えない                変えない（ログに残す）
+
+past_due の時は、Stripe の請求期間はもう次の月に進んでいる。その値を expiryTime に書かない。
+
+
+
+
+================================================================================
+状態遷移表
+================================================================================
+
+縦: 今の subscriptions のドキュメント。横: 届いた通知。
+
+通知の略:
+  完了  checkout.session.completed
+  支払  invoice.paid
+  失敗  invoice.payment_failed
+  更新  customer.subscription.updated
+  終了  customer.subscription.deleted
+  返金  charge.refunded / charge.dispute.created
+
+
+■ ドキュメントが無い
+
+  完了            account あり → ドキュメントを作る。accounts/{accountId}.stripeCustomerId を保存する
+                  account 無し → 全額返金して、Stripe の契約をすぐ終わらせる。ドキュメントは作らない
+  支払・失敗      何もしない（200）。完了より先に届いた時は、完了の時に今の状態で作られる
+  更新・終了      何もしない（200）。データ削除のあとに届いた時も同じ
+  返金            何もしない（200）
+
+
+■ PURCHASED（使える）
+
+  完了            取り直して書く（2 回目の通知）
+  支払            PURCHASED。expiryTime は次の期間の終わりに進む
+  失敗            IN_GRACE_PERIOD
+  更新            解約の予約なら CANCELED。それ以外は PURCHASED
+  終了            CANCELED。expiryTime = 終わった時刻
+  返金            VOIDED_ / expiryTime = 今。Stripe の契約をすぐ終わらせる
+
+
+■ IN_GRACE_PERIOD（支払いのやり直し中。使える）
+
+  完了            取り直して書く
+  支払            PURCHASED（やり直しで払えた）
+  失敗            IN_GRACE_PERIOD のまま
+  更新            状態の表のとおり
+  終了            CANCELED。expiryTime = 終わった時刻（やり直しが全部失敗。使えなくなる）
+  返金            VOIDED_ / expiryTime = 今。Stripe の契約をすぐ終わらせる
+
+
+■ CANCELED（解約の予約あり。期限まで使える）
+
+  完了            取り直して書く
+  支払            起きない。届いたら、取り直して書く
+  失敗            起きない。届いたら、取り直して書く
+  更新            解約を取り消した → PURCHASED。それ以外は CANCELED のまま
+  終了            CANCELED。expiryTime = 終わった時刻（期限が来た）
+  返金            VOIDED_ / expiryTime = 今。Stripe の契約をすぐ終わらせる
+
+
+■ CANCELED（契約が終わった。使えない）
+
+  どの通知        取り直して書く。結果は同じ（canceled は元に戻らない）
+  返金            VOIDED_ / expiryTime = 今
+
+
+■ VOIDED_FULL_REFUND / VOIDED_PARTIAL_REFUND（使えない）
+
+  どの通知        何もしない（不変条件 3）
+
+
+返金の補足:
+  ・charge.refunded は、全額なら VOIDED_FULL_REFUND、一部なら VOIDED_PARTIAL_REFUND。
+  ・charge.dispute.created は VOIDED_FULL_REFUND。
+  ・charge から契約が分からない時（サブスク以外の支払い）は、何もしない（200）。
+
+
+
+
+================================================================================
+決めること
+================================================================================
+
+1. 支払いが完了した時に、account が無い場合（購入画面を開いたまま、データ削除をした時など）。
+
+→　自動で全額返金して、Stripe の契約をすぐ終わらせる。ドキュメントは作らない。
+
+
+2. データ削除の時に、Stripe の顧客（cus_…）も消すか。
+
+→　消す。解約の後、Firestore を消す前に行う。失敗したら、何も消さずに止める。

@@ -83,6 +83,7 @@ export const zhHant: MessageCatalog = {
   'account.google_signing_in': "請在瀏覽器中登入…",
   'account.cancel': "取消",
   'account.sign_out': "登出",
+  'account.purchase': "購買",
   'account.trial_days_left': "此電腦的試用期: 剩餘{days}天",
   'account.entitlement_subscribed': "已訂閱",
   'account.entitlement_expired': "試用期已結束。",

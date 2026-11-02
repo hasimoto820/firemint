@@ -83,6 +83,7 @@ export const ja: MessageCatalog = {
   'account.google_signing_in': "ブラウザでログインしてください…",
   'account.cancel': "キャンセル",
   'account.sign_out': "ログアウト",
+  'account.purchase': "購入する",
   'account.trial_days_left': "この PC のトライアル 残り{days}日",
   'account.entitlement_subscribed': "契約中",
   'account.entitlement_expired': "トライアルの期限が切れました。",

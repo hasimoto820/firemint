@@ -31,6 +31,10 @@ C:\Users\<ユーザー名>\AppData\Roaming\firemint\account_cache.json
 | 期限切れ（過去の日付: 2023-11-15） | `1700000000000` |
 | トライアル中（2026-11-02 11:00） | `1793584800000` |
 
+## Hosting
+
+Google の OAuth 審査中は、`hosting/` をデプロイしない。デプロイ先は審査の対象の `firemint-e801f.web.app` で、モバイル版のサイトが丸ごと置き換わる。
+
 ## Cloud Functions のデプロイ
 
 ```powershell

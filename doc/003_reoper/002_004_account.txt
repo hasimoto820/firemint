@@ -333,6 +333,9 @@ Stripe の設定
 　　Firebase（firemint-e801f）のセーフリストには、その ID（750211540930-cpba2ri903e4t6lifbhkofutpisfgdp7）が残っているが、害は無い。
 　　セーフリストの ID は 1 件だけ消せない。Google の設定パネルの「Delete provider」は Google ログインごと消すので、押さない。
 
+　・firemint-e801f.web.app をデプロイしない（審査の対象）。hosting/ のデプロイ先も同じサイトで、丸ごと置き換わる。
+　・解約とデータ削除の Web ページは、審査が通ってから作る（公式サイトに置く）。
+
 ＊　審査中でも進められること
 　・開発中のログインは、今のクライアント（プロジェクト番号 415032174806）を使う。
 　　その ID を Firebase のセーフリストに足す。権限はモバイルと同じ（11）にして作る。
@@ -343,6 +346,11 @@ Stripe の設定
 　・データ削除（Web ページと windows_ の関数）
 　・トライアルが切れた時の画面（未策定 E）
 　・モバイル側の修正（002_100_mobile.txt）
+
+＊　審査が通ったらやること（Web ページ）
+　・解約（windows_createPortalSession と Customer Portal）とデータ削除（windows_ の関数）の Web ページを作る
+　・支払い完了のページを作り、windows_createCheckoutSession の戻り先を変える（今は公式サイトのトップ）
+　・顧客を消した後に返金できるかを、サンドボックスで試す（002_006「決めること」2）
 
 ＊　審査が通ったらやること
 　1. firemint-m に Windows 用の OAuth クライアント（種類: デスクトップ アプリ）を作る

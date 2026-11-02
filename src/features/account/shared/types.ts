@@ -41,6 +41,10 @@ export type AccountStatus = {
   firstUseDate: number | null
   entitlement: Entitlement
   trialDaysLeft: number | null
+  /** 購入できるのは owner だけ */
+  isOwner: boolean
 }
 
 export type AccountSignInResult = { ok: true; status: AccountStatus } | { ok: false; error: string }
+
+export type AccountPurchaseResult = { ok: true } | { ok: false; error: string }

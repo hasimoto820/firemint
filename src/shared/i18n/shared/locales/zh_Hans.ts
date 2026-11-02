@@ -83,6 +83,7 @@ export const zhHans: MessageCatalog = {
   'account.google_signing_in': "请在浏览器中登录…",
   'account.cancel': "取消",
   'account.sign_out': "退出登录",
+  'account.purchase': "购买",
   'account.trial_days_left': "此电脑的试用期: 剩余{days}天",
   'account.entitlement_subscribed': "已订阅",
   'account.entitlement_expired': "试用期已结束。",

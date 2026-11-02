@@ -81,6 +81,7 @@ export const en: Record<string, string> = {
   'account.google_signing_in': "Sign in using your browser…",
   'account.cancel': "Cancel",
   'account.sign_out': "Sign out",
+  'account.purchase': "Subscribe",
   'account.trial_days_left': "Trial on this PC: {days} days left",
   'account.entitlement_subscribed': "Subscribed",
   'account.entitlement_expired': "Your trial has ended.",

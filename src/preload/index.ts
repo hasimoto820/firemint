@@ -193,6 +193,8 @@ const api: IpcApi = {
     googleSignIn: () => ipcRenderer.invoke(IPC_CHANNELS.ACCOUNT_GOOGLE_SIGN_IN),
     googleCancelSignIn: () => ipcRenderer.invoke(IPC_CHANNELS.ACCOUNT_GOOGLE_CANCEL_SIGN_IN),
     signOut: () => ipcRenderer.invoke(IPC_CHANNELS.ACCOUNT_SIGN_OUT),
+    refresh: () => ipcRenderer.invoke(IPC_CHANNELS.ACCOUNT_REFRESH),
+    purchase: () => ipcRenderer.invoke(IPC_CHANNELS.ACCOUNT_PURCHASE),
     onChanged: (listener) => {
       const handler = (_event: IpcRendererEvent, status: AccountStatus): void => {
         listener(status)

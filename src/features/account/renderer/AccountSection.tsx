@@ -1,29 +1,15 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useI18n } from '@shared/i18n/renderer/I18nProvider'
 import Button from '@shared/ui/Button'
-import type { AccountStatus } from '@features/account/shared/types'
+import { useAccountStatus } from './useAccountStatus'
 
 /** Settings の「FireMint アカウント」。匿名なら Google ログインのボタンを出す。 */
 function AccountSection(): React.JSX.Element {
   const { t } = useI18n()
-  const [status, setStatus] = useState<AccountStatus | null>(null)
+  const status = useAccountStatus()
   const [signingIn, setSigningIn] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    let cancelled = false
-
-    void window.api.account.getStatus().then((next) => {
-      if (!cancelled) {
-        setStatus(next)
-      }
-    })
-
-    return () => {
-      cancelled = true
-    }
-  }, [])
 
   const handleSignIn = (): void => {
     setError(null)
@@ -31,22 +17,26 @@ function AccountSection(): React.JSX.Element {
     void window.api.account
       .googleSignIn()
       .then((result) => {
-        if (result.ok) {
-          setStatus(result.status)
-        } else {
+        if (!result.ok) {
           setError(result.error)
         }
       })
       .finally(() => setSigningIn(false))
   }
 
+  const handlePurchase = (): void => {
+    setError(null)
+    void window.api.account.purchase().then((result) => {
+      if (!result.ok) {
+        setError(result.error)
+      }
+    })
+  }
+
   const handleSignOut = (): void => {
     setError(null)
     setSigningOut(true)
-    void window.api.account
-      .signOut()
-      .then(setStatus)
-      .finally(() => setSigningOut(false))
+    void window.api.account.signOut().finally(() => setSigningOut(false))
   }
 
   return (
@@ -62,6 +52,9 @@ function AccountSection(): React.JSX.Element {
       {status?.email ? (
         <>
           <p className="settings-window__hint">{t('account.signed_in', { email: status.email })}</p>
+          {status.isOwner && status.entitlement !== 'subscribed' && (
+            <Button onClick={handlePurchase}>{t('account.purchase')}</Button>
+          )}
           <Button onClick={handleSignOut} disabled={signingOut}>
             {t('account.sign_out')}
           </Button>

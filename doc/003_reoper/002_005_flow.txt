@@ -175,8 +175,9 @@ owner の時は、次の順番で行う（呼ぶ関数は、未策定 I）。
      （課金が続いている契約は、買った側だけが権利を持つ）
   2. Stripe の課金が続いている → Stripe を解約する
      解約の結果が canceled なら 3 へ。失敗したら、何も消さずに止める（モバイル版の Google Play の解約と同じ）
-  3. FireMint 側のデータ（Firestore）を消す
-  4. そのあとに届く Stripe の通知（customer.subscription.deleted など）は、
+  3. Stripe の顧客（accounts/{accountId}.stripeCustomerId）を消す。失敗したら、何も消さずに止める
+  4. FireMint 側のデータ（Firestore）を消す
+  5. そのあとに届く Stripe の通知（customer.subscription.deleted など）は、
      subscriptions のドキュメントが無いので何もしない（D の決まり）
 devices には期限（expireAt）を入れるだけで消さない。トライアルはリセットされない。
 ↓
