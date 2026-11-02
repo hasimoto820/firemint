@@ -24,6 +24,8 @@ flow
   課金が切れたら、その PC の firstUseDate で判定する。
 • Google ログインの OAuth クライアントは、firemint-m のデスクトップ用クライアント
   （Firebase のセーフリストに登録）。firebase アカウント（Firestore 用のログイン）と共用する。
+• Firebase Auth は裏側（main）で動かす。画面側（renderer）にログイン情報を渡さない。
+  refresh token は safeStorage で暗号化して保存する。
 • 課金は Stripe。subscriptions/{Stripe の subscription ID}（provider = "Stripe"）。
 • 解約とデータ削除は、公式の Web ページで行う。アプリには、そのページへのリンクを置く。
 • デスクトップ版の Cloud Functions は、codebase を windows にし、名前の頭に windows_ を付ける。

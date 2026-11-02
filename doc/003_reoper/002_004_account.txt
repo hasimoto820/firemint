@@ -429,6 +429,12 @@ google_oauth_tokens.json
 3. 関数の土台と windows_registerDevice（実装）
 デスクトップのリポジトリに functions/ を作り、codebase を windows にします。最初の関数として、windows_registerDevice を作ります。
 
+→　OK（デプロイ済み）
+デプロイの手順（PowerShell。F:\FireMint\sys\firemint で実行）:
+　$env:NODE_OPTIONS="--use-system-ca"　　　　　… この PC は通信の証明書が差し替えられるため、Windows の証明書を使う
+　$env:FUNCTIONS_DISCOVERY_TIMEOUT="60"　　　 … コードの初回読み込みが 10 秒を超えることがあるため
+　firebase deploy --only functions:windows
+
 
 
 
@@ -443,6 +449,11 @@ google_oauth_tokens.json
 ・トライアルの判定
 ・期限切れのときの画面（E）
 
+→　Firebase Auth は裏側（main）で動かす。画面側（renderer）にログイン情報を渡さない。
+　　Firebase Auth の Web API を直接呼ぶ。refresh token は safeStorage で暗号化して保存する。
+　　関数の呼び出しと、契約の読み取りも裏側で行う。
+　　作る順番: 4-1 MachineGuid とキャッシュ / 4-2 匿名ユーザーと windows_registerDevice / 4-3 Google ログイン（昇格・合流）/ 4-4 トライアルの判定と画面（E）
+
 
 ================================================================================
 5. 課金の前に、Webhook の不変条件と状態遷移表をドキュメントに書く
@@ -451,6 +462,10 @@ google_oauth_tokens.json
 
 ================================================================================
 6. 課金・Webhook・解約・データ削除（実装）
+
+================================================================================
+7. Firestore 用ログインの権限と、projectId の入力（実装。4 の後に行う）
+11 の決定どおり、cloud-platform をやめて、モバイルと同じ権限にする。プロジェクトの一覧の取得をやめて、projectId を入力して繋ぐ。
 
 
 

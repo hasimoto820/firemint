@@ -12,7 +12,8 @@ import {
   windowBackgroundColor
 } from '@shared/settings/main/window_chrome'
 import { initFileLogging } from '@shared/logging/file_sink'
-import { logInfo } from '@shared/logging/logger'
+import { logInfo, logWarn } from '@shared/logging/logger'
+import { initializeAccount } from '@features/account/main/account_service'
 
 const APP_DISPLAY_NAME = 'FireMint'
 
@@ -97,6 +98,10 @@ function startApp(): void {
     void initializeWorkspace().then(() => {
       registerIpcHandlers()
       void createWindow()
+    })
+
+    void initializeAccount().catch((error) => {
+      logWarn('account', 'account initialization failed', error)
     })
 
     app.on('activate', function () {
