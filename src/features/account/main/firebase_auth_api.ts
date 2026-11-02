@@ -19,6 +19,9 @@ const INVALID_SESSION_MESSAGES = [
   'INVALID_REFRESH_TOKEN'
 ]
 
+// この値が返ったら、その Google は既に別の uid に紐づいている
+const ALREADY_LINKED_MESSAGES = ['FEDERATED_USER_ID_ALREADY_LINKED', 'EMAIL_EXISTS']
+
 async function readErrorMessage(response: Response): Promise<string> {
   try {
     const body = (await response.json()) as { error?: { message?: string } }
@@ -44,6 +47,55 @@ export async function signUpAnonymous(): Promise<FirebaseTokens> {
 
   if (!response.ok) {
     throw new Error(`匿名ユーザーを作成できませんでした: ${await readErrorMessage(response)}`)
+  }
+
+  const body = (await response.json()) as {
+    localId: string
+    idToken: string
+    refreshToken: string
+    expiresIn: string
+  }
+
+  return {
+    uid: body.localId,
+    idToken: body.idToken,
+    refreshToken: body.refreshToken,
+    expiresAt: toExpiresAt(body.expiresIn)
+  }
+}
+
+/**
+ * Google の ID トークンで Firebase Auth にログインする。
+ * currentIdToken を渡すと、そのユーザーに Google を紐付ける（昇格）。
+ * その Google が既に別の uid に紐づいている時は、null を返す（合流）。
+ */
+export async function signInWithGoogleIdToken(
+  googleIdToken: string,
+  currentIdToken?: string
+): Promise<FirebaseTokens | null> {
+  const response = await net.fetch(
+    `https://identitytoolkit.googleapis.com/v1/accounts:signInWithIdp?key=${FIREBASE_API_KEY}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        requestUri: 'http://localhost',
+        postBody: new URLSearchParams({
+          id_token: googleIdToken,
+          providerId: 'google.com'
+        }).toString(),
+        returnSecureToken: true,
+        ...(currentIdToken ? { idToken: currentIdToken } : {})
+      })
+    }
+  )
+
+  if (!response.ok) {
+    const message = await readErrorMessage(response)
+    if (currentIdToken && ALREADY_LINKED_MESSAGES.includes(message)) {
+      return null
+    }
+    throw new Error(`Google でログインできませんでした: ${message}`)
   }
 
   const body = (await response.json()) as {

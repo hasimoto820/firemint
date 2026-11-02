@@ -12,6 +12,7 @@ import { registerEmulatorHandlers } from '@features/emulator/main/ipc'
 import { registerScriptRunnerHandlers } from '@features/script_runner/main/ipc'
 import { registerWorkspaceHandlers } from '@features/workspace/main/ipc'
 import { registerAuthUsersHandlers } from '@features/auth_users/main/ipc'
+import { registerAccountHandlers } from '@features/account/main/ipc'
 import { registerSettingsHandlers } from '@shared/settings/main/ipc'
 import { registerWindowHandlers } from '../shell/window_ipc'
 import { registerAppHandlers } from '../shell/app_ipc'
@@ -34,5 +35,6 @@ export function registerIpcHandlers(): void {
   registerEmulatorHandlers()
   registerScriptRunnerHandlers()
   registerAuthUsersHandlers()
+  registerAccountHandlers()
   registerSettingsHandlers()
 }

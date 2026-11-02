@@ -189,6 +189,12 @@ const api: IpcApi = {
     deleteUsers: (input) => ipcRenderer.invoke(IPC_CHANNELS.AUTH_USERS_DELETE, input),
     exportUsers: (input) => ipcRenderer.invoke(IPC_CHANNELS.AUTH_USERS_EXPORT, input)
   },
+  account: {
+    getStatus: () => ipcRenderer.invoke(IPC_CHANNELS.ACCOUNT_GET_STATUS),
+    googleSignIn: () => ipcRenderer.invoke(IPC_CHANNELS.ACCOUNT_GOOGLE_SIGN_IN),
+    googleCancelSignIn: () => ipcRenderer.invoke(IPC_CHANNELS.ACCOUNT_GOOGLE_CANCEL_SIGN_IN),
+    signOut: () => ipcRenderer.invoke(IPC_CHANNELS.ACCOUNT_SIGN_OUT)
+  },
   settings: {
     get: () => ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_GET),
     setLocale: (locale) => ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_SET_LOCALE, locale),

@@ -109,6 +109,7 @@ import type {
   SetAuthUsersDisabledInput,
   UpdateAuthUserInput
 } from '@features/auth_users/shared/types'
+import type { AccountSignInResult, AccountStatus } from '@features/account/shared/types'
 
 import type { AppSettings, Theme } from '@shared/settings/shared/types'
 import type { Locale } from '@shared/i18n/shared/types'
@@ -300,6 +301,13 @@ export type EmulatorIpcApi = {
   discover: () => Promise<DiscoverEmulatorsResult>
 }
 
+export type AccountIpcApi = {
+  getStatus: () => Promise<AccountStatus>
+  googleSignIn: () => Promise<AccountSignInResult>
+  googleCancelSignIn: () => Promise<void>
+  signOut: () => Promise<AccountStatus>
+}
+
 export type SettingsIpcApi = {
   get: () => Promise<AppSettings>
   setLocale: (locale: Locale) => Promise<AppSettings>
@@ -326,5 +334,6 @@ export interface IpcApi {
   emulator: EmulatorIpcApi
   scriptRunner: ScriptRunnerIpcApi
   authUsers: AuthUsersIpcApi
+  account: AccountIpcApi
   settings: SettingsIpcApi
 }

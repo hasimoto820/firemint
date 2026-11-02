@@ -11,6 +11,7 @@ import {
   type Theme
 } from '@shared/settings/shared/types'
 import Button from '@shared/ui/Button'
+import AccountSection from '@features/account/renderer/AccountSection'
 
 /**
  * 別ウィンドウ用の Settings。言語とテーマと起動時 Discover。
@@ -73,6 +74,8 @@ function SettingsApp(): React.JSX.Element {
         <h1 className="settings-window__title">{t('settings.title')}</h1>
         <p className="settings-window__lead">{t('settings.lead')}</p>
       </header>
+
+      <AccountSection />
 
       <section className="settings-window__section">
         <h2 className="settings-window__section-title">{t('settings.language')}</h2>

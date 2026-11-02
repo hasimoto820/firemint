@@ -8,6 +8,8 @@ const STORE_FILE_NAME = 'account_session.json'
 export type AccountSession = {
   uid: string
   refreshToken: string
+  /** Google ログイン済みならメールアドレス。匿名のままなら null。 */
+  email: string | null
 }
 
 type AccountSessionFile = {
@@ -15,6 +17,7 @@ type AccountSessionFile = {
   uid: string
   refreshToken: string
   encrypted: boolean
+  email: string | null
 }
 
 function getStorePath(): string {
@@ -37,6 +40,7 @@ export async function loadAccountSession(): Promise<AccountSession | null> {
 
     return {
       uid: parsed.uid,
+      email: parsed.email ?? null,
       refreshToken: parsed.encrypted
         ? safeStorage.decryptString(Buffer.from(parsed.refreshToken, 'base64'))
         : parsed.refreshToken
@@ -58,7 +62,8 @@ export async function saveAccountSession(session: AccountSession): Promise<void>
     refreshToken: encrypted
       ? safeStorage.encryptString(session.refreshToken).toString('base64')
       : session.refreshToken,
-    encrypted
+    encrypted,
+    email: session.email
   }
   const storePath = getStorePath()
   await mkdir(dirname(storePath), { recursive: true })
