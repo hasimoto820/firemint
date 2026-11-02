@@ -452,6 +452,7 @@ google_oauth_tokens.json
 →　Firebase Auth は裏側（main）で動かす。画面側（renderer）にログイン情報を渡さない。
 　　Firebase Auth の Web API を直接呼ぶ。refresh token は safeStorage で暗号化して保存する。
 　　関数の呼び出しと、契約の読み取りも裏側で行う。
+　　開発中のテスト: 環境変数 FIREMINT_ACCOUNT_CACHE_ONLY=1 で起動すると、キャッシュだけで判定する（配布版では効かない）。
 　　作る順番: 4-1 MachineGuid とキャッシュ / 4-2 匿名ユーザーと windows_registerDevice / 4-3 Google ログイン（昇格・合流）/ 4-4 トライアルの判定と画面（E）
 
 

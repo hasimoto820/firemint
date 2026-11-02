@@ -246,6 +246,36 @@ code {
   overflow-y: auto;
 }
 
+.app-layout__sidebar--expired {
+  background: var(--ev-c-gray-3);
+}
+
+.app-layout__sidebar--expired > * {
+  visibility: hidden;
+}
+
+.app-layout__main--expired {
+  position: relative;
+}
+
+.app-layout__main--expired > * {
+  visibility: hidden;
+}
+
+.app-layout__main--expired::before {
+  content: attr(data-expired-message);
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ev-c-text-1);
+}
+
 .app-layout__main {
   flex: 1;
   width: 100%;
@@ -1616,7 +1646,12 @@ code {
   -webkit-app-region: no-drag;
 }
 
-.app-menu-bar__trigger:hover,
+.app-menu-bar__trigger:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.app-menu-bar__trigger:not(:disabled):hover,
 .app-menu-bar__trigger--open {
   color: var(--ev-c-text-1);
   background: var(--ev-c-gray-3);

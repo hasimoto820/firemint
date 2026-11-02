@@ -24,5 +24,7 @@ export type AppMenuEntry = AppMenuItem | AppMenuSeparator | AppMenuHeader
 export type AppMenuSection = {
   id: string
   label: string
+  /** true なら、メニューを開けない */
+  disabled?: boolean
   items: AppMenuEntry[]
 }

@@ -3,6 +3,7 @@ import { electronAPI } from '@electron-toolkit/preload'
 import { IPC_CHANNELS } from '@shared/ipc/channels'
 import type { IpcApi } from '@shared/ipc/types'
 import type { AppSettings } from '@shared/settings/shared/types'
+import type { AccountStatus } from '@features/account/shared/types'
 
 const api: IpcApi = {
   ping: () => ipcRenderer.invoke(IPC_CHANNELS.PING),
@@ -193,7 +194,16 @@ const api: IpcApi = {
     getStatus: () => ipcRenderer.invoke(IPC_CHANNELS.ACCOUNT_GET_STATUS),
     googleSignIn: () => ipcRenderer.invoke(IPC_CHANNELS.ACCOUNT_GOOGLE_SIGN_IN),
     googleCancelSignIn: () => ipcRenderer.invoke(IPC_CHANNELS.ACCOUNT_GOOGLE_CANCEL_SIGN_IN),
-    signOut: () => ipcRenderer.invoke(IPC_CHANNELS.ACCOUNT_SIGN_OUT)
+    signOut: () => ipcRenderer.invoke(IPC_CHANNELS.ACCOUNT_SIGN_OUT),
+    onChanged: (listener) => {
+      const handler = (_event: IpcRendererEvent, status: AccountStatus): void => {
+        listener(status)
+      }
+      ipcRenderer.on(IPC_CHANNELS.ACCOUNT_CHANGED, handler)
+      return () => {
+        ipcRenderer.removeListener(IPC_CHANNELS.ACCOUNT_CHANGED, handler)
+      }
+    }
   },
   settings: {
     get: () => ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_GET),

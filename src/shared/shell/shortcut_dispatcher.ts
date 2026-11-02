@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { matchShortcut } from '@shared/settings/shared/shortcuts'
 import {
   focusMenu,
@@ -11,7 +11,10 @@ import {
 /**
  * ウィンドウ keydown の1箇所。着地キーと、エリア内 Tab 一周。
  */
-export function useShortcutDispatcher(): void {
+export function useShortcutDispatcher(expired: boolean): void {
+  const expiredRef = useRef(expired)
+  expiredRef.current = expired
+
   useEffect(() => {
     let altAlone = false
 
@@ -47,6 +50,12 @@ export function useShortcutDispatcher(): void {
 
       const action = matchShortcut(event)
       if (!action) {
+        return
+      }
+
+      // 期限切れの時は、メニューと Settings へ移るキーだけ効かせる（未策定 E）
+      if (expiredRef.current && action !== 'menu' && action !== 'settings') {
+        event.preventDefault()
         return
       }
 

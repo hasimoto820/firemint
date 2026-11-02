@@ -1,8 +1,15 @@
-import { BrowserWindow, dialog, net } from 'electron'
+import { app, BrowserWindow, dialog, net } from 'electron'
 import { translate } from '@shared/i18n/shared/translate'
 import { logInfo, logWarn } from '@shared/logging/logger'
 import { getSettings } from '@shared/settings/main/service'
-import type { AccountSignInResult, AccountStatus } from '@features/account/shared/types'
+import { IPC_CHANNELS } from '@shared/ipc/channels'
+import {
+  computeEntitlement,
+  computeTrialDaysLeft,
+  type AccountSignInResult,
+  type AccountStatus,
+  type LatestSubscription
+} from '@features/account/shared/types'
 import {
   clearAccountCache,
   loadAccountCache,
@@ -81,8 +88,11 @@ async function callFunction<T>(name: string, data: unknown = {}): Promise<T> {
   return body.result
 }
 
-/** ③ 端末を登録して、キャッシュを作り直す。 */
-async function registerDevice(uid: string): Promise<AccountCache> {
+/** ③ 端末を登録して、キャッシュをサーバーの値で作り直す。契約の写しは引き継ぐ。 */
+async function registerDevice(
+  uid: string,
+  latestSubscription: LatestSubscription | null = null
+): Promise<AccountCache> {
   const result = await callFunction<{ firstUseDate: number; accountId: string | null }>(
     'windows_registerDevice',
     { deviceId: await readMachineGuid() }
@@ -90,7 +100,8 @@ async function registerDevice(uid: string): Promise<AccountCache> {
   const registered: AccountCache = {
     uid,
     accountId: result.accountId,
-    firstUseDate: result.firstUseDate
+    firstUseDate: result.firstUseDate,
+    latestSubscription
   }
   await saveAccountCache(registered)
   logInfo('account', 'device registered')
@@ -101,6 +112,81 @@ async function updateCachedAccountId(accountId: string): Promise<void> {
   if (currentCache) {
     currentCache = { ...currentCache, accountId }
     await saveAccountCache(currentCache)
+  }
+}
+
+/** accountId の最新の subscription を読む（モバイル版の fetchLatestSubscription と同じ）。 */
+async function fetchLatestSubscription(accountId: string): Promise<LatestSubscription | null> {
+  const response = await net.fetch(
+    `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents:runQuery`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${await getIdToken()}`
+      },
+      body: JSON.stringify({
+        structuredQuery: {
+          from: [{ collectionId: 'subscriptions' }],
+          where: {
+            fieldFilter: {
+              field: { fieldPath: 'accountId' },
+              op: 'EQUAL',
+              value: { stringValue: accountId }
+            }
+          },
+          orderBy: [{ field: { fieldPath: 'expiryTime' }, direction: 'DESCENDING' }],
+          limit: 1
+        }
+      })
+    }
+  )
+
+  if (!response.ok) {
+    throw new Error(`fetchLatestSubscription failed: HTTP ${response.status}`)
+  }
+
+  const rows = (await response.json()) as Array<{
+    document?: {
+      fields?: {
+        expiryTime?: { timestampValue?: string }
+        lastNotificationType?: { stringValue?: string }
+      }
+    }
+  }>
+  const fields = rows[0]?.document?.fields
+  if (!fields) {
+    return null
+  }
+
+  return {
+    expiryTimeMillis: Date.parse(fields.expiryTime?.timestampValue ?? '') || 0,
+    lastNotificationType: fields.lastNotificationType?.stringValue ?? null
+  }
+}
+
+/** 契約の写しを更新する。読めなければ、前の写しを使い続ける（未策定 J）。 */
+async function refreshLatestSubscription(): Promise<void> {
+  if (!currentCache) {
+    return
+  }
+  try {
+    const latestSubscription = currentCache.accountId
+      ? await fetchLatestSubscription(currentCache.accountId)
+      : null
+    currentCache = { ...currentCache, latestSubscription }
+    await saveAccountCache(currentCache)
+  } catch (error) {
+    logWarn('account', 'subscription refresh failed; using cache', error)
+  }
+}
+
+function notifyStatusChanged(): void {
+  const status = getAccountStatus()
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (!window.isDestroyed()) {
+      window.webContents.send(IPC_CHANNELS.ACCOUNT_CHANGED, status)
+    }
   }
 }
 
@@ -220,6 +306,7 @@ export async function initializeAccount(): Promise<void> {
       if (!(error instanceof InvalidSessionError)) {
         logWarn('account', 'session refresh failed; using cache', error)
         currentCache = await loadAccountCache(session.uid)
+        notifyStatusChanged()
         return
       }
       logInfo('account', 'session is no longer valid; creating a new anonymous user')
@@ -236,10 +323,37 @@ export async function initializeAccount(): Promise<void> {
     logInfo('account', 'anonymous user created')
   }
 
-  // ② この uid の写しがあるか。無ければ ③ 端末を登録する
-  currentCache = (await loadAccountCache(uid)) ?? (await registerDevice(uid))
+  // ② 通信できる時は、③ 端末を登録して、サーバーの日付を取り直す（キャッシュの書き換えを効かなくする）
+  const cached = await loadAccountCache(uid)
 
-  await checkForInvite()
+  // 開発中のテスト用。キャッシュだけで判定する（配布版では効かない）
+  if (!app.isPackaged && process.env.FIREMINT_ACCOUNT_CACHE_ONLY === '1') {
+    if (cached) {
+      logInfo('account', 'cache-only mode for testing')
+      currentCache = cached
+      notifyStatusChanged()
+      return
+    }
+    logWarn('account', 'cache-only mode: cache is missing or invalid; using server')
+  }
+
+  try {
+    currentCache = await registerDevice(uid, cached?.latestSubscription ?? null)
+  } catch (error) {
+    logWarn('account', 'device registration failed; using cache', error)
+    currentCache = cached
+    notifyStatusChanged()
+    return
+  }
+  notifyStatusChanged()
+
+  try {
+    await checkForInvite()
+  } catch (error) {
+    logWarn('account', 'invite check failed', error)
+  }
+  await refreshLatestSubscription()
+  notifyStatusChanged()
 }
 
 /**
@@ -261,14 +375,20 @@ export async function signOutOfAccount(): Promise<AccountStatus> {
     logWarn('account', 'account initialization failed after sign-out', error)
   }
 
+  notifyStatusChanged()
   return getAccountStatus()
 }
 
 export function getAccountStatus(): AccountStatus {
+  const firstUseDate = currentCache?.firstUseDate ?? null
+  const now = Date.now()
+
   return {
     email: currentEmail,
     accountId: currentCache?.accountId ?? null,
-    firstUseDate: currentCache?.firstUseDate ?? null
+    firstUseDate,
+    entitlement: computeEntitlement(firstUseDate, currentCache?.latestSubscription ?? null, now),
+    trialDaysLeft: firstUseDate === null ? null : computeTrialDaysLeft(firstUseDate, now)
   }
 }
 
@@ -307,6 +427,8 @@ export async function signInWithGoogle(): Promise<AccountSignInResult> {
 
     await updateUserProfile(currentTokens.uid)
     await checkForInvite()
+    await refreshLatestSubscription()
+    notifyStatusChanged()
     return { ok: true, status: getAccountStatus() }
   } catch (error) {
     logWarn('account', 'google sign-in failed', error)

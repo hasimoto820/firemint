@@ -17,10 +17,15 @@ import {
 import { useI18n } from '@shared/i18n/renderer/I18nProvider'
 import { useShortcutDispatcher } from '@shared/shell/shortcut_dispatcher'
 import { confirmAction } from '@shared/ui/confirmAction'
+import { useAccountStatus } from '@features/account/renderer/useAccountStatus'
+
+// 期限切れの時に開けないメニュー（未策定 E）
+const EXPIRED_DISABLED_MENU_IDS = ['file', 'edit', 'view']
 
 function App(): React.JSX.Element {
   const { t, ready } = useI18n()
-  useShortcutDispatcher()
+  const expired = useAccountStatus()?.entitlement === 'expired'
+  useShortcutDispatcher(expired)
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus | null | undefined>(
     undefined
   )
@@ -278,12 +283,28 @@ function App(): React.JSX.Element {
     ]
   )
 
+  const visibleMenus = useMemo(
+    () =>
+      menus.map((section) =>
+        expired && EXPIRED_DISABLED_MENU_IDS.includes(section.id)
+          ? { ...section, disabled: true }
+          : section
+      ),
+    [menus, expired]
+  )
+
   const chromeTitle = connectionStatus?.projectId ?? 'FireMint'
 
   let content: React.JSX.Element
 
   if (!ready || connectionStatus === undefined) {
     content = <main className="app-shell app-shell--loading">{t('common.busy')}</main>
+  } else if (!connectionStatus && expired) {
+    content = (
+      <main className="app-shell app-shell--landing">
+        <p>{t('account.expired_message')}</p>
+      </main>
+    )
   } else if (!connectionStatus) {
     content = (
       <main className="app-shell app-shell--landing">
@@ -312,7 +333,7 @@ function App(): React.JSX.Element {
 
   return (
     <AppMenuRegistryProvider value={registerMenu}>
-      <AppChrome title={chromeTitle} menus={menus}>
+      <AppChrome title={chromeTitle} menus={visibleMenus}>
         {content}
         <ListConnectDialog
           open={listConnectOpen}

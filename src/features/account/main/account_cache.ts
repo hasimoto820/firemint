@@ -1,6 +1,7 @@
 import { app } from 'electron'
 import { mkdir, readFile, rm, writeFile } from 'fs/promises'
 import { dirname, join } from 'path'
+import type { LatestSubscription } from '@features/account/shared/types'
 
 const STORE_FILE_NAME = 'account_cache.json'
 
@@ -9,6 +10,8 @@ export type AccountCache = {
   uid: string
   accountId: string | null
   firstUseDate: number
+  /** 通信できない時の判定に使う（未策定 J）。 */
+  latestSubscription: LatestSubscription | null
 }
 
 type AccountCacheFile = AccountCache & {
@@ -34,7 +37,12 @@ export async function loadAccountCache(uid: string): Promise<AccountCache | null
       return null
     }
 
-    return { uid, accountId: parsed.accountId, firstUseDate: parsed.firstUseDate }
+    return {
+      uid,
+      accountId: parsed.accountId,
+      firstUseDate: parsed.firstUseDate,
+      latestSubscription: parsed.latestSubscription ?? null
+    }
   } catch {
     return null
   }

@@ -52,6 +52,13 @@ function AccountSection(): React.JSX.Element {
   return (
     <section className="settings-window__section">
       <h2 className="settings-window__section-title">{t('account.title')}</h2>
+      {status && status.entitlement !== 'unknown' && (
+        <p className="settings-window__hint">
+          {status.entitlement === 'trial'
+            ? t('account.trial_days_left', { days: status.trialDaysLeft ?? 0 })
+            : t(`account.entitlement_${status.entitlement}`)}
+        </p>
+      )}
       {status?.email ? (
         <>
           <p className="settings-window__hint">{t('account.signed_in', { email: status.email })}</p>

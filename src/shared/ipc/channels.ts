@@ -82,6 +82,7 @@ export const IPC_CHANNELS = {
   ACCOUNT_GET_STATUS: 'account:get_status',
   ACCOUNT_GOOGLE_SIGN_IN: 'account:google_sign_in',
   ACCOUNT_SIGN_OUT: 'account:sign_out',
+  ACCOUNT_CHANGED: 'account:changed',
   ACCOUNT_GOOGLE_CANCEL_SIGN_IN: 'account:google_cancel_sign_in',
   SETTINGS_GET: 'settings:get',
   SETTINGS_SET_LOCALE: 'settings:set_locale',

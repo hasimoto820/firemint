@@ -78,6 +78,7 @@ function AppMenuBar({ menus }: AppMenuBarProps): React.JSX.Element {
               }
               aria-haspopup="menu"
               aria-expanded={isOpen}
+              disabled={section.disabled}
               onClick={() => handleToggleMenu(section.id)}
             >
               {section.label}

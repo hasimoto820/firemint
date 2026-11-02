@@ -306,6 +306,7 @@ export type AccountIpcApi = {
   googleSignIn: () => Promise<AccountSignInResult>
   googleCancelSignIn: () => Promise<void>
   signOut: () => Promise<AccountStatus>
+  onChanged: (listener: (status: AccountStatus) => void) => () => void
 }
 
 export type SettingsIpcApi = {
