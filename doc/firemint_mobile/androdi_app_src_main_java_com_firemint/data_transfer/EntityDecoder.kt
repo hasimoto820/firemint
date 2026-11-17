@@ -145,7 +145,11 @@ object EntityDecoder {
           else -> JSONObject().put("stringValue", String(bytes, Charsets.UTF_8))
         }
       }
-      4 -> JSONObject().put("doubleValue", Double.fromBits(value as Long))
+      4 -> {
+        // NaN と無限大は、JSON の数値では書けない（put で止まる）。REST と同じく文字列にする
+        val d = Double.fromBits(value as Long)
+        JSONObject().put("doubleValue", if (d.isNaN() || d.isInfinite()) d.toString() else d)
+      }
       5 -> {
         var lat = 0.0
         var lng = 0.0

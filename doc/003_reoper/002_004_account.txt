@@ -359,7 +359,7 @@ Stripe の設定
 　4. 開発用のクライアント（415032174806）の ID を、セーフリストから外す（外せなければ残してよい）
 
 ＊　審査に含まれていないもの
-　・service.management の権限が、Data Access に無い。モバイル（GoogleAuthModule.kt）は求めている。
+　・（解決済み 2026-11-14）service.management は、モバイルからも外した。両方とも datastore と identitytoolkit だけ。
 
 
 

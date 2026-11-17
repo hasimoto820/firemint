@@ -108,6 +108,10 @@ UI
 　　（Firebase Authentication をコンソール/公式SDKで使っているだけでは有効にならない。
 　　公式SDKは別経路でアクセスするため）。
 
+　　※ 2026-11-14 に廃止。service.management はアプリから外し、「有効化する」ボタンも消した。
+　　　 API が無効のときは、説明と「ブラウザで有効化のページを開く」リンクだけを出す。
+　　　 スコープは datastore と identitytoolkit の2つだけ。以下の service.management の話は当時の記録。
+
 　　cloud-platform は取らない（002_006_002「やらない」）。代わりに
 　　service.management（Google API のサービス設定を管理するだけの狭いスコープ。
 　　Firestore・Cloud Storage 等のデータには触れない）を追加で申請し、

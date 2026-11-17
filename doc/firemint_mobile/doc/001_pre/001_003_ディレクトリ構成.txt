@@ -33,6 +33,12 @@ FireMint_M ディレクトリ構成
   android/                 … Kotlin 本体（features/*/native の実装）
     shared/                … Firestore 初期化、ログ、共通ユーティリティ
 
+  __tests__/               … 自動テスト（npm test）。本体と分けて、ここだけに置く。アプリには入らない
+                               中は src/ と同じ並び（例: __tests__/features/account/entitlement.test.ts）
+    android/               … Kotlin のテスト（cd android → .\gradlew.bat :app:testDebugUnitTest）
+                               中は android/app/src/main/java と同じ並び（com/firemint/...）
+                               場所は android/app/build.gradle の sourceSets で指している
+
 
 ================================================================================
 features/ 一覧

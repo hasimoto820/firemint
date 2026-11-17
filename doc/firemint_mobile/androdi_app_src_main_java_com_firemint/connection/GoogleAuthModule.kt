@@ -179,17 +179,6 @@ class GoogleAuthModule(private val reactContext: ReactApplicationContext) :
     )
   }
 
-  @ReactMethod
-  fun ensureServiceManagementAccess(promise: Promise) {
-    ensureScopeAccess(
-        promise,
-        "https://www.googleapis.com/auth/service.management",
-        REQ_SVC_MGMT,
-        store::serviceManagementAccessToken,
-        store::saveServiceManagementAccessToken,
-    )
-  }
-
   private fun ensureScopeAccess(
       promise: Promise,
       scopeUrl: String,
@@ -255,9 +244,6 @@ class GoogleAuthModule(private val reactContext: ReactApplicationContext) :
       REQ_CLOUD -> onScopeResult(activity, requestCode, resultCode, data, store::saveAccessToken)
       REQ_AUTH_USERS ->
           onScopeResult(activity, requestCode, resultCode, data, store::saveAuthUsersAccessToken)
-      REQ_SVC_MGMT ->
-          onScopeResult(
-              activity, requestCode, resultCode, data, store::saveServiceManagementAccessToken)
     }
   }
 
@@ -334,7 +320,6 @@ class GoogleAuthModule(private val reactContext: ReactApplicationContext) :
     const val NAME = "GoogleAuth"
     private const val REQ_CLOUD = 4281
     private const val REQ_AUTH_USERS = 4282
-    private const val REQ_SVC_MGMT = 4283
     private const val TOKEN_TTL_MS = 50L * 60L * 1000L
     private const val GOOGLE_ACCOUNT_TYPE = "com.google"
   }

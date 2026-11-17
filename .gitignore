@@ -12,3 +12,6 @@ hosting/.firebase
 hosting/secrets/*
 !hosting/secrets/.gitignore
 !hosting/secrets/README.txt
+
+# 署名鍵とパスワード。Git に入れない（本物はモバイルのリポジトリの keys/ と、PC の外のバックアップ）
+doc/firemint_mobile/doc/900_key/**/keys/

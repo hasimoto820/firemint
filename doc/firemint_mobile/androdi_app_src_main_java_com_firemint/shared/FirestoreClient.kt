@@ -756,7 +756,7 @@ class FirestoreClient(
     }
   }
 
-  private fun fieldsBody(projectId: String, fieldsJson: String): String {
+  internal fun fieldsBody(projectId: String, fieldsJson: String): String {
     val raw = fieldsJson.trim().ifBlank { "{}" }
     val plain = JSONObject(raw)
     return JSONObject().put("fields", plainToFirestore(plain, projectId)).toString()
@@ -1078,7 +1078,7 @@ class FirestoreClient(
   //   {"__firemint_type": "double", "value": "NaN"}   … NaN / Infinity / -Infinity だけ
   // 保存の時に、JSON の見た目から型を推測しない（"0901234567" は文字列、30 は整数、1.0 は小数）。
 
-  private fun firestoreToPlain(fields: JSONObject, projectId: String): JSONObject {
+  internal fun firestoreToPlain(fields: JSONObject, projectId: String): JSONObject {
     val out = JSONObject()
     val keys = fields.keys()
     while (keys.hasNext()) {
@@ -1237,7 +1237,7 @@ class FirestoreClient(
 
   // 編集欄に出す JSON。org.json の toString は 1.0 を 1 と書く（整数と区別できなくなる）ので、
   // 小数は必ず小数点を付けて書く。文字列は quoteJson で書く（/ をエスケープしない）
-  private fun prettyJson(value: Any?, indent: String = ""): String {
+  internal fun prettyJson(value: Any?, indent: String = ""): String {
     val inner = "$indent  "
     return when (value) {
       null, JSONObject.NULL -> "null"

@@ -25,9 +25,6 @@ class AuthUsersModule(private val reactContext: ReactApplicationContext) :
   private val store = GoogleSessionStore(reactContext.applicationContext)
   private val client =
       IdentityToolkitClient({ store.authUsersAccessToken() }, { store.clearAuthUsersAccessToken() })
-  private val serviceUsage =
-      ServiceUsageClient(
-          { store.serviceManagementAccessToken() }, { store.clearServiceManagementAccessToken() })
   private var pickExportDestPromise: Promise? = null
 
   init {
@@ -118,18 +115,6 @@ class AuthUsersModule(private val reactContext: ReactApplicationContext) :
     scope.launch {
       try {
         client.deleteAccount(projectId, uid)
-        promise.resolve(null)
-      } catch (e: Exception) {
-        reject(promise, e)
-      }
-    }
-  }
-
-  @ReactMethod
-  fun enableIdentityToolkit(projectId: String, promise: Promise) {
-    scope.launch {
-      try {
-        serviceUsage.enableService(projectId, "identitytoolkit.googleapis.com")
         promise.resolve(null)
       } catch (e: Exception) {
         reject(promise, e)

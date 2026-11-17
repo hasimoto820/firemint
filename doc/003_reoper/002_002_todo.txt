@@ -10,10 +10,11 @@ todo
 アカウント・課金　再開メモ（2026-11-02 時点）
 ================================================================================
 
-＊　今は何を待っているか
-　Google の OAuth 審査（firemint-m）。2026-10-29 に申請した。最大 4〜6 週間。
-　連絡は carepanda886@gmail.com に来る。
+＊　Google の OAuth 審査（firemint-m）
+　2026-11-17 に承認された（datastore。identitytoolkit は non-sensitive なので審査の対象外）。
 　状態の確認: https://console.cloud.google.com/auth/verification?project=firemint-m
+　これから、スコープを増やす・同意画面の設定（アプリ名、ロゴ、ホームページとプライバシーの URL、
+　承認済みドメイン）を変えると、審査のやり直しになる。
 
 
 ＊　仕様の置き場所
@@ -36,9 +37,11 @@ todo
 　　サンドボックスのテスト用カードで購入し、「契約中」になることまで確認した
 
 
-＊　審査中にしないこと
-　・firemint-m に OAuth クライアントを足さない
-　・hosting/ をデプロイしない（審査の対象のサイトが丸ごと置き換わる）
+＊　しないこと（2026-11-18 更新。OAuth の審査は 2026-11-17 に通った）
+　・このリポジトリの hosting/ と functions/ は、デプロイしない（審査後も、ずっと）。
+　　サーバー側（Functions・Firestore ルール・Hosting）の本流は firemint_m。変更とデプロイは firemint_m で行う。
+　　hosting/ … ここからデプロイすると、公開中のサイト（hydrangy.com/firemint/）が丸ごと置き換わる
+　　functions/ … Windows 用の関数（windows_*）も、firemint_m/functions/ に移した（codebase default）
 
 
 ＊　審査中でも試せること（まだ確認していない）
@@ -66,7 +69,6 @@ todo
 　・Stripe の本番環境に、同じ設定を作り直す（002_004「Stripe の設定」）
 　　差し替えるもの: STRIPE_SECRET_KEY、STRIPE_WEBHOOK_SECRET、functions/.env.firemint-e801f の価格の ID
 　・法律とお金まわり（下の「Stripe で直接売るときの、法律とお金まわり」）
-　・service.management が審査に入っていない（モバイルは求めている）。審査の連絡で聞かれたら対応する
 
 
 

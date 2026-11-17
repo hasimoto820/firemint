@@ -212,15 +212,22 @@ cd F:\HandyPC\sys\handypc\android
 
 
 
-
 ＊　firebase functions
-
 
 firebase login --reauth
 
-$env:FUNCTIONS_DISCOVERY_TIMEOUT=60   
+（Norton が入っている PC だけ。先に実行する）
 $env:NODE_EXTRA_CA_CERTS="C:\ProgramData\Norton\Antivirus\wscert.pem"; $env:NODE_USE_SYSTEM_CA="1"
 
-firebase deploy --only functions
+（リポジトリの一番上 firemint_m で実行。functions はすべて functions/ の1つ）
+$env:FUNCTIONS_DISCOVERY_TIMEOUT=60; firebase deploy --only functions --project firemint-e801f
+
+
+
+
+
+
+
+
 
 

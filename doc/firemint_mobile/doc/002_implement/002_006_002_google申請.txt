@@ -1,6 +1,10 @@
 
 5  auth_users Google申請
 
+※ 2026-11-14 に、service.management はアプリから外した（Identity Toolkit API の自動有効化はやめた）。
+　 審査に出したスコープは datastore と identitytoolkit の2つだけ。2026-11-17 に審査が通った。
+　 このファイルの service.management の話は、当時の記録。
+
 
 
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@

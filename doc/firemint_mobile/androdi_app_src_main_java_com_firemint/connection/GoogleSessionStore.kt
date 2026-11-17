@@ -41,15 +41,6 @@ class GoogleSessionStore(context: Context) {
         .apply()
   }
 
-  fun saveServiceManagementAccessToken(token: String, expiresAtMs: Long) {
-    prefs
-        .edit()
-        .putString(KEY_SVCMGMT_ACCESS_TOKEN, token)
-        .putLong(KEY_SVCMGMT_ACCESS_EXPIRES, expiresAtMs)
-        .putString(KEY_SVCMGMT_ACCESS_SCOPE, SCOPE_SERVICE_MANAGEMENT)
-        .apply()
-  }
-
   // サーバーが権限エラー（401）を返した時に、保存したトークンを捨てる。
   // 保存した期限より先に、Google 側で期限が切れていることがあるため（使い回しのトークン）。
   // 捨てておけば、次の ensure… が新しいトークンを取りに行く
@@ -59,10 +50,6 @@ class GoogleSessionStore(context: Context) {
 
   fun clearAuthUsersAccessToken() {
     prefs.edit().remove(KEY_AUTH_ACCESS_TOKEN).remove(KEY_AUTH_ACCESS_EXPIRES).apply()
-  }
-
-  fun clearServiceManagementAccessToken() {
-    prefs.edit().remove(KEY_SVCMGMT_ACCESS_TOKEN).remove(KEY_SVCMGMT_ACCESS_EXPIRES).apply()
   }
 
   fun email(): String? = prefs.getString(KEY_EMAIL, null)?.takeIf { it.isNotBlank() }
@@ -94,19 +81,6 @@ class GoogleSessionStore(context: Context) {
     return token
   }
 
-  fun serviceManagementAccessToken(): String? {
-    val token =
-        prefs.getString(KEY_SVCMGMT_ACCESS_TOKEN, null)?.takeIf { it.isNotBlank() } ?: return null
-    if (prefs.getString(KEY_SVCMGMT_ACCESS_SCOPE, "") != SCOPE_SERVICE_MANAGEMENT) {
-      return null
-    }
-    val expires = prefs.getLong(KEY_SVCMGMT_ACCESS_EXPIRES, 0L)
-    if (expires != 0L && expires <= System.currentTimeMillis()) {
-      return null
-    }
-    return token
-  }
-
   fun clear() {
     prefs.edit().clear().apply()
   }
@@ -123,9 +97,5 @@ class GoogleSessionStore(context: Context) {
     private const val KEY_AUTH_ACCESS_EXPIRES = "auth_access_expires"
     private const val KEY_AUTH_ACCESS_SCOPE = "auth_access_scope"
     private const val SCOPE_IDENTITYTOOLKIT = "identitytoolkit"
-    private const val KEY_SVCMGMT_ACCESS_TOKEN = "svcmgmt_access_token"
-    private const val KEY_SVCMGMT_ACCESS_EXPIRES = "svcmgmt_access_expires"
-    private const val KEY_SVCMGMT_ACCESS_SCOPE = "svcmgmt_access_scope"
-    private const val SCOPE_SERVICE_MANAGEMENT = "service.management"
   }
 }

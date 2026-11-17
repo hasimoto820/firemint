@@ -87,7 +87,8 @@
     モバイル版を作る前のドキュメント。
 
 ＊　doc/firemint_mobile/
-    モバイル版のドキュメント・ソースの写し。
+    モバイル版のドキュメント・ソースの写し（2026-11-18 に写し直した。本物は firemint_m）。
+    900_key/ の鍵は写していない。
     doc/firemint_mobile/doc/002_implement/   実装（002_007 json 等）
     doc/firemint_mobile/doc/003_account/     アカウント・課金（003_001 〜 003_004）
 

@@ -28,8 +28,8 @@ mobileに向けて
 
 
 
-＊　codebaseの名前変更
-default　→　android
+＊　codebaseの名前変更（不要になった 2026-11-17）
+　関数はすべて firemint_m/functions/ の1つにまとめた（Windows 用の windows_* も含む）。codebase は default のまま。
 
 
 
