@@ -55,7 +55,15 @@ todo
 ＊　審査が通ったら、この順番で
 　1. firemint-m に Windows 用の OAuth クライアント（種類: デスクトップ アプリ）を作る
 　　 追加の審査（Windows の動画）が要るかは、未確認。ここで確かめる
+
+        → OK
+
+
 　2. その ID を Firebase のセーフリストに足す。config/google_oauth.json を差し替える
+
+        → OK
+
+
 　3. 公式サイトの改修（下の「Stripe リダイレクト先の変更」）。Windows 版の内容を足す
 　4. 支払い完了のページを作り、windows_createCheckoutSession の戻り先を変える
 　5. 解約の Web ページと windows_createPortalSession を作る
