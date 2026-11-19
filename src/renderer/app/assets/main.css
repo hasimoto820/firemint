@@ -494,6 +494,11 @@ code {
   background: rgba(255, 107, 107, 0.15);
 }
 
+.fm-button:not(:disabled):active {
+  filter: brightness(0.85);
+  transform: translateY(1px);
+}
+
 .fm-button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
