@@ -4250,6 +4250,58 @@ html.settings-window-root #root {
   color: var(--ev-c-text-2);
 }
 
+/* Settings の FireMint アカウント: メンバーの一覧と招待 */
+.account-members {
+  margin-top: 16px;
+}
+
+.account-members__title {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.account-members__list {
+  margin: 0 0 10px;
+  padding: 0;
+  list-style: none;
+}
+
+.account-members__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--ev-c-gray-2);
+}
+
+.account-members__email {
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.account-members__leave {
+  margin-top: 12px;
+}
+
+.account-members__add {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.account-members__input {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--ev-c-gray-1);
+  border-radius: 4px;
+  background: var(--ev-c-black-soft);
+  color: var(--ev-c-text-1);
+  font-size: 12px;
+}
+
 .emulator-page .fm-button {
   width: auto;
   min-width: 5.5em;

@@ -48,3 +48,16 @@ export type AccountStatus = {
 export type AccountSignInResult = { ok: true; status: AccountStatus } | { ok: false; error: string }
 
 export type AccountPurchaseResult = { ok: true } | { ok: false; error: string }
+
+/**
+ * accounts/{accountId}/members の 1 件（モバイル版の MemberEntry と同じ）。
+ * pending: true は、まだログインしていない招待中（ドキュメント ID が email）。
+ */
+export type AccountMember = {
+  id: string
+  email: string | null
+  pending: boolean
+  isSelf: boolean
+}
+
+export type AccountMemberResult = { ok: true } | { ok: false; error: string }

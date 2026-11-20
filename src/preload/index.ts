@@ -196,6 +196,11 @@ const api: IpcApi = {
     signOut: () => ipcRenderer.invoke(IPC_CHANNELS.ACCOUNT_SIGN_OUT),
     refresh: () => ipcRenderer.invoke(IPC_CHANNELS.ACCOUNT_REFRESH),
     purchase: () => ipcRenderer.invoke(IPC_CHANNELS.ACCOUNT_PURCHASE),
+    listMembers: () => ipcRenderer.invoke(IPC_CHANNELS.ACCOUNT_LIST_MEMBERS),
+    addMember: (email: string) => ipcRenderer.invoke(IPC_CHANNELS.ACCOUNT_ADD_MEMBER, email),
+    removeMember: (memberId: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.ACCOUNT_REMOVE_MEMBER, memberId),
+    leave: () => ipcRenderer.invoke(IPC_CHANNELS.ACCOUNT_LEAVE),
     onChanged: (listener) => {
       const handler = (_event: IpcRendererEvent, status: AccountStatus): void => {
         listener(status)

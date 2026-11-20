@@ -6,6 +6,8 @@ import { IPC_CHANNELS } from '@shared/ipc/channels'
 import {
   computeEntitlement,
   computeTrialDaysLeft,
+  type AccountMember,
+  type AccountMemberResult,
   type AccountPurchaseResult,
   type AccountSignInResult,
   type AccountStatus,
@@ -114,7 +116,7 @@ async function registerDevice(
   return registered
 }
 
-async function updateCachedAccountId(accountId: string): Promise<void> {
+async function updateCachedAccountId(accountId: string | null): Promise<void> {
   if (currentCache) {
     currentCache = { ...currentCache, accountId }
     await saveAccountCache(currentCache)
@@ -226,6 +228,103 @@ export async function purchaseSubscription(): Promise<AccountPurchaseResult> {
     logWarn('account', 'purchase failed', error)
     return { ok: false, error: error instanceof Error ? error.message : '購入できませんでした' }
   }
+}
+
+/** callFunction のエラーから、サーバーの理由だけを取り出す（「addMember failed: 」を外す） */
+function functionErrorMessage(error: unknown, fallback: string): string {
+  if (!(error instanceof Error)) {
+    return fallback
+  }
+  return error.message.replace(/^[A-Za-z_]+ failed: /, '') || fallback
+}
+
+/**
+ * accounts/{accountId}/members を読む（モバイル版の fetchMembers と同じ）。
+ * 読めるのは、その account のメンバーだけ（firestore.rules）。オーナー自身もメンバーに入っている。
+ */
+export async function listAccountMembers(): Promise<AccountMember[]> {
+  const accountId = currentCache?.accountId
+  if (!accountId || !currentEmail) {
+    return []
+  }
+
+  const response = await net.fetch(
+    `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/accounts/${accountId}/members?pageSize=20`,
+    { headers: { Authorization: `Bearer ${await getIdToken()}` } }
+  )
+  if (!response.ok) {
+    throw new Error(`listAccountMembers failed: HTTP ${response.status}`)
+  }
+
+  const body = (await response.json()) as {
+    documents?: Array<{ name: string; fields?: { email?: { stringValue?: string } } }>
+  }
+  const selfUid = currentTokens?.uid ?? null
+
+  return (body.documents ?? []).map((doc) => {
+    const id = doc.name.split('/').pop() ?? ''
+    return {
+      id,
+      email: doc.fields?.email?.stringValue ?? null,
+      // 招待中は、ドキュメント ID が email（参加すると uid に替わる）
+      pending: id.includes('@'),
+      isSelf: id === selfUid
+    }
+  })
+}
+
+/** オーナーがメンバーを招待する（addMember。上限やメールアドレスの確認はサーバー側） */
+export async function addAccountMember(email: string): Promise<AccountMemberResult> {
+  try {
+    await callFunction('addMember', { email: email.trim() })
+    logInfo('account', 'member invited')
+    return { ok: true }
+  } catch (error) {
+    logWarn('account', 'addMember failed', error)
+    return { ok: false, error: functionErrorMessage(error, '追加できませんでした') }
+  }
+}
+
+/** オーナーがメンバーを外す（removeMember）。招待中の人は email、参加済みの人は uid を渡す */
+export async function removeAccountMember(memberId: string): Promise<AccountMemberResult> {
+  try {
+    await callFunction('removeMember', { uid: memberId })
+    logInfo('account', 'member removed')
+    return { ok: true }
+  } catch (error) {
+    logWarn('account', 'removeMember failed', error)
+    return { ok: false, error: functionErrorMessage(error, '外せませんでした') }
+  }
+}
+
+/**
+ * メンバーが自分でグループから抜ける（removeMember に自分の uid を渡す。モバイル版の onLeaveAccount と同じ）。
+ * 抜けた直後は accountId が空になる。招待が無ければ checkForInvite が新しい account を作る。
+ * オーナーは抜けられない（サーバー側で拒否）。
+ */
+export async function leaveAccount(): Promise<AccountMemberResult> {
+  const uid = currentTokens?.uid
+  if (!uid) {
+    return { ok: false, error: 'ログインしていません' }
+  }
+  try {
+    await callFunction('removeMember', { uid })
+    logInfo('account', 'left account')
+  } catch (error) {
+    logWarn('account', 'leave account failed', error)
+    return { ok: false, error: functionErrorMessage(error, '脱退できませんでした') }
+  }
+
+  // ここから先は、抜けた後の後始末。失敗しても、脱退そのものは済んでいる
+  try {
+    await updateCachedAccountId(null)
+    await checkForInvite()
+    await refreshLatestSubscription()
+  } catch (error) {
+    logWarn('account', 'after leaving: account setup failed', error)
+  }
+  notifyStatusChanged()
+  return { ok: true }
 }
 
 function notifyStatusChanged(): void {

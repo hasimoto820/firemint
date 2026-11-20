@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useI18n } from '@shared/i18n/renderer/I18nProvider'
 import Button from '@shared/ui/Button'
+import AccountMembers from './AccountMembers'
 import { useAccountStatus } from './useAccountStatus'
 
 /** Settings の「FireMint アカウント」。匿名なら Google ログインのボタンを出す。 */
@@ -58,6 +59,13 @@ function AccountSection(): React.JSX.Element {
           <Button onClick={handleSignOut} disabled={signingOut}>
             {t('account.sign_out')}
           </Button>
+          {status.accountId && (
+            <AccountMembers
+              accountId={status.accountId}
+              isOwner={status.isOwner}
+              firstUseDate={status.firstUseDate}
+            />
+          )}
         </>
       ) : (
         <>

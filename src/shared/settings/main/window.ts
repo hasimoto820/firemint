@@ -73,8 +73,22 @@ export function openSettingsWindow(): void {
       settingsWindow?.show()
     })
 
+    // 閉じた後に前へ出すウィンドウを Windows に任せると、別のアプリが前に来ることがある。
+    // 閉じる直前に、親（メインのウィンドウ）を前に出しておく
+    settingsWindow.on('close', () => {
+      if (parent && !parent.isDestroyed()) {
+        if (parent.isMinimized()) {
+          parent.restore()
+        }
+        parent.focus()
+      }
+    })
+
     settingsWindow.on('closed', () => {
       settingsWindow = null
+      if (parent && !parent.isDestroyed()) {
+        parent.focus()
+      }
     })
 
     void settingsWindow.loadURL(settingsUrl())
