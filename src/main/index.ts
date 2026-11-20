@@ -14,6 +14,7 @@ import {
 import { initFileLogging } from '@shared/logging/file_sink'
 import { logInfo, logWarn } from '@shared/logging/logger'
 import { initializeAccount } from '@features/account/main/account_service'
+import { startAutoUpdate } from './auto_update'
 
 const APP_DISPLAY_NAME = 'FireMint'
 
@@ -103,6 +104,8 @@ function startApp(): void {
     void initializeAccount().catch((error) => {
       logWarn('account', 'account initialization failed', error)
     })
+
+    startAutoUpdate()
 
     app.on('activate', function () {
       if (BrowserWindow.getAllWindows().length === 0) void createWindow()

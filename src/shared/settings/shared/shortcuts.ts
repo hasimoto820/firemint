@@ -68,7 +68,9 @@ function isMacPlatform(): boolean {
     return false
   }
 
-  return window.electron.process.platform === 'darwin'
+  // このファイルはメイン側の型チェックにも入る。window.electron の型は画面側にしか無いので、ここで型を付ける
+  const electronApi = (window as Window & { electron?: { process: { platform: string } } }).electron
+  return electronApi?.process.platform === 'darwin'
 }
 
 /** メニュー右端の表示。Ctrl+P / Ctrl+W 用。 */
