@@ -4,7 +4,7 @@
   "description": "Firestore external management desktop tool",
   "main": "./out/main/index.js",
   "author": "FireMint",
-  "homepage": "https://github.com/hasimoto820/firemint-desktop",
+  "homepage": "https://hydrangy.com/firemint/",
   "engines": {
     "node": ">=20.11.0"
   },

@@ -55,9 +55,17 @@ async function createWindow(): Promise<void> {
     }
   })
 
-  mainWindow.on('ready-to-show', () => {
+  // ready-to-show が来ないことがある（ウィンドウが隠れたまま、アプリだけ動く）。
+  // 読み込みの完了（did-finish-load）でも表示し、先に来たほうで 1 回だけ show する。
+  let shown = false
+  const showWindow = (reason: string): void => {
+    if (shown || mainWindow.isDestroyed()) return
+    shown = true
+    logInfo('window', `show (${reason})`)
     mainWindow.show()
-  })
+  }
+  mainWindow.once('ready-to-show', () => showWindow('ready-to-show'))
+  mainWindow.webContents.once('did-finish-load', () => showWindow('did-finish-load'))
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url)

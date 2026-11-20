@@ -229,7 +229,7 @@ function ConnectionPanel({
             onClick={() => onRequestGoogleConnect?.()}
             disabled={loading || !onRequestGoogleConnect}
           >
-            Google でサインイン…
+            サインイン
           </button>
         </div>
       )}

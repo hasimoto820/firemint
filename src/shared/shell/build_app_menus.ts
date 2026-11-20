@@ -6,7 +6,7 @@ import type { TranslateFn } from '@shared/i18n/shared/types'
 import { shortcutLabel } from '@shared/settings/shared/shortcuts'
 import type { AppMenuSection } from './app_menu'
 
-export const FIREMINT_DOCS_URL = 'https://electron-vite.org'
+export const FIREMINT_DOCS_URL = 'https://hydrangy.com/firemint/'
 
 /**
  * 画面（Explorer など）から登録される、文脈依存メニューの状態とハンドラ。
