@@ -245,8 +245,20 @@ google審査に絡む為、審査終了後に、以下を修正
 
 
 
+＊　解約の Web ページと windows_createPortalSession
 
 
+＊　データ削除（Web ページと windows_ の関数）
+
+
+＊　支払い完了のページ
+    windows_createCheckoutSession の戻り先が、まだ https://firemint-e801f.web.app/ のまま
+
+＊　公式サイトに Windows 版を足す
+    hosting/firemint の3ページ（index、privacy、delete_account）に、Windows と Stripe の記述がありません
+
+
+＊　顧客を消した後に返金できるか	サンドボックスで試していません
 
 
 
