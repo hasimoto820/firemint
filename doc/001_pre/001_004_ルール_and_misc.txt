@@ -110,7 +110,6 @@ npx firebase-tools deploy --only hosting --project firemint-e801f
 
 
 
-
 Emulator起動
 npm run emulators
 
@@ -128,4 +127,6 @@ Emulator使用アドレス
 
 
 
+デスクトップのインストールファイル
+dist\firemint-1.0.0-setup.exe
 
