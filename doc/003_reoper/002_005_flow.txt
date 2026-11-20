@@ -27,7 +27,8 @@ flow
 • Firebase Auth は裏側（main）で動かす。画面側（renderer）にログイン情報を渡さない。
   refresh token は safeStorage で暗号化して保存する。
 • 課金は Stripe。subscriptions/{Stripe の subscription ID}（provider = "Stripe"）。
-• 解約とデータ削除は、公式の Web ページで行う。アプリには、そのページへのリンクを置く。
+• 解約は、アプリから Stripe の Customer Portal を開く（windows_createPortalSession）。
+  データ削除は、アプリの中で行う（モバイル版と同じ deleteAccount / deleteMyData）。（2026-11-20 変更）
 • デスクトップ版の Cloud Functions は、codebase を windows にし、名前の頭に windows_ を付ける。
 • 端末に置くもの（キャッシュ・設定）は、C:\Users\<ユーザー名>\AppData\Roaming\FireMint\ の JSON。
 
@@ -149,14 +150,27 @@ subscriptions/{Stripe の subscription ID} を作る・更新する
 フロー　　■ 解約
 ================================================================================
 
-アプリの「解約」→ 公式の Web ページを開く
+（2026-11-20 変更。以前は「公式の Web ページで Google ログインしてから解約」）
+
+アプリ「Settings」→「FireMint アカウント」→「支払いの管理・解約」（owner だけに出す）
 ↓
-Web ページで Google ログイン（owner 本人か確かめる）
+windows_createPortalSession を呼ぶ（firemint_m の Functions。Firebase のログイン情報が付く）
 ↓
-Stripe の Customer Portal で解約する
+サーバー
+　・呼んだ人が owner か確かめる。owner でなければ断る
+　・accounts/{accountId}.stripeCustomerId が無い（Stripe で買ったことが無い）なら断る
+　・stripeCustomerId で、Customer Portal の URL を作って返す
 ↓
-Webhook で、subscriptions の lastNotificationType を更新する
+アプリが、その URL をブラウザで開く（メールアドレスの入力やコードは要らない）
+↓
+Stripe の Customer Portal で解約する（請求期間の終了時にキャンセル）
+↓
+Webhook で、subscriptions の lastNotificationType を CANCELED にする
 （expiryTime は変えない。期限まで使える。モバイル版の CANCELED と同じ考え方）
+
+アプリが使えない人の入口
+　公式サイトに、Stripe の Customer Portal のログインリンクを載せる。
+　購入した時のメールアドレスを入れると、Stripe からコードが届き、それで入る。
 
 
 
@@ -165,27 +179,36 @@ Webhook で、subscriptions の lastNotificationType を更新する
 フロー　　■ データ削除
 ================================================================================
 
-アプリの「データ削除」→ 公式の Web ページを開く
+（2026-11-20 変更。以前は「公式の Web ページで Google ログインしてから削除。windows_ の関数で
+　Stripe を自動で解約し、Stripe の顧客も消す」）
+
+アプリ「Settings」→「FireMint アカウント」→「アカウント削除」
 ↓
-Web ページで Google ログイン
+確認（モバイル版と同じ）
+　・owner / member / 未所属（匿名）で、確認の文言を変える
+　・Google ログイン済みなら、メールアドレスを入力して確定する。匿名なら、確認 1 回で実行する
 ↓
-中身は、モバイル版「データ削除」の owner / member / 未所属の 3 分岐と同じ。
-owner の時は、次の順番で行う（呼ぶ関数は、未策定 I）。
-  1. Google Play の課金が続いている → 削除を断る。Google Play には触らない。Android アプリでの操作を案内する
-     （課金が続いている契約は、買った側だけが権利を持つ）
-  2. Stripe の課金が続いている → Stripe を解約する
-     解約の結果が canceled なら 3 へ。失敗したら、何も消さずに止める（モバイル版の Google Play の解約と同じ）
-  3. Stripe の顧客（accounts/{accountId}.stripeCustomerId）を消す。失敗したら、何も消さずに止める
-  4. FireMint 側のデータ（Firestore）を消す
-  5. そのあとに届く Stripe の通知（customer.subscription.deleted など）は、
+呼ぶ関数（firemint_m の Functions。モバイル版と同じもの。windows_ の関数は作らない）
+　owner　　　　　→ deleteAccount
+　member・未所属 → deleteMyData
+↓
+サーバーの順番（deleteAccountCore.ts。今のまま）
+  1. Stripe の課金が続いている → 何も消さずに断る（OTHER_BILLING_ACTIVE）
+     アプリは「支払いの管理・解約」で先に解約するよう案内する。
+     解約の予約（CANCELED）は「続いていない」扱い。期限を待たずに、すぐ消せる
+  2. Google Play の課金が続いている → Google Play を解約する。失敗したら、何も消さずに止める
+     （モバイル版と同じ。以前の「断って Android アプリでの操作を案内する」から変更）
+  3. FireMint 側のデータ（Firestore）を消す
+  4. そのあとに届く Stripe の通知（customer.subscription.deleted など）は、
      subscriptions のドキュメントが無いので何もしない（D の決まり）
 devices には期限（expireAt）を入れるだけで消さない。トライアルはリセットされない。
+Stripe の顧客は消さない（メールアドレスと支払いの履歴は、決済の記録として Stripe に残る）。
 ↓
-アプリ側の後始末（次にアプリを起動した時）
+アプリ側の後始末
   ・Firebase Auth のセッションが無効になっているので、①で新しい匿名ユーザーを作る
   ・キャッシュは、uid が合わないので捨てる
   ・トライアルは、この PC の日付のまま続く
-  ・firebase アカウント（Firestore 用のログイン）のセッションを消すかは、未策定 H
+  ・プロジェクトの一覧・設定・firebase アカウント（Firestore 用のログイン）のセッションを消すかは、未策定 H
 
 
 
@@ -287,6 +310,10 @@ H. データ削除の後、アプリに残っている firebase アカウント�
 
 →　webページでの削除だよね。じゃあ、わざわざユーザーのアプリに向かって削除しない。消すのはサーバー側だけ。
 
+→　2026-11-20 変更: アプリの中で消すので、決め直す（未決）。
+　　推奨: モバイル版と同じにする（プロジェクト一覧・スニペット・設定を消して、アプリを閉じる。
+　　公式サイトの delete_account.html にも、そう書いてある）。消すもの（%APPDATA%\firemint の中）を一覧にして決める。
+
 
 
 
@@ -295,6 +322,9 @@ I. データ削除の Web ページから呼ぶ関数。
 
 →　windows_を作る。
 　　Google Play の課金が続いている owner の削除は断る（「データ削除」）。
+
+→　2026-11-20 変更: Web ページは作らず、アプリから deleteAccount / deleteMyData をそのまま呼ぶ。windows_ の関数は作らない。
+　　Google Play の課金が続いている owner は、断らずに Google Play を解約する（モバイル版と同じ）。
 
 
 
@@ -307,6 +337,8 @@ J. オフラインの時の動き。
 
 
 
+K. Stripe の顧客を消さないことを、プライバシーポリシーと delete_account.html に書くか。（2026-11-20）
 
 
 
+L. 「支払いの管理・解約」を出す条件。owner なら常に出すか、stripeCustomerId がある時だけ出すか。（2026-11-20）
