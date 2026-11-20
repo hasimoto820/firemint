@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ConnectResult, ConnectionStatus } from '@features/connection/shared/types'
 import { workspaceAuthLabel, type WorkspaceState } from '@features/workspace/shared/types'
 
@@ -24,8 +24,19 @@ function ConnectionPanel({
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
+  const initialModeChosenRef = useRef(false)
+
   const refreshWorkspace = useCallback(async (): Promise<void> => {
-    setWorkspace(await window.api.workspace.getState())
+    const next = await window.api.workspace.getState()
+    setWorkspace(next)
+
+    // 最初の 1 回だけ。登録済みが無ければ（初めて使う人）、リストではなく Google を開く
+    if (!initialModeChosenRef.current) {
+      initialModeChosenRef.current = true
+      if (next.entries.length === 0) {
+        setMode('google')
+      }
+    }
   }, [])
 
   useEffect(() => {
@@ -137,18 +148,6 @@ function ConnectionPanel({
         <button
           type="button"
           className={
-            mode === 'json'
-              ? 'connection-panel__mode-btn connection-panel__mode-btn--active'
-              : 'connection-panel__mode-btn'
-          }
-          onClick={() => setMode('json')}
-          disabled={loading}
-        >
-          JSON
-        </button>
-        <button
-          type="button"
-          className={
             mode === 'google'
               ? 'connection-panel__mode-btn connection-panel__mode-btn--active'
               : 'connection-panel__mode-btn'
@@ -158,6 +157,18 @@ function ConnectionPanel({
         >
           Google
         </button>
+        <button
+          type="button"
+          className={
+            mode === 'json'
+              ? 'connection-panel__mode-btn connection-panel__mode-btn--active'
+              : 'connection-panel__mode-btn'
+          }
+          onClick={() => setMode('json')}
+          disabled={loading}
+        >
+          サービスアカウント JSON
+        </button>
       </div>
 
       {mode === 'list' && (
@@ -165,7 +176,7 @@ function ConnectionPanel({
           <p className="connection-panel__hint">登録済みをクリックして接続します。</p>
           {entries.length === 0 ? (
             <p className="connection-panel__empty">
-              登録済みがありません。JSON または Google で接続してください。
+              登録済みがありません。Google またはサービスアカウント JSON で接続してください。
             </p>
           ) : (
             <ul className="workspace-panel__list">
@@ -229,7 +240,7 @@ function ConnectionPanel({
             onClick={() => onRequestGoogleConnect?.()}
             disabled={loading || !onRequestGoogleConnect}
           >
-            サインイン
+            接続
           </button>
         </div>
       )}

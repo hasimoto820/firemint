@@ -42,6 +42,12 @@ export type GoogleSignInResult =
       error: string
     }
 
+/** この PC に保存してある Google アカウント（Firestore の接続用） */
+export type GoogleSavedAccount = {
+  accountKey: string
+  email: string
+}
+
 export type GoogleConnectProjectInput = {
   accountKey: string
   accountEmail: string

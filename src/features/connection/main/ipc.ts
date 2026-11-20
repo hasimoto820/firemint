@@ -14,6 +14,7 @@ import {
   getConnectionStatus,
   signInWithGoogle
 } from './service'
+import { listGoogleAccounts } from './google_token_store'
 
 export function registerConnectionHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.CONNECTION_SELECT_FILE, async (event) => {
@@ -62,6 +63,10 @@ export function registerConnectionHandlers(): void {
       return connectWithGoogleProject(input)
     }
   )
+
+  ipcMain.handle(IPC_CHANNELS.CONNECTION_GOOGLE_LIST_ACCOUNTS, async () => {
+    return listGoogleAccounts()
+  })
 
   ipcMain.handle(
     IPC_CHANNELS.CONNECTION_EMULATOR_CONNECT,

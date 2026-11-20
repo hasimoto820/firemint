@@ -110,3 +110,13 @@ export async function removeGoogleRefreshToken(accountKey: string): Promise<void
   delete store.accounts[key]
   await saveStore(store)
 }
+
+/** この PC に保存してある Google アカウント（Firestore の接続用）。トークンは返さない */
+export async function listGoogleAccounts(): Promise<{ accountKey: string; email: string }[]> {
+  const store = await loadStore()
+
+  return Object.entries(store.accounts).map(([accountKey, entry]) => ({
+    accountKey,
+    email: entry.email
+  }))
+}

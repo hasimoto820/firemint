@@ -223,14 +223,7 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
           disabled: !(handlers.canListConnect ?? false),
           onClick: handlers.onListConnect
         },
-        {
-          type: 'item',
-          id: 'file-json-connect',
-          label: t('menu.connect_json'),
-          indent: true,
-          disabled: !handlers.onJsonConnect,
-          onClick: handlers.onJsonConnect
-        },
+        // 本番のクラウドへの接続は Google が本命なので、JSON より先に出す
         {
           type: 'item',
           id: 'file-google-connect',
@@ -238,6 +231,14 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
           indent: true,
           disabled: !handlers.onGoogleConnect,
           onClick: handlers.onGoogleConnect
+        },
+        {
+          type: 'item',
+          id: 'file-json-connect',
+          label: t('menu.connect_json'),
+          indent: true,
+          disabled: !handlers.onJsonConnect,
+          onClick: handlers.onJsonConnect
         },
         {
           type: 'item',

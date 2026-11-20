@@ -1,5 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
+import GoogleConnectDialog from '@features/connection/renderer/ui/GoogleConnectDialog'
+import EmulatorConnectDialog from '@features/emulator/renderer/ui/EmulatorConnectDialog'
 import {
   DEFAULT_ENTRY_COLOR,
   workspaceAuthLabel,
@@ -41,6 +43,11 @@ function WorkspaceProjectList({
   const [colorDraft, setColorDraft] = useState(DEFAULT_ENTRY_COLOR)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [addMenuOpen, setAddMenuOpen] = useState(false)
+  const [addMenuPos, setAddMenuPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 })
+  const [googleOpen, setGoogleOpen] = useState(false)
+  const [emulatorOpen, setEmulatorOpen] = useState(false)
+  const addMenuRef = useRef<HTMLDivElement | null>(null)
 
   const refresh = useCallback(async (): Promise<void> => {
     const next = await window.api.workspace.getState()
@@ -51,7 +58,37 @@ function WorkspaceProjectList({
     void refresh()
   }, [refresh, refreshToken])
 
-  const handleAdd = async (): Promise<void> => {
+  // 「+」のメニューは、外をクリックするか Esc で閉じる
+  useEffect(() => {
+    if (!addMenuOpen) {
+      return
+    }
+
+    const handlePointerDown = (event: MouseEvent): void => {
+      if (addMenuRef.current && !addMenuRef.current.contains(event.target as Node)) {
+        setAddMenuOpen(false)
+      }
+    }
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') {
+        setAddMenuOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handlePointerDown)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [addMenuOpen])
+
+  const handleAddConnected = async (): Promise<void> => {
+    await refresh()
+    onChanged()
+  }
+
+  const handleAddJson = async (): Promise<void> => {
     setError(null)
     const filePath = await window.api.connection.selectServiceAccountFile()
 
@@ -369,17 +406,78 @@ function WorkspaceProjectList({
     <section className="project-list">
       <div className="project-list__header">
         <span className="project-list__title">{t('workspace.projects')}</span>
-        <button
-          type="button"
-          className="project-list__add"
-          onClick={() => void handleAdd()}
-          disabled={busy}
-          title={t('workspace.add_project')}
-          aria-label={t('workspace.add_project')}
-        >
-          +
-        </button>
+        <div className="project-list__add-wrap" ref={addMenuRef}>
+          <button
+            type="button"
+            className="project-list__add"
+            onClick={(event) => {
+              const rect = event.currentTarget.getBoundingClientRect()
+              setAddMenuPos({ top: rect.bottom + 4, left: rect.left })
+              setAddMenuOpen((open) => !open)
+            }}
+            disabled={busy}
+            title={t('workspace.add_project')}
+            aria-label={t('workspace.add_project')}
+            aria-haspopup="menu"
+            aria-expanded={addMenuOpen}
+          >
+            +
+          </button>
+          {addMenuOpen && (
+            <div
+              className="project-list__add-menu"
+              role="menu"
+              style={{ top: addMenuPos.top, left: addMenuPos.left }}
+            >
+              <button
+                type="button"
+                role="menuitem"
+                className="project-list__add-item"
+                onClick={() => {
+                  setAddMenuOpen(false)
+                  setGoogleOpen(true)
+                }}
+              >
+                {t('workspace.add_google')}
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                className="project-list__add-item"
+                onClick={() => {
+                  setAddMenuOpen(false)
+                  void handleAddJson()
+                }}
+              >
+                {t('workspace.add_json')}
+              </button>
+              <div className="project-list__add-separator" role="separator" />
+              <button
+                type="button"
+                role="menuitem"
+                className="project-list__add-item"
+                onClick={() => {
+                  setAddMenuOpen(false)
+                  setEmulatorOpen(true)
+                }}
+              >
+                {t('workspace.add_emulator')}
+              </button>
+            </div>
+          )}
+        </div>
       </div>
+
+      <GoogleConnectDialog
+        open={googleOpen}
+        onClose={() => setGoogleOpen(false)}
+        onConnected={() => void handleAddConnected()}
+      />
+      <EmulatorConnectDialog
+        open={emulatorOpen}
+        onClose={() => setEmulatorOpen(false)}
+        onConnected={handleAddConnected}
+      />
 
       {error && <p className="project-list__error">{error}</p>}
 
