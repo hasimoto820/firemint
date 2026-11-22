@@ -126,6 +126,9 @@ export const ja: MessageCatalog = {
   'account.invite_blocked_title': "招待を受けられません",
   'account.invite_blocked_message': "{providers} の支払いが続いています。先にその支払いを解約してから、もう一度招待を受けてください。",
 
+  'oauth_callback.done': "ログインが完了しました。アプリに戻ってください。",
+  'oauth_callback.failed': "ログインに失敗しました。アプリからやり直してください。",
+
   'connection.lead': 'Firestore に接続',
   'connection.mode_list': 'リスト',
   'connection.mode_json': 'JSON',

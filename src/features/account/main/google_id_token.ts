@@ -4,6 +4,7 @@ import type { AddressInfo } from 'net'
 import { shell } from 'electron'
 import { OAuth2Client } from 'google-auth-library'
 import { loadGoogleOAuthConfig } from '@features/connection/main/google_oauth_config'
+import { sendOAuthCallbackPage } from '@features/connection/main/oauth_callback_page'
 
 // FireMint へのログインに要るのは、本人とメールアドレスだけ
 const SCOPES = ['openid', 'email', 'profile']
@@ -39,11 +40,6 @@ export async function requestGoogleIdToken(): Promise<string> {
       }
     }
 
-    const respond = (res: http.ServerResponse, status: number, message: string): void => {
-      res.writeHead(status, { 'Content-Type': 'text/html; charset=utf-8' })
-      res.end(`<html><body><h1>FireMint</h1><p>${message}</p></body></html>`)
-    }
-
     const server = http.createServer((req, res) => {
       void (async () => {
         const url = new URL(req.url ?? '/', 'http://127.0.0.1')
@@ -55,7 +51,7 @@ export async function requestGoogleIdToken(): Promise<string> {
 
         const code = url.searchParams.get('code')
         if (url.searchParams.get('state') !== state || !code) {
-          respond(res, 400, 'ログインに失敗しました。アプリからやり直してください。')
+          await sendOAuthCallbackPage(res, 400, 'failed')
           finish(new Error('Google ログインがキャンセルまたは失敗しました'))
           return
         }
@@ -65,10 +61,10 @@ export async function requestGoogleIdToken(): Promise<string> {
           if (!tokens.id_token) {
             throw new Error('ID トークンを取得できませんでした')
           }
-          respond(res, 200, 'ログインが完了しました。アプリに戻ってください。')
+          await sendOAuthCallbackPage(res, 200, 'done')
           finish(null, tokens.id_token)
         } catch (error) {
-          respond(res, 500, 'ログインに失敗しました。アプリからやり直してください。')
+          await sendOAuthCallbackPage(res, 500, 'failed')
           finish(error instanceof Error ? error : new Error('Google ログインに失敗しました'))
         }
       })()

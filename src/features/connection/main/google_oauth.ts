@@ -2,6 +2,7 @@ import http from 'http'
 import { shell } from 'electron'
 import { OAuth2Client } from 'google-auth-library'
 import { logInfo } from '@shared/logging/logger'
+import { sendOAuthCallbackPage } from './oauth_callback_page'
 import type { GoogleOAuthConfig } from './google_oauth_config'
 
 // Firestore と Authentication の操作に要るものだけ（002_004 の 11）
@@ -150,8 +151,7 @@ export async function runGoogleOAuthLogin(config: GoogleOAuthConfig): Promise<{
           const errorParam = url.searchParams.get('error')
 
           if (errorParam) {
-            res.writeHead(400, { 'Content-Type': 'text/html; charset=utf-8' })
-            res.end(`<html><body><h1>認証に失敗しました</h1><p>${errorParam}</p></body></html>`)
+            await sendOAuthCallbackPage(res, 400, 'failed', errorParam)
             finish(new Error(`Google 認証がキャンセルまたは失敗しました: ${errorParam}`))
             return
           }
@@ -177,10 +177,7 @@ export async function runGoogleOAuthLogin(config: GoogleOAuthConfig): Promise<{
 
           const email = await fetchAccountEmail(tokens.access_token)
 
-          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
-          res.end(
-            '<html><body><h1>FireMint</h1><p>認証が完了しました。アプリに戻ってください。</p></body></html>'
-          )
+          await sendOAuthCallbackPage(res, 200, 'done')
 
           finish(null, {
             email,
@@ -188,8 +185,7 @@ export async function runGoogleOAuthLogin(config: GoogleOAuthConfig): Promise<{
             accessToken: tokens.access_token
           })
         } catch (error) {
-          res.writeHead(500, { 'Content-Type': 'text/html; charset=utf-8' })
-          res.end('<html><body><h1>認証エラー</h1><p>アプリ側のログを確認してください。</p></body></html>')
+          await sendOAuthCallbackPage(res, 500, 'failed')
           finish(error instanceof Error ? error : new Error('OAuth コールバック処理に失敗しました'))
         }
       })()
@@ -211,9 +207,12 @@ export async function runGoogleOAuthLogin(config: GoogleOAuthConfig): Promise<{
       })
     })
 
-    const timeoutId = setTimeout(() => {
-      finish(new Error('Google 認証がタイムアウトしました（5分）'))
-    }, 5 * 60 * 1000)
+    const timeoutId = setTimeout(
+      () => {
+        finish(new Error('Google 認証がタイムアウトしました（5分）'))
+      },
+      5 * 60 * 1000
+    )
   })
 }
 
@@ -224,7 +223,7 @@ export async function refreshGoogleAccessToken(
   const client = new OAuth2Client(config.clientId, config.clientSecret)
   client.setCredentials({ refresh_token: refreshToken })
   const response = await client.getAccessToken()
-  const token = typeof response.token === 'string' ? response.token : response.token ?? null
+  const token = typeof response.token === 'string' ? response.token : (response.token ?? null)
 
   if (!token) {
     throw new Error('access_token の更新に失敗しました。再サインインしてください。')

@@ -124,6 +124,9 @@ export const en: Record<string, string> = {
   'account.invite_blocked_title': "Cannot accept the invitation",
   'account.invite_blocked_message': "Your {providers} payment is still active. Cancel that payment first, then accept the invitation again.",
 
+  'oauth_callback.done': "Sign-in is complete. Please return to the app.",
+  'oauth_callback.failed': "Sign-in failed. Please try again from the app.",
+
   'connection.lead': 'Connect to Firestore',
   'connection.mode_list': 'List',
   'connection.mode_json': 'JSON',

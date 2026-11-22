@@ -126,6 +126,9 @@ export const zhHans: MessageCatalog = {
   'account.invite_blocked_title': "无法接受邀请",
   'account.invite_blocked_message': "{providers} 的付款仍在继续。请先取消该付款，然后再次接受邀请。",
 
+  'oauth_callback.done': "登录已完成。请返回应用。",
+  'oauth_callback.failed': "登录失败。请在应用中重试。",
+
   'connection.lead': '连接到 Firestore',
   'connection.mode_list': '列表',
   'connection.mode_json': 'JSON',
