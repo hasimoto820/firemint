@@ -1,3 +1,4 @@
+import { useI18n } from '@shared/i18n/renderer/I18nProvider'
 import { useCallback, useEffect, useState } from 'react'
 import {
   DEFAULT_ENTRY_COLOR,
@@ -13,6 +14,7 @@ type WorkspacePanelProps = {
 }
 
 function WorkspacePanel({ onChanged, disabled = false }: WorkspacePanelProps): React.JSX.Element {
+  const { t } = useI18n()
   const [state, setState] = useState<WorkspaceState | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [labelDraft, setLabelDraft] = useState('')
@@ -96,11 +98,7 @@ function WorkspacePanel({ onChanged, disabled = false }: WorkspacePanelProps): R
   }
 
   const handleRemove = async (projectId: string): Promise<void> => {
-    if (
-      !(await confirmAction(
-        'このプロジェクトの登録を解除しますか？（Firestore 上のデータは消えません）'
-      ))
-    ) {
+    if (!(await confirmAction(t('workspace.unregister_confirm')))) {
       return
     }
 
@@ -176,16 +174,16 @@ function WorkspacePanel({ onChanged, disabled = false }: WorkspacePanelProps): R
   return (
     <section className="workspace-panel">
       <div className="workspace-panel__header">
-        <h2 className="workspace-panel__title">プロジェクト</h2>
+        <h2 className="workspace-panel__title">{t('workspace.projects')}</h2>
         <Button onClick={() => void handleAdd()} disabled={disabled || loading}>
-          追加
+          {t('workspace.add')}
         </Button>
       </div>
 
       {error && <p className="workspace-panel__error">{error}</p>}
 
       {entries.length === 0 && (
-        <p className="workspace-panel__empty">プロジェクトがありません</p>
+        <p className="workspace-panel__empty">{t('workspace.no_projects')}</p>
       )}
 
       <ul className="workspace-panel__list">
@@ -227,7 +225,7 @@ function WorkspacePanel({ onChanged, disabled = false }: WorkspacePanelProps): R
       {selectedId && (
         <div className="workspace-panel__editor">
           <label className="workspace-panel__field">
-            表示名
+            {t('workspace.display_name')}
             <input
               className="workspace-panel__input"
               value={labelDraft}
@@ -236,7 +234,7 @@ function WorkspacePanel({ onChanged, disabled = false }: WorkspacePanelProps): R
             />
           </label>
           <label className="workspace-panel__field">
-            色
+            {t('workspace.color')}
             <input
               className="workspace-panel__input workspace-panel__input--color"
               type="color"
@@ -247,14 +245,14 @@ function WorkspacePanel({ onChanged, disabled = false }: WorkspacePanelProps): R
           </label>
           <div className="workspace-panel__editor-actions">
             <Button onClick={() => void handleSaveMeta()} disabled={disabled || loading}>
-              保存
+              {t('common.save')}
             </Button>
             <Button
               variant="danger"
               onClick={() => void handleRemove(selectedId)}
               disabled={disabled || loading}
             >
-              登録解除
+              {t('workspace.unregister')}
             </Button>
           </div>
           {entries
@@ -267,7 +265,7 @@ function WorkspacePanel({ onChanged, disabled = false }: WorkspacePanelProps): R
                   onChange={() => void handleToggleReadOnly(entry)}
                   disabled={disabled || loading}
                 />
-                read-only（書込禁止）
+                {t('workspace.read_only')}
               </label>
             ))}
         </div>

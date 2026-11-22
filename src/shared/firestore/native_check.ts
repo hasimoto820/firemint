@@ -1,19 +1,11 @@
+import { tr } from '@shared/i18n/shared/current'
 import { logInfo, logWarn } from '@shared/logging/logger'
 
 const PROBE_TIMEOUT_MS = 10_000
 
-export const NATIVE_FIRESTORE_DATASTORE_MESSAGE =
-  'このプロジェクトの Firestore は Datastore モードです。Native Firestore ではないため使えません。'
-
-export const NATIVE_FIRESTORE_MISSING_MESSAGE =
-  'このプロジェクトに Firestore データベースがありません。'
-
 export function formatUnavailableFirestoreMessage(message: string): string | null {
-  if (
-    message.includes('Datastore Mode') ||
-    message.includes('Firestore in Datastore Mode')
-  ) {
-    return NATIVE_FIRESTORE_DATASTORE_MESSAGE
+  if (message.includes('Datastore Mode') || message.includes('Firestore in Datastore Mode')) {
+    return tr('ui.native_datastore')
   }
 
   if (
@@ -21,7 +13,7 @@ export function formatUnavailableFirestoreMessage(message: string): string | nul
     message.includes('Database not found') ||
     message.includes('datastore/setup')
   ) {
-    return NATIVE_FIRESTORE_MISSING_MESSAGE
+    return tr('ui.native_missing')
   }
 
   return null
@@ -61,7 +53,7 @@ export async function probeWriteBlockedReason(input: {
 
     if (response.status === 404) {
       logInfo('firestore', `native probe: database missing project_id=${input.projectId}`)
-      return NATIVE_FIRESTORE_MISSING_MESSAGE
+      return tr('ui.native_missing')
     }
 
     if (response.status === 401 || response.status === 403) {
@@ -84,7 +76,7 @@ export async function probeWriteBlockedReason(input: {
 
     if (body.type === 'DATASTORE_MODE') {
       logInfo('firestore', `native probe: DATASTORE_MODE project_id=${input.projectId}`)
-      return NATIVE_FIRESTORE_DATASTORE_MESSAGE
+      return tr('ui.native_datastore')
     }
 
     logInfo(

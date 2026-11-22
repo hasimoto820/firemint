@@ -1,3 +1,4 @@
+import { useI18n } from '@shared/i18n/renderer/I18nProvider'
 import { useFieldAutocompleteItems } from '@features/autocomplete/renderer/hooks'
 import Button from '@shared/ui/Button'
 import AutocompleteInput from '@shared/ui/AutocompleteInput'
@@ -48,6 +49,7 @@ function DocumentJsonPanel({
   showCreate = true,
   onOpenReference
 }: DocumentJsonPanelProps): React.JSX.Element {
+  const { t } = useI18n()
   const geopoints = documentData ? findGeopointFields(documentData) : []
   const imageUrls = documentData ? findImageUrlFields(documentData) : []
   const references = documentData ? findReferenceFields(documentData) : []
@@ -56,23 +58,23 @@ function DocumentJsonPanel({
   return (
     <div className="document-json-panel">
       <div className="document-json-panel__header">
-        <h2 className="document-json-panel__title">ドキュメント</h2>
+        <h2 className="document-json-panel__title">{t('ui.document')}</h2>
         <div className="document-json-panel__actions">
           {!readOnly && (
             <>
               {showCreate && (
                 <Button onClick={onCreate} disabled={loading}>
-                  新規
+                  {t('ui.new')}
                 </Button>
               )}
               <Button onClick={onSave} disabled={loading || !documentPath}>
-                保存
+                {t('common.save')}
               </Button>
               <Button onClick={onDuplicate} disabled={loading || !documentPath || !onDuplicate}>
-                複製
+                {t('ui.duplicate')}
               </Button>
               <Button variant="danger" onClick={onDelete} disabled={loading || !documentPath}>
-                削除
+                {t('common.delete')}
               </Button>
             </>
           )}
@@ -107,7 +109,7 @@ function DocumentJsonPanel({
           wordCompletion
           placeholder='{ "field": "value" }'
           fieldClassName="document-json-panel__editor"
-          aria-label="ドキュメント JSON"
+          aria-label={t('ui.document_json_aria')}
           onChange={onChange}
         />
       )}

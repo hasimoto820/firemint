@@ -1,3 +1,4 @@
+import { tr } from '@shared/i18n/shared/current'
 import { useEffect, useMemo, useState } from 'react'
 import { useOptionalAutocompleteApi } from '@features/autocomplete/renderer/hooks'
 import { matchesAutocompleteNeedle } from '@features/autocomplete/renderer/catalog'
@@ -50,13 +51,13 @@ type EmulatorPageProps = {
 function statusLabel(job: ScriptJobSnapshot): string {
   switch (job.status) {
     case 'running':
-      return '実行中'
+      return tr('dt.status_running')
     case 'succeeded':
-      return '完了'
+      return tr('dt.status_done')
     case 'failed':
-      return '失敗'
+      return tr('dt.status_failed')
     case 'canceled':
-      return '中止'
+      return tr('dt.status_canceled')
   }
 }
 
@@ -377,7 +378,7 @@ function EmulatorPage({
   const importTargetName = importEntry ? emulatorProjectName(importEntry) : trimmedNewProjectId
   const newProjectIdError =
     !importEntry && trimmedNewProjectId && !EMULATOR_PROJECT_ID_PATTERN.test(trimmedNewProjectId)
-      ? 'ID は英小文字・数字・ハイフンで入れてください'
+      ? t('emu.err_id_format')
       : null
 
   /** 検証・インポートに渡す書き込み先 */
@@ -459,20 +460,20 @@ function EmulatorPage({
   /** 実行前の確認。検証なしの警告 → 別のプロジェクトの確認 → 書き方ごとの確認 */
   const confirmImport = async (): Promise<boolean> => {
     if (!validation) {
-      const proceed = await confirmAction('検証していません。このまま実行しますか？', {
-        detail: '検証は書き込みをしません。実行前に、Emulator とファイルの件数を見られます。',
-        confirmLabel: '実行に進む'
+      const proceed = await confirmAction(t('dt.not_validated_confirm'), {
+        detail: t('emu.not_validated_detail'),
+        confirmLabel: t('dt.proceed')
       })
       if (!proceed) {
         return false
       }
     }
 
-    const name = `Emulator の ${importTargetName}`
+    const name = t('emu.target_name', { name: importTargetName })
     if (sourceProjectId && sourceProjectId !== importTargetName) {
       const proceed = await confirmAction(
-        `このファイルは ${sourceProjectId} からエクスポートしたものです。${name} に入れますか？`,
-        { confirmLabel: '入れる' }
+        t('dt.source_mismatch_confirm', { source: sourceProjectId, name }),
+        { confirmLabel: t('dt.import_it') }
       )
       if (!proceed) {
         return false
@@ -480,15 +481,11 @@ function EmulatorPage({
     }
 
     return writeMode === 'overwrite'
-      ? confirmAction(`${name} にあるドキュメントは、ファイルの中身で丸ごと置き換わります。`, {
-          detail:
-            'Emulator にだけあるフィールドは消えます。ファイルに無いドキュメントには触れません。途中で止めても、書いた分は戻りません。',
-          confirmLabel: '上書きで実行'
+      ? confirmAction(t('dt.overwrite_confirm', { name }), {
+          detail: t('emu.overwrite_detail'),
+          confirmLabel: t('dt.run_overwrite')
         })
-      : confirmAction(
-          `${name} の、Emulator に無いドキュメントだけを作ります。既にあるドキュメントには触れません。`,
-          { confirmLabel: '追記で実行' }
-        )
+      : confirmAction(t('emu.append_confirm', { name }), { confirmLabel: t('dt.run_append') })
   }
 
   const handleImport = async (): Promise<void> => {
@@ -543,7 +540,7 @@ function EmulatorPage({
 
   const handleExport = async (): Promise<void> => {
     if (!poolId) {
-      setError('データのあるプロジェクトがありません')
+      setError(t('emu.no_projects_with_data'))
       return
     }
 
@@ -561,7 +558,7 @@ function EmulatorPage({
       if (target === 'collection') {
         const path = collectionPath.trim()
         if (!path) {
-          setError('コレクション path を指定してください')
+          setError(t('explorer.err_collection_path_required'))
           return
         }
 
@@ -582,7 +579,7 @@ function EmulatorPage({
       if (target === 'group') {
         const collectionId = lastPathSegment(collectionPath)
         if (!collectionId) {
-          setError('グループ名（コレクション ID）を指定してください')
+          setError(t('dt.err_group_required'))
           return
         }
 
@@ -600,7 +597,7 @@ function EmulatorPage({
       }
 
       if (selectedRoots.length === 0) {
-        setError('エクスポートするルートコレクションを選んでください')
+        setError(t('dt.err_select_roots'))
         return
       }
 
@@ -658,24 +655,24 @@ function EmulatorPage({
               <h1 className="imp-exp-form__title">{t('menu.emulator')}</h1>
               <div className="imp-exp-form__toggles">
                 <ToggleBar
-                  ariaLabel="向き"
+                  ariaLabel={t('dt.direction')}
                   value={direction}
                   disabled={togglesDisabled}
                   options={[
-                    { id: 'import', label: 'Import' },
-                    { id: 'export', label: 'Export' }
+                    { id: 'import', label: t('menu.import') },
+                    { id: 'export', label: t('menu.export') }
                   ]}
                   onChange={setDirection}
                 />
                 {direction === 'export' ? (
                   <ToggleBar
-                    ariaLabel="対象"
+                    ariaLabel={t('dt.target')}
                     value={target}
                     disabled={togglesDisabled}
                     options={[
-                      { id: 'collection', label: 'Collection' },
-                      { id: 'group', label: 'Group' },
-                      { id: 'project', label: 'Project' }
+                      { id: 'collection', label: t('explorer.kind_collection') },
+                      { id: 'group', label: t('dt.kind_group') },
+                      { id: 'project', label: t('dt.project') }
                     ]}
                     onChange={setTarget}
                   />
@@ -686,7 +683,7 @@ function EmulatorPage({
               {mode === 'import-project' && (
                 <>
                   <label className="imp-exp-form__field">
-                    インポート先
+                    {t('dt.import_destination')}
                     <select
                       className="bulk-actions__input"
                       value={selectedImportTarget}
@@ -697,7 +694,7 @@ function EmulatorPage({
                         setValidation(null)
                       }}
                     >
-                      <option value={NEW_TARGET}>新規 ID</option>
+                      <option value={NEW_TARGET}>{t('emu.new_id')}</option>
                       {entriesWithData.map((entry) => (
                         <option key={entry.id} value={entry.id}>
                           {emulatorOptionLabel(entry)}
@@ -707,7 +704,7 @@ function EmulatorPage({
                   </label>
                   {selectedImportTarget === NEW_TARGET && (
                     <label className="imp-exp-form__field">
-                      新しいプロジェクトの ID
+                      {t('emu.new_project_id')}
                       <input
                         className="bulk-actions__input"
                         value={newProjectId}
@@ -721,34 +718,34 @@ function EmulatorPage({
                     </label>
                   )}
                   {selectedImportTarget === NEW_TARGET && importEntry && (
-                    <p className="imp-exp-form__hint">
-                      この ID のプロジェクトはもうあります。そこに入れます。
-                    </p>
+                    <p className="imp-exp-form__hint">{t('emu.id_exists')}</p>
                   )}
                   {newProjectIdError && <p className="simple-main__error">{newProjectIdError}</p>}
 
                   <div className="imp-exp-form__file">
                     <Button onClick={() => void handleSelectFile()} disabled={formDisabled || busy}>
-                      ファイル（ZIP / JSONL） / フォルダを選択…
+                      {t('dt.select_file_or_folder', { kind: t('dt.file_zip_jsonl') })}
                     </Button>
                     {filePath && <span className="imp-exp-form__path">{filePath}</span>}
                   </div>
                   {fileInfo && (
                     <p className="imp-exp-form__hint">
-                      形式: {formatLabel(fileInfo.format)}
-                      {' ／ '}エクスポート元: {fileInfo.sourceProjectId ?? '不明'}
+                      {t('dt.file_info', {
+                        format: formatLabel(fileInfo.format),
+                        source: fileInfo.sourceProjectId ?? t('dt.unknown')
+                      })}
                     </p>
                   )}
 
                   <div className="imp-exp-form__section">
-                    <p className="imp-exp-form__label">書き方</p>
+                    <p className="imp-exp-form__label">{t('dt.write_mode')}</p>
                     <ToggleBar
-                      ariaLabel="書き方"
+                      ariaLabel={t('dt.write_mode')}
                       value={writeMode}
                       disabled={formDisabled}
                       options={[
-                        { id: 'append', label: '追記' },
-                        { id: 'overwrite', label: '上書き' }
+                        { id: 'append', label: t('dt.append') },
+                        { id: 'overwrite', label: t('dt.overwrite') }
                       ]}
                       onChange={setWriteMode}
                     />
@@ -757,22 +754,24 @@ function EmulatorPage({
 
                   <div className="imp-exp-form__actions">
                     <Button onClick={() => void handleValidate('quick')} disabled={!canValidate}>
-                      {busy && !jobRunning ? '検証中…' : '簡易検証'}
+                      {busy && !jobRunning ? t('dt.validating') : t('dt.quick_validate')}
                     </Button>
                     <Button onClick={() => void handleValidate('detailed')} disabled={!canValidate}>
-                      詳細検証
+                      {t('dt.detailed_validate')}
                     </Button>
                     <Button
                       variant="primary"
                       onClick={() => void handleImport()}
                       disabled={!canValidate}
                     >
-                      インポート実行
+                      {t('dt.run_import')}
                     </Button>
                   </div>
 
                   {validateProgressLabel && busy && (
-                    <p className="imp-exp-form__hint">検証中 {validateProgressLabel}</p>
+                    <p className="imp-exp-form__hint">
+                      {t('dt.validating_progress', { progress: validateProgressLabel })}
+                    </p>
                   )}
 
                   {validation && (
@@ -783,7 +782,7 @@ function EmulatorPage({
 
               {direction === 'export' && (
                 <label className="imp-exp-form__field">
-                  プロジェクト
+                  {t('dt.project')}
                   <select
                     className="bulk-actions__input"
                     value={poolId ?? ''}
@@ -791,7 +790,7 @@ function EmulatorPage({
                     onChange={(event) => setExportProjectId(event.target.value)}
                   >
                     {entriesWithData.length === 0 && (
-                      <option value="">データのあるプロジェクトがありません</option>
+                      <option value="">{t('emu.no_projects_with_data')}</option>
                     )}
                     {entriesWithData.map((entry) => (
                       <option key={entry.id} value={entry.id}>
@@ -805,13 +804,13 @@ function EmulatorPage({
               {mode === 'export-collection' && (
                 <>
                   <label className="imp-exp-form__field">
-                    コレクション
+                    {t('explorer.kind_collection')}
                     <AutocompleteInput
                       value={collectionPath}
                       items={collectionItems}
                       disabled={formDisabled || !poolId}
                       placeholder="equipment / users/uid/posts"
-                      aria-label="コレクション path"
+                      aria-label={t('dt.collection_path')}
                       onChange={setCollectionPath}
                     />
                   </label>
@@ -821,13 +820,13 @@ function EmulatorPage({
               {mode === 'export-group' && (
                 <>
                   <label className="imp-exp-form__field">
-                    グループ（コレクション ID）
+                    {t('dt.group_collection_id')}
                     <AutocompleteInput
                       value={collectionPath}
                       items={groupItems}
                       disabled={formDisabled || !poolId}
                       placeholder="posts"
-                      aria-label="コレクション ID"
+                      aria-label={t('dt.collection_id')}
                       onChange={(value) => {
                         setCollectionPath(value.includes('/') ? lastPathSegment(value) : value)
                       }}
@@ -840,7 +839,7 @@ function EmulatorPage({
                 <>
                   <div className="imp-exp-form__roots">
                     {exportRoots.length === 0 ? (
-                      <p className="imp-exp-form__hint">ルートコレクションがありません。</p>
+                      <p className="imp-exp-form__hint">{t('dt.no_roots')}</p>
                     ) : (
                       <>
                         <label className="imp-exp-form__check">
@@ -850,7 +849,10 @@ function EmulatorPage({
                             disabled={formDisabled}
                             onChange={() => setSelectedRoots(allSelected ? [] : [...exportRoots])}
                           />
-                          すべて選択（{selectedCount}/{exportRoots.length}）
+                          {t('dt.select_all_count', {
+                            selected: selectedCount,
+                            total: exportRoots.length
+                          })}
                         </label>
                         <ul className="imp-exp-form__root-list">
                           {exportRoots.map((rootId) => (
@@ -891,11 +893,11 @@ function EmulatorPage({
                         disabled={formDisabled}
                         onChange={(event) => setIncludeSubcollections(event.target.checked)}
                       />
-                      サブコレクションを含む
+                      {t('explorer.include_subcollections')}
                     </label>
                   )}
                   <div className="imp-exp-form__section">
-                    <p className="imp-exp-form__label">保存先</p>
+                    <p className="imp-exp-form__label">{t('dt.save_to')}</p>
                     <p className="imp-exp-form__path">
                       {!defaultExportPath
                         ? '…'
@@ -908,7 +910,7 @@ function EmulatorPage({
                         onClick={() => void handleChooseExportPath()}
                         disabled={formDisabled || !poolId}
                       >
-                        保存先を選ぶ…
+                        {t('dt.choose_save_to')}
                       </Button>
                     </div>
                   </div>
@@ -924,7 +926,7 @@ function EmulatorPage({
                             : !canStartExportProject
                       }
                     >
-                      エクスポート
+                      {t('dt.export')}
                     </Button>
                   </div>
                 </>
@@ -947,7 +949,7 @@ function EmulatorPage({
                 </p>
               </header>
 
-              <div className="imp-exp-view__progress" aria-label="進捗">
+              <div className="imp-exp-view__progress" aria-label={t('dt.progress')}>
                 <div className="imp-exp-view__progress-bar" style={{ width: `${job.percent}%` }} />
                 <p className="imp-exp-view__progress-label">{job.percent}%</p>
               </div>
@@ -961,13 +963,13 @@ function EmulatorPage({
 
               {job.status === 'running' && (
                 <div className="imp-exp-view__actions">
-                  <Button onClick={() => onCancelJob?.()}>中止</Button>
+                  <Button onClick={() => onCancelJob?.()}>{t('dt.stop')}</Button>
                 </div>
               )}
 
-              <section className="imp-exp-view__log" aria-label="ログ">
+              <section className="imp-exp-view__log" aria-label={t('dt.log')}>
                 {job.logs.length === 0 ? (
-                  <p className="simple-main__empty-hint">ログはまだありません</p>
+                  <p className="simple-main__empty-hint">{t('dt.no_log')}</p>
                 ) : (
                   job.logs.map((line, index) => (
                     <p
@@ -986,9 +988,7 @@ function EmulatorPage({
               </section>
             </div>
           ) : (
-            <p className="simple-main__empty-hint">
-              実行中は別のコレクションタブへ戻れます。進捗とログはここに出ます。
-            </p>
+            <p className="simple-main__empty-hint">{t('dt.running_hint')}</p>
           )
         }
       />

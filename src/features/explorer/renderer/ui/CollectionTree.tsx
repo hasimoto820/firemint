@@ -1,3 +1,5 @@
+import { tr } from '@shared/i18n/shared/current'
+import { useI18n } from '@shared/i18n/renderer/I18nProvider'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { BulkFieldMode } from '@features/bulk_operations/shared/types'
 import { useOptionalAutocompleteApi } from '@features/autocomplete/renderer/hooks'
@@ -72,9 +74,10 @@ function CollectionTree({
   reloadToken = 0,
   contentReloadToken = 0,
   disabled = false,
-  title = 'コレクション',
+  title = tr('explorer.kind_collection'),
   unavailableReason = null
 }: CollectionTreeProps): React.JSX.Element {
+  const { t } = useI18n()
   const autocomplete = useOptionalAutocompleteApi()
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set())
   const [childrenByPath, setChildrenByPath] = useState<Record<string, TreeNode[]>>({})
@@ -109,9 +112,7 @@ function CollectionTree({
 
   const registerCollectionPaths = useCallback(
     (nodes: TreeNode[]): void => {
-      const paths = nodes
-        .filter((node) => node.kind === 'collection')
-        .map((node) => node.path)
+      const paths = nodes.filter((node) => node.kind === 'collection').map((node) => node.path)
 
       if (paths.length > 0) {
         autocomplete.addCollectionPaths(projectId, paths)
@@ -197,7 +198,7 @@ function CollectionTree({
         nextCursorByPathRef.current[collectionPath] = result.data.nextCursor
         setHasMoreByPath((current) => ({ ...current, [collectionPath]: result.data.hasMore }))
       } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : 'ツリーの読み込みに失敗しました')
+        setError(loadError instanceof Error ? loadError.message : t('explorer.err_tree_load'))
       } finally {
         setLoadingPaths((current) => {
           const next = new Set(current)
@@ -206,7 +207,7 @@ function CollectionTree({
         })
       }
     },
-    [projectId]
+    [projectId, t]
   )
 
   const refreshChildren = useCallback(
@@ -238,7 +239,7 @@ function CollectionTree({
           delete next[path]
           return next
         })
-        setError(loadError instanceof Error ? loadError.message : 'ツリーの読み込みに失敗しました')
+        setError(loadError instanceof Error ? loadError.message : t('explorer.err_tree_load'))
       } finally {
         setLoadingPaths((current) => {
           const next = new Set(current)
@@ -247,7 +248,7 @@ function CollectionTree({
         })
       }
     },
-    [loadChildren, registerCollectionPaths]
+    [loadChildren, registerCollectionPaths, t]
   )
 
   useEffect(() => {
@@ -291,7 +292,7 @@ function CollectionTree({
         setExpandedPaths((current) => new Set(current).add(path))
         registerCollectionPaths(children)
       } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : 'ツリーの読み込みに失敗しました')
+        setError(loadError instanceof Error ? loadError.message : t('explorer.err_tree_load'))
       } finally {
         setLoadingPaths((current) => {
           const next = new Set(current)
@@ -300,7 +301,7 @@ function CollectionTree({
         })
       }
     },
-    [loadChildren, registerCollectionPaths]
+    [loadChildren, registerCollectionPaths, t]
   )
 
   const expandPathChain = useCallback(
@@ -383,10 +384,7 @@ function CollectionTree({
     }
   }
 
-  const handleCollectionContextMenu = (
-    event: React.MouseEvent,
-    collectionPath: string
-  ): void => {
+  const handleCollectionContextMenu = (event: React.MouseEvent, collectionPath: string): void => {
     event.preventDefault()
     event.stopPropagation()
 
@@ -466,7 +464,7 @@ function CollectionTree({
             tabIndex={-1}
             onClick={() => void handleToggle(node)}
             disabled={disabled || isLoading}
-            aria-label={isExpanded ? '折りたたむ' : '展開する'}
+            aria-label={isExpanded ? t('explorer.collapse') : t('explorer.expand')}
           >
             {isLoading ? '…' : isExpanded ? '▼' : '▶'}
           </button>
@@ -510,7 +508,9 @@ function CollectionTree({
             }
             disabled={disabled}
           >
-            <span className="collection-tree__kind">{node.kind === 'collection' ? '📁' : '📄'}</span>
+            <span className="collection-tree__kind">
+              {node.kind === 'collection' ? '📁' : '📄'}
+            </span>
             {node.name}
           </button>
         </div>
@@ -530,7 +530,7 @@ function CollectionTree({
                     onClick={() => void loadMoreDocuments(node.path)}
                     disabled={disabled || isLoading}
                   >
-                    {isLoading ? '読み込み中…' : 'さらに読み込む'}
+                    {isLoading ? t('explorer.loading') : t('explorer.load_more')}
                   </button>
                 </div>
               </li>
@@ -539,7 +539,7 @@ function CollectionTree({
         )}
         {isExpanded && !isLoading && children.length === 0 && (
           <p className="collection-tree__empty" style={{ paddingLeft: `${24 + depth * 14}px` }}>
-            （なし）
+            {t('explorer.none')}
           </p>
         )}
       </li>
@@ -563,7 +563,7 @@ function CollectionTree({
         <p className="collection-tree__error">{error}</p>
       ) : null}
       {unavailableReason ? null : rootNodes.length === 0 ? (
-        <p className="collection-tree__empty">（コレクションなし）</p>
+        <p className="collection-tree__empty">{t('explorer.no_collections')}</p>
       ) : (
         <ul className="collection-tree__roots">{rootNodes.map((node) => renderNode(node))}</ul>
       )}
@@ -589,12 +589,14 @@ function CollectionTree({
                 onOpenInNewTab(path, contextMenu.kind)
               }}
             >
-              新しいタブで開く
+              {t('explorer.open_in_new_tab')}
             </button>
           ) : null}
           {!canWrite ? null : contextMenu.kind === 'document' ? (
             <>
-              <div className="collection-tree__context-header">サブコレクション</div>
+              <div className="collection-tree__context-header">
+                {t('explorer.kind_subcollection')}
+              </div>
               <button
                 type="button"
                 className="collection-tree__context-item collection-tree__context-item--indent"
@@ -607,9 +609,9 @@ function CollectionTree({
                   onCreateSubcollection?.(path)
                 }}
               >
-                作成
+                {t('explorer.create')}
               </button>
-              <div className="collection-tree__context-header">ドキュメント</div>
+              <div className="collection-tree__context-header">{t('explorer.document')}</div>
               <button
                 type="button"
                 className="collection-tree__context-item collection-tree__context-item--indent"
@@ -622,7 +624,7 @@ function CollectionTree({
                   onDuplicateDocument?.(path)
                 }}
               >
-                複製
+                {t('explorer.duplicate')}
               </button>
               <button
                 type="button"
@@ -636,7 +638,7 @@ function CollectionTree({
                   onDeleteDocument?.(path)
                 }}
               >
-                削除
+                {t('common.delete')}
               </button>
             </>
           ) : (
@@ -656,7 +658,7 @@ function CollectionTree({
                   onRenameCollection?.(path)
                 }}
               >
-                リネーム
+                {t('explorer.rename')}
               </button>
               <button
                 type="button"
@@ -670,7 +672,7 @@ function CollectionTree({
                   onDuplicateCollection?.(path)
                 }}
               >
-                複製
+                {t('explorer.duplicate')}
               </button>
               <button
                 type="button"
@@ -684,9 +686,9 @@ function CollectionTree({
                   onDeleteCollection?.(path)
                 }}
               >
-                削除
+                {t('common.delete')}
               </button>
-              <div className="collection-tree__context-header">ドキュメント</div>
+              <div className="collection-tree__context-header">{t('explorer.document')}</div>
               <button
                 type="button"
                 className="collection-tree__context-item collection-tree__context-item--indent"
@@ -699,9 +701,9 @@ function CollectionTree({
                   onCreateDocument?.(path)
                 }}
               >
-                新規
+                {t('explorer.new')}
               </button>
-              <div className="collection-tree__context-header">フィールド一括</div>
+              <div className="collection-tree__context-header">{t('explorer.field_bulk')}</div>
               <button
                 type="button"
                 className="collection-tree__context-item collection-tree__context-item--indent"
@@ -714,7 +716,7 @@ function CollectionTree({
                   onFieldBulk?.(path, 'create')
                 }}
               >
-                新規
+                {t('explorer.new')}
               </button>
               <button
                 type="button"
@@ -728,7 +730,7 @@ function CollectionTree({
                   onFieldBulk?.(path, 'update')
                 }}
               >
-                値変更
+                {t('explorer.update_value')}
               </button>
               <button
                 type="button"
@@ -742,7 +744,7 @@ function CollectionTree({
                   onFieldBulk?.(path, 'rename')
                 }}
               >
-                リネーム
+                {t('explorer.rename')}
               </button>
               <button
                 type="button"
@@ -756,7 +758,7 @@ function CollectionTree({
                   onFieldBulk?.(path, 'delete')
                 }}
               >
-                削除
+                {t('common.delete')}
               </button>
             </>
           )}

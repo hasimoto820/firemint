@@ -1,3 +1,4 @@
+import { tr } from '@shared/i18n/shared/current'
 import { dialog, ipcMain, BrowserWindow } from 'electron'
 import { IPC_CHANNELS } from '@shared/ipc/channels'
 import { logInfo } from '@shared/logging/logger'
@@ -22,12 +23,12 @@ export function registerConnectionHandlers(): void {
     const window = BrowserWindow.fromWebContents(event.sender)
     const result = window
       ? await dialog.showOpenDialog(window, {
-          title: 'サービスアカウント JSON を選択',
+          title: tr('conn.select_sa_json'),
           filters: [{ name: 'JSON', extensions: ['json'] }],
           properties: ['openFile']
         })
       : await dialog.showOpenDialog({
-          title: 'サービスアカウント JSON を選択',
+          title: tr('conn.select_sa_json'),
           filters: [{ name: 'JSON', extensions: ['json'] }],
           properties: ['openFile']
         })

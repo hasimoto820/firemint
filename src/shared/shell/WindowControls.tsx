@@ -1,6 +1,8 @@
+import { useI18n } from '@shared/i18n/renderer/I18nProvider'
 import { useEffect, useState } from 'react'
 
 function WindowControls(): React.JSX.Element {
+  const { t } = useI18n()
   const [isMaximized, setIsMaximized] = useState(false)
 
   useEffect(() => {
@@ -17,7 +19,7 @@ function WindowControls(): React.JSX.Element {
       <button
         type="button"
         className="window-controls__button"
-        aria-label="Minimize"
+        aria-label={t('menu.minimize')}
         onClick={() => void window.api.window.minimize()}
       >
         <span className="window-controls__icon window-controls__icon--minimize" />
@@ -25,7 +27,7 @@ function WindowControls(): React.JSX.Element {
       <button
         type="button"
         className="window-controls__button"
-        aria-label={isMaximized ? 'Restore' : 'Maximize'}
+        aria-label={isMaximized ? t('ui.restore') : t('ui.maximize')}
         onClick={() => void handleMaximizeToggle()}
       >
         <span
@@ -39,7 +41,7 @@ function WindowControls(): React.JSX.Element {
       <button
         type="button"
         className="window-controls__button window-controls__button--close"
-        aria-label="Close"
+        aria-label={t('ui.close')}
         onClick={() => void window.api.window.close()}
       >
         <span className="window-controls__icon window-controls__icon--close" />

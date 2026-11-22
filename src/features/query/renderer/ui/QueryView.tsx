@@ -1,9 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useOptionalAutocompleteApi } from '@features/autocomplete/renderer/hooks'
-import {
-  isFirestoreWriteDisabled,
-  type ConnectionStatus
-} from '@features/connection/shared/types'
+import { isFirestoreWriteDisabled, type ConnectionStatus } from '@features/connection/shared/types'
 import type { DocumentSummary } from '@features/explorer/shared/types'
 import {
   buildCollectionGroupJsQuerySource,
@@ -89,7 +86,7 @@ function QueryView({
   const refreshSavedQueries = useCallback(async (): Promise<void> => {
     try {
       if (typeof window.api.query.listSaved !== 'function') {
-        setError('Saved Queries API が未反映です。アプリを再起動してください。')
+        setError(t('query.err_api_missing'))
         return
       }
 
@@ -101,13 +98,9 @@ function QueryView({
 
       setSavedQueries(result.data)
     } catch (refreshError) {
-      setError(
-        refreshError instanceof Error
-          ? refreshError.message
-          : '保存クエリ一覧の取得に失敗しました'
-      )
+      setError(refreshError instanceof Error ? refreshError.message : t('query.err_list_failed'))
     }
-  }, [projectId])
+  }, [projectId, t])
 
   useEffect(() => {
     void refreshSavedQueries()
@@ -230,7 +223,7 @@ function QueryView({
         autocomplete.addFieldNames(projectId, fields)
       }
     } catch (runError) {
-      setError(runError instanceof Error ? runError.message : 'Query の実行に失敗しました')
+      setError(runError instanceof Error ? runError.message : t('query.err_run_failed'))
       onQueryDraftChange({ ...EMPTY_RESULTS_PATCH })
     } finally {
       setLoading(false)
@@ -324,9 +317,9 @@ function QueryView({
 
       autocomplete.addFieldNames(projectId, Object.keys(parsed))
       await handleSelectDocument(queryResultSelectedPath)
-      setStatusMessage('保存しました')
+      setStatusMessage(t('query.saved'))
     } catch (parseError) {
-      setError(parseError instanceof Error ? parseError.message : 'JSON の形式が正しくありません')
+      setError(parseError instanceof Error ? parseError.message : t('explorer.err_invalid_json'))
     } finally {
       setLoading(false)
     }
@@ -337,7 +330,7 @@ function QueryView({
       return
     }
 
-    if (!(await confirmAction('このドキュメントを削除しますか？'))) {
+    if (!(await confirmAction(t('explorer.delete_document_confirm')))) {
       return
     }
 
@@ -371,7 +364,7 @@ function QueryView({
       setJsonText('{\n  \n}')
       setSelectedCreateTime(null)
       setSelectedUpdateTime(null)
-      setStatusMessage('削除しました')
+      setStatusMessage(t('query.deleted'))
     } finally {
       setLoading(false)
     }
@@ -450,7 +443,7 @@ function QueryView({
       querySeededPath: null,
       querySavedName: selected.name
     })
-    setStatusMessage(`読込: ${selected.name}`)
+    setStatusMessage(t('query.loaded', { name: selected.name }))
     setError(null)
   }
 
@@ -458,7 +451,7 @@ function QueryView({
     const name = querySavedName.trim() || activeCollectionPath || 'untitled query'
 
     if (!name.trim()) {
-      setError('名前を入力してください')
+      setError(t('query.err_name_required'))
       return
     }
 
@@ -468,7 +461,7 @@ function QueryView({
 
     try {
       if (typeof window.api.query.saveSaved !== 'function') {
-        setError('Saved Queries API が未反映です。アプリを再起動してください。')
+        setError(t('query.err_api_missing'))
         return
       }
 
@@ -490,9 +483,9 @@ function QueryView({
         querySavedName: result.data.name
       })
       await refreshSavedQueries()
-      setStatusMessage(`保存しました: ${result.data.name}`)
+      setStatusMessage(t('query.saved_named', { name: result.data.name }))
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : '保存に失敗しました')
+      setError(saveError instanceof Error ? saveError.message : t('query.err_save_failed'))
     } finally {
       setLoading(false)
     }
@@ -504,7 +497,11 @@ function QueryView({
     }
 
     const selected = savedQueries.find((query) => query.id === querySelectedSavedId)
-    if (!(await confirmAction(`「${selected?.name ?? querySelectedSavedId}」を削除しますか？`))) {
+    if (
+      !(await confirmAction(
+        t('query.delete_confirm', { name: selected?.name ?? querySelectedSavedId })
+      ))
+    ) {
       return
     }
 
@@ -514,7 +511,7 @@ function QueryView({
 
     try {
       if (typeof window.api.query.deleteSaved !== 'function') {
-        setError('Saved Queries API が未反映です。アプリを再起動してください。')
+        setError(t('query.err_api_missing'))
         return
       }
 
@@ -529,9 +526,9 @@ function QueryView({
         querySavedName: ''
       })
       await refreshSavedQueries()
-      setStatusMessage('削除しました')
+      setStatusMessage(t('query.deleted'))
     } catch (deleteError) {
-      setError(deleteError instanceof Error ? deleteError.message : '削除に失敗しました')
+      setError(deleteError instanceof Error ? deleteError.message : t('query.err_delete_failed'))
     } finally {
       setLoading(false)
     }
@@ -547,7 +544,7 @@ function QueryView({
         unit="px"
         minFirst={180}
         minSecond={160}
-        ariaLabel="クエリエディタと結果の境目"
+        ariaLabel={t('query.editor_split')}
         first={
           // 上段: エディタ・Saved・実行結果の件数。下段: 結果テーブル（列設定 / フィルタから下）
           <div className="query-main__top">
@@ -577,7 +574,7 @@ function QueryView({
             </div>
             {error && <p className="query-main__error">{error}</p>}
             {statusMessage && <p className="query-main__status">{statusMessage}</p>}
-            {loading && <p className="query-main__loading">実行中...</p>}
+            {loading && <p className="query-main__loading">{t('explorer.running')}</p>}
             {queryResultCount !== null && (
               <div className="query-main__result-label">{queryResultCount} docs</div>
             )}
@@ -586,10 +583,7 @@ function QueryView({
         second={
           <div className="query-main__after-editor">
             {queryResultCount === null && !loading && (
-              <p className="query-main__empty-hint">
-                Run で絞り込み → 行を選んで JSON を保存、またはチェックして一括。db / admin
-                が使えます。
-              </p>
+              <p className="query-main__empty-hint">{t('query.hint')}</p>
             )}
             {queryResultCount !== null && (
               <SplitPane
@@ -601,43 +595,53 @@ function QueryView({
                 unit="percent"
                 minFirst={100}
                 minSecond={100}
-                ariaLabel="JSON パネルの高さ"
+                ariaLabel={t('explorer.json_panel_height')}
                 first={
-                  <div className="query-main__workspace" data-area="settings" data-pane={pane} tabIndex={-1}>
+                  <div
+                    className="query-main__workspace"
+                    data-area="settings"
+                    data-pane={pane}
+                    tabIndex={-1}
+                  >
                     <TableBulkSplit
                       table={
-                    <DocumentTable
-                      documents={queryDocuments}
-                      selectedDocumentPath={queryResultSelectedPath}
-                      showPath={showResultPath}
-                      tableKey={`js-query:${queryResultCount}:${queryDocuments[0]?.path ?? 'empty'}`}
-                      columnWidthsKey="table.col:js-query"
-                      projectId={projectId}
-                      selectable={!readOnly}
-                      bulkSelectedPaths={bulkSelectedPaths}
-                      onBulkToggle={handleBulkToggle}
-                      onBulkToggleAll={handleBulkToggleAll}
-                      onSelectDocument={(path) => void handleSelectDocument(path)}
-                    />
+                        <DocumentTable
+                          documents={queryDocuments}
+                          selectedDocumentPath={queryResultSelectedPath}
+                          showPath={showResultPath}
+                          tableKey={`js-query:${queryResultCount}:${queryDocuments[0]?.path ?? 'empty'}`}
+                          columnWidthsKey="table.col:js-query"
+                          projectId={projectId}
+                          selectable={!readOnly}
+                          bulkSelectedPaths={bulkSelectedPaths}
+                          onBulkToggle={handleBulkToggle}
+                          onBulkToggleAll={handleBulkToggleAll}
+                          onSelectDocument={(path) => void handleSelectDocument(path)}
+                        />
                       }
                       bulk={
                         !readOnly && bulkSelectedPaths.size > 0 ? (
-                      <BulkActionsPanel
-                        projectId={projectId}
-                        selectedPaths={Array.from(bulkSelectedPaths)}
-                        loading={loading}
-                        onLoadingChange={setLoading}
-                        onClearSelection={() => setBulkSelectedPaths(new Set())}
-                        onOperationComplete={() => void handleBulkOperationComplete()}
-                        onError={setError}
-                      />
+                          <BulkActionsPanel
+                            projectId={projectId}
+                            selectedPaths={Array.from(bulkSelectedPaths)}
+                            loading={loading}
+                            onLoadingChange={setLoading}
+                            onClearSelection={() => setBulkSelectedPaths(new Set())}
+                            onOperationComplete={() => void handleBulkOperationComplete()}
+                            onError={setError}
+                          />
                         ) : null
                       }
                     />
                   </div>
                 }
                 second={
-                  <div className="query-main__json" data-area="results" data-pane={pane} tabIndex={-1}>
+                  <div
+                    className="query-main__json"
+                    data-area="results"
+                    data-pane={pane}
+                    tabIndex={-1}
+                  >
                     <DocumentJsonPanel
                       projectId={projectId}
                       documentPath={queryResultSelectedPath}

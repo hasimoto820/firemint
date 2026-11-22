@@ -1,3 +1,4 @@
+import { useI18n } from '@shared/i18n/renderer/I18nProvider'
 import type { ReferenceField } from './firestore_display'
 
 type ReferencePreviewProps = {
@@ -9,13 +10,14 @@ function ReferencePreview({
   references,
   onOpen
 }: ReferencePreviewProps): React.JSX.Element | null {
+  const { t } = useI18n()
   if (references.length === 0) {
     return null
   }
 
   return (
     <section className="reference-preview">
-      <h3 className="reference-preview__title">Reference</h3>
+      <h3 className="reference-preview__title">{t('ui.reference')}</h3>
       <ul className="reference-preview__list">
         {references.map((reference) => (
           <li key={`${reference.field}:${reference.path}`} className="reference-preview__item">

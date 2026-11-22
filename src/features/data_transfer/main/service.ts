@@ -1,3 +1,4 @@
+import { tr } from '@shared/i18n/shared/current'
 import type { BrowserWindow } from 'electron'
 import { dialog } from 'electron'
 
@@ -7,12 +8,12 @@ export async function promptIncludeSubcollections(
 ): Promise<{ canceled: boolean; includeSubcollections: boolean }> {
   const options = {
     type: 'question' as const,
-    title: 'コレクションをエクスポート',
-    message: `「${collectionPath}」をエクスポートします。`,
-    detail: 'サブコレクションを含めると、配下のドキュメントもすべて書き出します（件数・時間が増えます）。',
-    checkboxLabel: 'サブコレクションを含む',
+    title: tr('dt.export_collection_title'),
+    message: tr('dt.export_collection_message', { path: collectionPath }),
+    detail: tr('dt.export_subcollections_detail'),
+    checkboxLabel: tr('explorer.include_subcollections'),
     checkboxChecked: false,
-    buttons: ['エクスポート', 'キャンセル'],
+    buttons: [tr('dt.export'), tr('common.cancel')],
     defaultId: 0,
     cancelId: 1,
     noLink: true

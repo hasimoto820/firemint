@@ -1,3 +1,4 @@
+import { tr } from '@shared/i18n/shared/current'
 import admin from 'firebase-admin'
 import type { Credential } from 'firebase-admin/app'
 import { initializeFirestore, type Firestore } from 'firebase-admin/firestore'
@@ -142,7 +143,7 @@ export async function connectFirestoreWithGoogle(input: {
   const projectId = input.projectId.trim()
 
   if (!projectId) {
-    throw new Error('projectId を指定してください')
+    throw new Error(tr('ui.err_project_id_required'))
   }
 
   logInfo('firestore', `connect with google account project_id=${projectId}`)
@@ -159,7 +160,10 @@ export async function connectFirestoreWithGoogle(input: {
   // firebase-admin の initializeFirestore は RefreshTokenCredential を拒否する
   // （cert / ADC のみ可）。Google ユーザー OAuth は @google-cloud/firestore に
   // authorized_user を直接渡して初期化する。
-  logInfo('firestore', `initialize firestore client via google user creds preferRest=true project_id=${projectId}`)
+  logInfo(
+    'firestore',
+    `initialize firestore client via google user creds preferRest=true project_id=${projectId}`
+  )
   const firestore = new GoogleCloudFirestore({
     projectId,
     preferRest: true,
@@ -205,7 +209,7 @@ export async function connectFirestoreWithEmulator(input: {
   const host = input.host.trim()
 
   if (!poolId || !projectId || !host) {
-    throw new Error('Emulator の host と projectId を指定してください')
+    throw new Error(tr('ui.err_emulator_host_required'))
   }
 
   logInfo('firestore', `connect emulator pool_id=${poolId} project_id=${projectId} host=${host}`)
@@ -274,7 +278,7 @@ export function getFirestore(projectId?: string): Firestore {
   const entry = connections.get(resolvedProjectId)
 
   if (!entry) {
-    throw new Error(`Firestore is not connected: ${resolvedProjectId}`)
+    throw new Error(tr('ui.err_not_connected', { projectId: resolvedProjectId }))
   }
 
   return entry.firestore
@@ -285,7 +289,7 @@ function requireEntry(projectId?: string): ConnectionEntry {
   const entry = connections.get(resolvedProjectId)
 
   if (!entry) {
-    throw new Error(`Firestore is not connected: ${resolvedProjectId}`)
+    throw new Error(tr('ui.err_not_connected', { projectId: resolvedProjectId }))
   }
 
   return entry
@@ -369,7 +373,7 @@ export function getAuth(projectId?: string): admin.auth.Auth {
   const entry = connections.get(resolvedProjectId)
 
   if (!entry) {
-    throw new Error(`Firestore is not connected: ${resolvedProjectId}`)
+    throw new Error(tr('ui.err_not_connected', { projectId: resolvedProjectId }))
   }
 
   return admin.auth(entry.app)

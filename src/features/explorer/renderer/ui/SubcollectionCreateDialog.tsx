@@ -1,3 +1,4 @@
+import { useI18n } from '@shared/i18n/renderer/I18nProvider'
 import { useEffect, useMemo, useState } from 'react'
 import { buildSubcollectionPath } from '@features/explorer/shared/tree'
 import Button from '@shared/ui/Button'
@@ -17,6 +18,7 @@ function SubcollectionCreateDialog({
   onClose,
   onCreated
 }: SubcollectionCreateDialogProps): React.JSX.Element | null {
+  const { t } = useI18n()
   const [subcollectionId, setSubcollectionId] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -79,24 +81,24 @@ function SubcollectionCreateDialog({
       <div className="project-export-dialog__backdrop" onClick={busy ? undefined : onClose} />
       <div className="project-export-dialog__panel">
         <header className="project-export-dialog__header">
-          <h2 className="project-export-dialog__title">サブコレクションを作成</h2>
-          <p className="project-export-dialog__lead">
-            ドキュメント配下にサブコレクションを追加します。空のドキュメント 1 件を作成して表示します。
-          </p>
+          <h2 className="project-export-dialog__title">
+            {t('explorer.create_subcollection_title')}
+          </h2>
+          <p className="project-export-dialog__lead">{t('explorer.create_subcollection_lead')}</p>
         </header>
 
         <p className="project-export-dialog__hint">
-          親ドキュメント: <code>{documentPath}</code>
+          {t('explorer.parent_document')} <code>{documentPath}</code>
         </p>
 
         <label className="project-export-dialog__option">
-          サブコレクション名
+          {t('explorer.subcollection_name')}
           <input
             className="bulk-actions__input"
             value={subcollectionId}
             disabled={busy}
             autoFocus
-            placeholder="例: orders"
+            placeholder={t('explorer.example_orders')}
             onChange={(event) => {
               setSubcollectionId(event.target.value)
               setError(null)
@@ -111,7 +113,7 @@ function SubcollectionCreateDialog({
 
         {subcollectionPath && (
           <p className="project-export-dialog__hint">
-            作成後: <code>{subcollectionPath}</code>
+            {t('explorer.after_create')} <code>{subcollectionPath}</code>
           </p>
         )}
 
@@ -119,10 +121,10 @@ function SubcollectionCreateDialog({
 
         <div className="project-export-dialog__actions">
           <Button onClick={onClose} disabled={busy}>
-            キャンセル
+            {t('common.cancel')}
           </Button>
           <Button variant="primary" onClick={() => void handleSubmit()} disabled={!canSubmit}>
-            {busy ? '作成中…' : '作成'}
+            {busy ? t('explorer.creating') : t('explorer.create')}
           </Button>
         </div>
       </div>

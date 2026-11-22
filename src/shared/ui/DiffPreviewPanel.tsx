@@ -1,3 +1,4 @@
+import { useI18n } from '@shared/i18n/renderer/I18nProvider'
 import type { DiffPreviewItem } from '@features/bulk_operations/shared/types'
 
 function formatDiffValue(value: unknown): string {
@@ -23,11 +24,12 @@ type DiffPreviewPanelProps = {
 }
 
 function DiffPreviewPanel({ items, matchedCount }: DiffPreviewPanelProps): React.JSX.Element {
+  const { t } = useI18n()
   const targetCount = matchedCount ?? items.length
   const title =
     matchedCount !== undefined
-      ? `先頭 ${items.length} 件表示 / 対象 ${targetCount} 件`
-      : `変更内容（${items.length} 件）`
+      ? t('ui.diff_head_of', { shown: items.length, total: targetCount })
+      : t('ui.diff_changes', { count: items.length })
 
   return (
     <div className="diff-preview">
@@ -36,10 +38,10 @@ function DiffPreviewPanel({ items, matchedCount }: DiffPreviewPanelProps): React
         <table className="diff-preview__table">
           <thead>
             <tr>
-              <th>path</th>
-              <th>field</th>
-              <th>before</th>
-              <th>after</th>
+              <th>{t('ui.col_path')}</th>
+              <th>{t('ui.col_field')}</th>
+              <th>{t('ui.col_before')}</th>
+              <th>{t('ui.col_after')}</th>
             </tr>
           </thead>
           <tbody>

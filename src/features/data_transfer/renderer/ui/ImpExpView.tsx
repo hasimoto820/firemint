@@ -1,3 +1,4 @@
+import { tr } from '@shared/i18n/shared/current'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useOptionalAutocompleteApi } from '@features/autocomplete/renderer/hooks'
 import { matchesAutocompleteNeedle } from '@features/autocomplete/renderer/catalog'
@@ -38,13 +39,13 @@ type ImpExpViewProps = {
 function statusLabel(job: ScriptJobSnapshot): string {
   switch (job.status) {
     case 'running':
-      return '実行中'
+      return tr('dt.status_running')
     case 'succeeded':
-      return '完了'
+      return tr('dt.status_done')
     case 'failed':
-      return '失敗'
+      return tr('dt.status_failed')
     case 'canceled':
-      return '中止'
+      return tr('dt.status_canceled')
   }
 }
 
@@ -89,10 +90,10 @@ function ToggleBar<T extends string>({
 
 function fileKindLabel(draft: ImpExpDraft): string {
   if (draft.direction === 'import') {
-    return 'ファイル（ZIP / JSONL）'
+    return tr('dt.file_zip_jsonl')
   }
 
-  return draft.format === 'jsonl' ? 'JSON（.jsonl）' : '公式ダンプ（ZIP）'
+  return draft.format === 'jsonl' ? tr('dt.json_jsonl') : tr('dt.official_dump_zip')
 }
 
 const EXTENSIONS: Record<ImpExpDraft['format'], string> = { official: '.zip', jsonl: '.jsonl' }
@@ -157,7 +158,7 @@ function projectOptionLabel(
     return `${name}（read-only）`
   }
   if (writeBlockedReasons[entry.id]) {
-    return `${name}（Firestore 書込不可）`
+    return tr('dt.name_read_only', { name })
   }
   return name
 }
@@ -400,9 +401,9 @@ function ImpExpView({
     const name = destEntry?.label ?? destinationId
 
     if (!projectValidation) {
-      const proceed = await confirmAction('検証していません。このまま実行しますか？', {
-        detail: '検証は書き込みをしません。実行前に、クラウドとファイルの件数を見られます。',
-        confirmLabel: '実行に進む'
+      const proceed = await confirmAction(t('dt.not_validated_confirm'), {
+        detail: t('dt.not_validated_detail'),
+        confirmLabel: t('dt.proceed')
       })
       if (!proceed) {
         return false
@@ -416,8 +417,8 @@ function ImpExpView({
         : destinationId
     if (sourceProjectId && sourceProjectId !== destProjectId) {
       const proceed = await confirmAction(
-        `このファイルは ${sourceProjectId} からエクスポートしたものです。${name} に入れますか？`,
-        { confirmLabel: '入れる' }
+        t('dt.source_mismatch_confirm', { source: sourceProjectId, name }),
+        { confirmLabel: t('dt.import_it') }
       )
       if (!proceed) {
         return false
@@ -425,20 +426,16 @@ function ImpExpView({
     }
 
     return draft.writeMode === 'overwrite'
-      ? confirmAction(`${name} にあるドキュメントは、ファイルの中身で丸ごと置き換わります。`, {
-          detail:
-            'クラウドにだけあるフィールドは消えます。ファイルに無いドキュメントには触れません。途中で止めても、書いた分は戻りません。',
-          confirmLabel: '上書きで実行'
+      ? confirmAction(t('dt.overwrite_confirm', { name }), {
+          detail: t('dt.overwrite_detail'),
+          confirmLabel: t('dt.run_overwrite')
         })
-      : confirmAction(
-          `${name} の、クラウドに無いドキュメントだけを作ります。既にあるドキュメントには触れません。`,
-          { confirmLabel: '追記で実行' }
-        )
+      : confirmAction(t('dt.append_confirm', { name }), { confirmLabel: t('dt.run_append') })
   }
 
   const ensureDestinationLoaded = async (): Promise<string | null> => {
     if (!destinationId) {
-      setFormError('プロジェクトを選んでください')
+      setFormError(t('dt.err_select_project'))
       return null
     }
 
@@ -457,7 +454,7 @@ function ImpExpView({
 
   const validateOfficial = async (level: ImportVerifyLevel): Promise<boolean> => {
     if (!draft.filePath) {
-      setFormError(`${fileKindLabel(draft)} を選択してください`)
+      setFormError(t('dt.err_select_file', { kind: fileKindLabel(draft) }))
       return false
     }
 
@@ -519,7 +516,7 @@ function ImpExpView({
       if (draft.direction === 'export' && draft.target === 'collection') {
         const collectionPath = draft.collectionPath.trim()
         if (!collectionPath) {
-          setFormError('コレクション path を指定してください')
+          setFormError(t('explorer.err_collection_path_required'))
           return
         }
 
@@ -545,7 +542,7 @@ function ImpExpView({
       if (draft.direction === 'export' && draft.target === 'group') {
         const collectionId = lastPathSegment(draft.collectionPath)
         if (!collectionId) {
-          setFormError('グループ名（コレクション ID）を指定してください')
+          setFormError(t('dt.err_group_required'))
           return
         }
 
@@ -569,7 +566,7 @@ function ImpExpView({
 
       if (draft.direction === 'export' && draft.target === 'project') {
         if (draft.selectedRoots.length === 0) {
-          setFormError('エクスポートするルートコレクションを選んでください')
+          setFormError(t('dt.err_select_roots'))
           return
         }
 
@@ -593,7 +590,7 @@ function ImpExpView({
       }
 
       if (!draft.filePath) {
-        setFormError(`${fileKindLabel(draft)} を選択してください`)
+        setFormError(t('dt.err_select_file', { kind: fileKindLabel(draft) }))
         return
       }
 
@@ -613,7 +610,7 @@ function ImpExpView({
         }
 
         if (destinationReadOnly) {
-          setFormError('このプロジェクトは read-only です')
+          setFormError(t('dt.err_read_only'))
           return
         }
       }
@@ -685,35 +682,35 @@ function ImpExpView({
             <h1 className="imp-exp-form__title">{t('menu.cloud')}</h1>
             <div className="imp-exp-form__toggles">
               <ToggleBar
-                ariaLabel="向き"
+                ariaLabel={t('dt.direction')}
                 value={draft.direction}
                 disabled={formDisabled}
                 options={[
-                  { id: 'import', label: 'Import' },
-                  { id: 'export', label: 'Export' }
+                  { id: 'import', label: t('menu.import') },
+                  { id: 'export', label: t('menu.export') }
                 ]}
                 onChange={handleDirection}
               />
               {draft.direction === 'export' ? (
                 <ToggleBar
-                  ariaLabel="対象"
+                  ariaLabel={t('dt.target')}
                   value={draft.target}
                   disabled={formDisabled}
                   options={[
-                    { id: 'collection', label: 'Collection' },
-                    { id: 'group', label: 'Group' },
-                    { id: 'project', label: 'Project' }
+                    { id: 'collection', label: t('explorer.kind_collection') },
+                    { id: 'group', label: t('dt.kind_group') },
+                    { id: 'project', label: t('dt.project') }
                   ]}
                   onChange={handleTarget}
                 />
               ) : null}
               {draft.direction === 'export' ? (
                 <ToggleBar
-                  ariaLabel="形式"
+                  ariaLabel={t('dt.format')}
                   value={draft.format}
                   disabled={formDisabled}
                   options={[
-                    { id: 'official', label: '公式ダンプ' },
+                    { id: 'official', label: t('dt.official_dump') },
                     { id: 'jsonl', label: 'JSON' }
                   ]}
                   onChange={(format) => {
@@ -728,17 +725,17 @@ function ImpExpView({
 
             <p className="imp-exp-form__lead">
               {draft.direction === 'import'
-                ? '選んだプロジェクトへ、ファイルの path どおり書きます。'
+                ? t('dt.lead_import')
                 : draft.target === 'group'
-                  ? '同じコレクション ID の全部（グループ）を出します。'
+                  ? t('dt.lead_group')
                   : draft.target === 'collection'
-                    ? 'この path の範囲を出します。'
-                    : '選んだルートを出します。'}
-              ファイルは {fileKindLabel(draft)} です。
+                    ? t('dt.lead_collection')
+                    : t('dt.lead_project')}
+              {t('dt.file_is', { kind: fileKindLabel(draft) })}
             </p>
 
             <label className="imp-exp-form__field">
-              {draft.direction === 'import' ? 'インポート先' : 'プロジェクト'}
+              {draft.direction === 'import' ? t('dt.import_destination') : t('dt.project')}
               <select
                 className="bulk-actions__input"
                 value={destinationId}
@@ -762,13 +759,13 @@ function ImpExpView({
 
             {draft.direction === 'export' && draft.target === 'collection' && (
               <label className="imp-exp-form__field">
-                コレクション
+                {t('explorer.kind_collection')}
                 <AutocompleteInput
                   value={draft.collectionPath}
                   items={collectionItems}
                   disabled={formDisabled}
                   placeholder="equipment / users/uid/posts"
-                  aria-label="コレクション path"
+                  aria-label={t('dt.collection_path')}
                   onChange={(value) => {
                     resetValidation({ collectionPath: value })
                   }}
@@ -778,13 +775,13 @@ function ImpExpView({
 
             {draft.direction === 'export' && draft.target === 'group' && (
               <label className="imp-exp-form__field">
-                グループ（コレクション ID）
+                {t('dt.group_collection_id')}
                 <AutocompleteInput
                   value={draft.collectionPath}
                   items={groupItems}
                   disabled={formDisabled}
                   placeholder="posts"
-                  aria-label="コレクション ID"
+                  aria-label={t('dt.collection_id')}
                   onChange={(value) => {
                     resetValidation({
                       collectionPath: value.includes('/') ? lastPathSegment(value) : value
@@ -797,7 +794,7 @@ function ImpExpView({
             {draft.direction === 'export' && draft.target === 'project' && (
               <div className="imp-exp-form__roots">
                 {projectRoots.length === 0 ? (
-                  <p className="imp-exp-form__hint">ルートコレクションがありません。</p>
+                  <p className="imp-exp-form__hint">{t('dt.no_roots')}</p>
                 ) : (
                   <>
                     <label className="imp-exp-form__check">
@@ -811,7 +808,10 @@ function ImpExpView({
                           })
                         }
                       />
-                      すべて選択（{selectedCount}/{projectRoots.length}）
+                      {t('dt.select_all_count', {
+                        selected: selectedCount,
+                        total: projectRoots.length
+                      })}
                     </label>
                     <ul className="imp-exp-form__root-list">
                       {projectRoots.map((rootId) => (
@@ -851,13 +851,13 @@ function ImpExpView({
                     resetValidation({ includeSubcollections: event.target.checked })
                   }}
                 />
-                サブコレクションを含む
+                {t('explorer.include_subcollections')}
               </label>
             )}
 
             {draft.direction === 'export' && (
               <div className="imp-exp-form__section">
-                <p className="imp-exp-form__label">保存先</p>
+                <p className="imp-exp-form__label">{t('dt.save_to')}</p>
                 <p className="imp-exp-form__path">
                   {!defaultExportPath
                     ? '…'
@@ -867,7 +867,7 @@ function ImpExpView({
                 </p>
                 <div className="imp-exp-form__file">
                   <Button onClick={() => void handleChooseExportPath()} disabled={formDisabled}>
-                    保存先を選ぶ…
+                    {t('dt.choose_save_to')}
                   </Button>
                 </div>
               </div>
@@ -877,37 +877,39 @@ function ImpExpView({
               <>
                 <div className="imp-exp-form__file">
                   <Button onClick={() => void handleSelectFile()} disabled={formDisabled || busy}>
-                    {fileKindLabel(draft)} / フォルダを選択…
+                    {t('dt.select_file_or_folder', { kind: fileKindLabel(draft) })}
                   </Button>
                   {draft.filePath && <span className="imp-exp-form__path">{draft.filePath}</span>}
                 </div>
                 {draft.fileInfo && (
                   <p className="imp-exp-form__hint">
-                    形式: {formatLabel(draft.fileInfo.format)}
-                    {' ／ '}エクスポート元: {draft.fileInfo.sourceProjectId ?? '不明'}
+                    {t('dt.file_info', {
+                      format: formatLabel(draft.fileInfo.format),
+                      source: draft.fileInfo.sourceProjectId ?? t('dt.unknown')
+                    })}
                   </p>
                 )}
                 {destination?.authType !== 'emulator' && destinationReadOnly ? (
-                  <p className="simple-main__error">
-                    このプロジェクトは read-only です。検証はできますが、実行はできません。
-                  </p>
+                  <p className="simple-main__error">{t('dt.read_only_validate_only')}</p>
                 ) : destination?.authType !== 'emulator' && destinationWriteBlockedReason ? (
                   <p className="simple-main__error">{destinationWriteBlockedReason}</p>
                 ) : null}
 
                 <div className="imp-exp-form__section">
-                  <p className="imp-exp-form__label">書き方</p>
+                  <p className="imp-exp-form__label">{t('dt.write_mode')}</p>
                   <ToggleBar
-                    ariaLabel="書き方"
+                    ariaLabel={t('dt.write_mode')}
                     value={draft.writeMode}
                     disabled={formDisabled}
                     options={[
-                      { id: 'append', label: '追記' },
-                      { id: 'overwrite', label: '上書き' }
+                      { id: 'append', label: t('dt.append') },
+                      { id: 'overwrite', label: t('dt.overwrite') }
                     ]}
                     onChange={(writeMode) => onDraftChange({ writeMode })}
                   />
-                  <p className="imp-exp-form__hint">{writeModeHint(draft.writeMode, 'クラウド')}</p>
+                  <p className="imp-exp-form__hint">
+                    {writeModeHint(draft.writeMode, t('dt.cloud'))}
+                  </p>
                 </div>
               </>
             )}
@@ -918,10 +920,10 @@ function ImpExpView({
               {draft.direction === 'import' && (
                 <>
                   <Button onClick={() => void handleValidate('quick')} disabled={!canValidate}>
-                    {busy && !jobRunning ? '検証中…' : '簡易検証'}
+                    {busy && !jobRunning ? t('dt.validating') : t('dt.quick_validate')}
                   </Button>
                   <Button onClick={() => void handleValidate('detailed')} disabled={!canValidate}>
-                    詳細検証
+                    {t('dt.detailed_validate')}
                   </Button>
                 </>
               )}
@@ -938,12 +940,14 @@ function ImpExpView({
                     : !canStartImport
                 }
               >
-                {draft.direction === 'export' ? 'エクスポート' : 'インポート実行'}
+                {draft.direction === 'export' ? t('dt.export') : t('dt.run_import')}
               </Button>
             </div>
 
             {validateProgressLabel && busy && (
-              <p className="imp-exp-form__hint">検証中 {validateProgressLabel}</p>
+              <p className="imp-exp-form__hint">
+                {t('dt.validating_progress', { progress: validateProgressLabel })}
+              </p>
             )}
 
             {projectValidation && <ImportVerifyTable validation={projectValidation} />}
@@ -960,7 +964,7 @@ function ImpExpView({
                 </p>
               </header>
 
-              <div className="imp-exp-view__progress" aria-label="進捗">
+              <div className="imp-exp-view__progress" aria-label={t('dt.progress')}>
                 <div className="imp-exp-view__progress-bar" style={{ width: `${job.percent}%` }} />
                 <p className="imp-exp-view__progress-label">{job.percent}%</p>
               </div>
@@ -974,13 +978,13 @@ function ImpExpView({
 
               {job.status === 'running' && (
                 <div className="imp-exp-view__actions">
-                  <Button onClick={onCancel}>中止</Button>
+                  <Button onClick={onCancel}>{t('dt.stop')}</Button>
                 </div>
               )}
 
-              <section className="imp-exp-view__log" aria-label="ログ">
+              <section className="imp-exp-view__log" aria-label={t('dt.log')}>
                 {job.logs.length === 0 ? (
-                  <p className="simple-main__empty-hint">ログはまだありません</p>
+                  <p className="simple-main__empty-hint">{t('dt.no_log')}</p>
                 ) : (
                   job.logs.map((line, index) => (
                     <p
@@ -999,9 +1003,7 @@ function ImpExpView({
               </section>
             </div>
           ) : (
-            <p className="simple-main__empty-hint">
-              実行中は別のコレクションタブへ戻れます。進捗とログはここに出ます。
-            </p>
+            <p className="simple-main__empty-hint">{t('dt.running_hint')}</p>
           )
         }
       />

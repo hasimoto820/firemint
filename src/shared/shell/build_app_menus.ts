@@ -440,7 +440,7 @@ export function buildAppMenus(handlers: AppMenuHandlers): AppMenuSection[] {
         {
           type: 'item',
           id: 'view-command-palette',
-          label: 'Command Palette…',
+          label: t('ui.command_palette_menu'),
           shortcut: shortcutLabel('p'),
           disabled: !handlers.connected,
           onClick: shell?.openCommandPalette

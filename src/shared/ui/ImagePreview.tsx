@@ -1,3 +1,4 @@
+import { useI18n } from '@shared/i18n/renderer/I18nProvider'
 import { useState } from 'react'
 import type { ImageUrlField } from './firestore_display'
 
@@ -6,6 +7,7 @@ type ImagePreviewProps = {
 }
 
 function ImagePreviewItem({ field, url }: ImageUrlField): React.JSX.Element {
+  const { t } = useI18n()
   const [loadFailed, setLoadFailed] = useState(false)
 
   return (
@@ -13,11 +15,11 @@ function ImagePreviewItem({ field, url }: ImageUrlField): React.JSX.Element {
       <p className="image-preview__label">
         {field}:{' '}
         <a href={url} target="_blank" rel="noreferrer">
-          画像を開く
+          {t('ui.open_image')}
         </a>
       </p>
       {loadFailed ? (
-        <p className="image-preview__error">プレビューを表示できませんでした</p>
+        <p className="image-preview__error">{t('ui.preview_failed')}</p>
       ) : (
         <a className="image-preview__link" href={url} target="_blank" rel="noreferrer">
           <img
@@ -34,6 +36,7 @@ function ImagePreviewItem({ field, url }: ImageUrlField): React.JSX.Element {
 }
 
 function ImagePreview({ images }: ImagePreviewProps): React.JSX.Element | null {
+  const { t } = useI18n()
   if (images.length === 0) {
     return null
   }
@@ -41,7 +44,7 @@ function ImagePreview({ images }: ImagePreviewProps): React.JSX.Element | null {
   return (
     // 画像は高さを取るので、最初は閉じておき JSON を先に見せる
     <details className="image-preview">
-      <summary className="image-preview__title">画像 ({images.length})</summary>
+      <summary className="image-preview__title">{t('ui.images', { count: images.length })}</summary>
       {images.map((image) => (
         <ImagePreviewItem key={`${image.field}:${image.url}`} field={image.field} url={image.url} />
       ))}

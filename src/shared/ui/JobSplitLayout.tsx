@@ -1,3 +1,4 @@
+import { useI18n } from '@shared/i18n/renderer/I18nProvider'
 import type { ReactNode } from 'react'
 import SplitPane from '@shared/ui/SplitPane'
 
@@ -16,6 +17,7 @@ function JobSplitLayout({
   storageKey = 'job.log',
   defaultLogSize = 280
 }: JobSplitLayoutProps): React.JSX.Element {
+  const { t } = useI18n()
   return (
     <SplitPane
       className="job-split"
@@ -26,7 +28,7 @@ function JobSplitLayout({
       unit="px"
       minFirst={140}
       minSecond={96}
-      ariaLabel="ログの高さ"
+      ariaLabel={t('ui.log_height')}
       first={form}
       second={log}
     />

@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { setCurrentLocale } from '@shared/i18n/shared/current'
 import { createTranslator } from '@shared/i18n/shared/translate'
 import {
   DEFAULT_LOCALE,
@@ -88,7 +89,11 @@ export function I18nProvider({ children }: I18nProviderProps): React.JSX.Element
     await window.api.settings.setTheme(next)
   }, [])
 
-  const t = useMemo(() => createTranslator(locale), [locale])
+  const t = useMemo(() => {
+    // React の外の補助関数（tr）も、同じ言語にする
+    setCurrentLocale(locale)
+    return createTranslator(locale)
+  }, [locale])
 
   const value = useMemo(
     (): I18nContextValue => ({

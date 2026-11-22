@@ -1,3 +1,4 @@
+import { tr } from '@shared/i18n/shared/current'
 import { randomBytes } from 'crypto'
 import http from 'http'
 import type { AddressInfo } from 'net'
@@ -10,7 +11,9 @@ import { sendOAuthCallbackPage } from '@features/connection/main/oauth_callback_
 const SCOPES = ['openid', 'email', 'profile']
 const TIMEOUT_MS = 5 * 60 * 1000
 
-export const GOOGLE_SIGN_IN_CANCELED_MESSAGE = 'Google ログインをキャンセルしました'
+export function googleSignInCanceledMessage(): string {
+  return tr('account.google_sign_in_canceled')
+}
 
 let cancelActive: (() => void) | null = null
 
@@ -36,7 +39,7 @@ export async function requestGoogleIdToken(): Promise<string> {
       if (idToken) {
         resolve(idToken)
       } else {
-        reject(error ?? new Error('Google ログインに失敗しました'))
+        reject(error ?? new Error(tr('account.err_google_sign_in_failed')))
       }
     }
 
@@ -52,20 +55,22 @@ export async function requestGoogleIdToken(): Promise<string> {
         const code = url.searchParams.get('code')
         if (url.searchParams.get('state') !== state || !code) {
           await sendOAuthCallbackPage(res, 400, 'failed')
-          finish(new Error('Google ログインがキャンセルまたは失敗しました'))
+          finish(new Error(tr('account.err_google_canceled_or_failed')))
           return
         }
 
         try {
           const { tokens } = await client.getToken(code)
           if (!tokens.id_token) {
-            throw new Error('ID トークンを取得できませんでした')
+            throw new Error(tr('account.err_no_id_token'))
           }
           await sendOAuthCallbackPage(res, 200, 'done')
           finish(null, tokens.id_token)
         } catch (error) {
           await sendOAuthCallbackPage(res, 500, 'failed')
-          finish(error instanceof Error ? error : new Error('Google ログインに失敗しました'))
+          finish(
+            error instanceof Error ? error : new Error(tr('account.err_google_sign_in_failed'))
+          )
         }
       })()
     })
@@ -73,10 +78,10 @@ export async function requestGoogleIdToken(): Promise<string> {
     server.on('error', (error) => finish(error))
 
     const timeoutId = setTimeout(() => {
-      finish(new Error('Google ログインがタイムアウトしました（5分）'))
+      finish(new Error(tr('account.err_google_timeout')))
     }, TIMEOUT_MS)
 
-    cancelActive = () => finish(new Error(GOOGLE_SIGN_IN_CANCELED_MESSAGE))
+    cancelActive = () => finish(new Error(googleSignInCanceledMessage()))
 
     server.listen(0, '127.0.0.1', () => {
       const { port } = server.address() as AddressInfo
@@ -91,7 +96,7 @@ export async function requestGoogleIdToken(): Promise<string> {
         prompt: 'select_account'
       })
       void shell.openExternal(authUrl).catch((error: unknown) => {
-        finish(error instanceof Error ? error : new Error('ブラウザを開けませんでした'))
+        finish(error instanceof Error ? error : new Error(tr('conn.err_open_browser')))
       })
     })
   })

@@ -1,3 +1,4 @@
+import { tr } from '@shared/i18n/shared/current'
 import { BrowserWindow } from 'electron'
 import { IPC_CHANNELS } from '@shared/ipc/channels'
 import { logJob } from '@shared/logging/job_logger'
@@ -136,14 +137,14 @@ function logProgressLine(
 
 function onOfficialExportProgress(progress: OfficialExportProgress): void {
   const suffix = progress.detail ? ` / ${progress.detail}` : ''
-  const detail = `${progress.phase} ${progress.processedCount} 件${suffix}`
+  const detail = `${progress.phase} ${tr('sr.count', { count: progress.processedCount })}${suffix}`
   logProgressLine(progress.phase, progress.percent, detail)
 }
 
 function onTransportProgress(progress: TransportProgress): void {
   const detail = progress.detail
-    ? `${progress.phase} ${progress.processedCount} 件 / 書込 ${progress.writtenCount} / スキップ ${progress.skippedCount} / ${progress.detail}`
-    : `${progress.phase} ${progress.processedCount} 件 / 書込 ${progress.writtenCount} / スキップ ${progress.skippedCount}`
+    ? `${progress.phase} ${tr('sr.write_progress', { count: progress.processedCount, written: progress.writtenCount, skipped: progress.skippedCount })} / ${progress.detail}`
+    : `${progress.phase} ${tr('sr.write_progress', { count: progress.processedCount, written: progress.writtenCount, skipped: progress.skippedCount })}`
   logProgressLine(progress.phase, progress.percent, detail, progress.writtenCount)
 }
 
@@ -162,7 +163,7 @@ function appendCollisionSamples(samples: string[], reason: string): void {
     return
   }
 
-  appendLog('info', `${reason}: ${samples.length} 件（例）`)
+  appendLog('info', tr('sr.samples', { reason, count: samples.length }))
   for (const path of samples) {
     appendLog('info', `  skip ${path}`)
   }
@@ -174,34 +175,41 @@ async function runExport(input: OfficialExportInput, signal: AbortSignal): Promi
     throw Object.assign(new Error(result.error), { canceled: result.canceled })
   }
   patchSnapshot({
-    resultSummary: `${result.data.documentCount} 件を ${result.data.filePath} に保存しました`
+    resultSummary: tr('sr.exported', {
+      count: result.data.documentCount,
+      path: result.data.filePath
+    })
   })
 }
 
 /** 書いた / 飛ばした / 書けなかった件数と、途中で止まった理由 */
 function reportImportSummary(summary: OfficialImportSummary): void {
-  const mode = summary.writeMode === 'overwrite' ? '上書き' : '追記'
+  const mode = summary.writeMode === 'overwrite' ? tr('dt.overwrite') : tr('dt.append')
   patchSnapshot({
     writtenCount: summary.writtenCount,
-    resultSummary: `${mode}: 書いた ${summary.writtenCount} / 飛ばした ${summary.skippedCount} / 書けなかった ${summary.failedCount} → ${summary.writtenProjectId}`
+    resultSummary: `${mode}: ${tr('sr.import_counts', { written: summary.writtenCount, skipped: summary.skippedCount, failed: summary.failedCount })} → ${summary.writtenProjectId}`
   })
   appendLog(
     'info',
-    `プロジェクト ${summary.sourceProjectId ?? '-'} → ${summary.writtenProjectId}（${mode}）`
+    tr('sr.project_flow', {
+      source: summary.sourceProjectId ?? '-',
+      target: summary.writtenProjectId,
+      mode
+    })
   )
   appendLog(
     'info',
-    `書いた ${summary.writtenCount} / 飛ばした ${summary.skippedCount} / 書けなかった ${summary.failedCount}（ファイル ${summary.documentCount} 件）`
+    `${tr('sr.import_counts', { written: summary.writtenCount, skipped: summary.skippedCount, failed: summary.failedCount })}${tr('sr.file_total', { count: summary.documentCount })}`
   )
-  appendCollisionSamples(summary.skippedSamples, '飛ばした')
+  appendCollisionSamples(summary.skippedSamples, tr('sr.skipped'))
   if (summary.failedSamples.length > 0) {
-    appendLog('error', `書けなかった: ${summary.failedCount} 件（例）`)
+    appendLog('error', tr('sr.failed_samples', { count: summary.failedCount }))
     for (const label of summary.failedSamples) {
       appendLog('error', `  fail ${label}`)
     }
   }
   if (summary.stoppedReason) {
-    appendLog('error', `途中で止まった理由: ${summary.stoppedReason}`)
+    appendLog('error', tr('sr.stopped_reason', { reason: summary.stoppedReason }))
   }
 }
 
@@ -266,9 +274,13 @@ async function runJob(input: StartScriptJobInput, signal: AbortSignal): Promise<
       }
       patchSnapshot({
         writtenCount: result.data.writtenCount,
-        resultSummary: `成功 ${result.data.writtenCount} / スキップ ${result.data.skippedCount} / 対象 ${result.data.documentCount}`
+        resultSummary: tr('sr.transport_summary', {
+          written: result.data.writtenCount,
+          skipped: result.data.skippedCount,
+          total: result.data.documentCount
+        })
       })
-      appendCollisionSamples(result.data.collisionSamples, '既存のためスキップ')
+      appendCollisionSamples(result.data.collisionSamples, tr('sr.skipped_existing'))
       return
     }
   }
@@ -282,25 +294,19 @@ function finishJob(status: ScriptJobSnapshot['status'], error: string | null): v
   const writtenCount = active.snapshot.writtenCount
   if (status === 'canceled') {
     if (writtenCount && writtenCount > 0) {
-      appendLog(
-        'error',
-        `中止しました。Firestore に書いた分は残っています（${writtenCount} 件）。ロールバックできません。`
-      )
+      appendLog('error', tr('sr.canceled_written', { count: writtenCount }))
     } else {
-      appendLog('info', '中止しました')
+      appendLog('info', tr('sr.canceled'))
     }
   } else if (status === 'failed') {
     if (writtenCount && writtenCount > 0) {
-      appendLog(
-        'error',
-        `失敗しました。Firestore に書いた分は残っています（${writtenCount} 件）。ロールバックできません。`
-      )
+      appendLog('error', tr('sr.failed_written', { count: writtenCount }))
     }
     if (error) {
       appendLog('error', error)
     }
   } else if (active.snapshot.resultSummary) {
-    appendLog('info', `完了: ${active.snapshot.resultSummary}`)
+    appendLog('info', tr('sr.done', { summary: active.snapshot.resultSummary }))
   }
 
   appendLog('info', `---- job end status=${status} id=${active.snapshot.id} ----`)
@@ -326,7 +332,7 @@ export function cancelScriptJob(): { ok: true } {
   }
 
   active.abort.abort()
-  appendLog('info', '中止を要求しました')
+  appendLog('info', tr('sr.cancel_requested'))
   broadcast()
   return { ok: true }
 }
@@ -336,7 +342,7 @@ export async function startScriptJob(
   window: BrowserWindow | null
 ): Promise<StartScriptJobResult> {
   if (isJobRunning()) {
-    return { ok: false, error: '別の Import / Export が実行中です', busy: true }
+    return { ok: false, error: tr('sr.busy'), busy: true }
   }
 
   let resolvedInput = input
@@ -344,13 +350,13 @@ export async function startScriptJob(
   if (input.kind === 'export_collection' && input.includeSubcollections === undefined) {
     const prompt = await promptIncludeSubcollections(window, input.collectionPath)
     if (prompt.canceled) {
-      return { ok: false, error: '保存をキャンセルしました', canceled: true }
+      return { ok: false, error: tr('diff.save_canceled'), canceled: true }
     }
     resolvedInput = { ...input, includeSubcollections: prompt.includeSubcollections }
   }
 
   if (isJobRunning()) {
-    return { ok: false, error: '別の Import / Export が実行中です', busy: true }
+    return { ok: false, error: tr('sr.busy'), busy: true }
   }
 
   const abort = new AbortController()
@@ -360,7 +366,7 @@ export async function startScriptJob(
     status: 'running',
     title: jobTitle(resolvedInput),
     percent: 0,
-    detail: '開始…',
+    detail: tr('sr.starting'),
     logs: [],
     error: null,
     resultSummary: null,
@@ -373,7 +379,7 @@ export async function startScriptJob(
     lastLoggedPercent: -1
   }
   appendLog('info', `---- job start id=${snapshot.id} ----`)
-  appendLog('info', `${snapshot.title} を開始しました`)
+  appendLog('info', tr('sr.started', { title: snapshot.title }))
   broadcast()
   logInfo('script_runner', `start kind=${resolvedInput.kind} id=${snapshot.id}`)
 
@@ -394,7 +400,7 @@ export async function startScriptJob(
         return
       }
 
-      const raw = error instanceof Error ? error.message : 'Import / Export に失敗しました'
+      const raw = error instanceof Error ? error.message : tr('sr.err_failed')
       const message = formatUnavailableFirestoreMessage(raw) ?? raw
       logError('script_runner', `job failed id=${snapshot.id}`, error)
       finishJob('failed', message)

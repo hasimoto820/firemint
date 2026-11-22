@@ -1,5 +1,10 @@
+import { tr } from '@shared/i18n/shared/current'
+import { useI18n } from '@shared/i18n/renderer/I18nProvider'
 import { useEffect, useState } from 'react'
-import { useFieldAutocompleteItems, useOptionalAutocompleteApi } from '@features/autocomplete/renderer/hooks'
+import {
+  useFieldAutocompleteItems,
+  useOptionalAutocompleteApi
+} from '@features/autocomplete/renderer/hooks'
 import type {
   BulkFieldMode,
   BulkFieldPreview,
@@ -30,14 +35,14 @@ function formatCollisionMessage(result: BulkFieldWriteResult): string {
   const listed = result.collisionPaths.join('\n')
   const rest =
     result.skippedCount > result.collisionPaths.length
-      ? `\n…他 ${result.skippedCount - result.collisionPaths.length} 件`
+      ? `\n${tr('explorer.collision_more', { count: result.skippedCount - result.collisionPaths.length })}`
       : ''
 
   if (result.affectedCount === 0) {
-    return `衝突のため ${result.skippedCount} 件は更新していません。\n${listed}${rest}`
+    return `${tr('explorer.collision_skipped', { skipped: result.skippedCount })}\n${listed}${rest}`
   }
 
-  return `${result.affectedCount} 件を更新しました。衝突のため ${result.skippedCount} 件は更新していません。\n${listed}${rest}`
+  return `${tr('explorer.collision_updated', { count: result.affectedCount, skipped: result.skippedCount })}\n${listed}${rest}`
 }
 
 function FieldBulkRenameDialog({
@@ -48,6 +53,7 @@ function FieldBulkRenameDialog({
   onClose,
   onCompleted
 }: FieldBulkRenameDialogProps): React.JSX.Element | null {
+  const { t } = useI18n()
   const autocomplete = useOptionalAutocompleteApi()
   const kindLabel = collectionKindLabel(collectionPath)
   const [mode, setMode] = useState<BulkFieldMode>(initialMode)
@@ -117,8 +123,7 @@ function FieldBulkRenameDialog({
     setPreview(null)
   }
 
-  const valueForType = (raw: string): string =>
-    valueType === 'boolean' ? raw || 'true' : raw
+  const valueForType = (raw: string): string => (valueType === 'boolean' ? raw || 'true' : raw)
 
   const handlePreview = async (): Promise<void> => {
     setBusy(true)
@@ -205,19 +210,40 @@ function FieldBulkRenameDialog({
 
   const handleApply = async (): Promise<void> => {
     if (!preview || (preview.matchedCount === 0 && preview.skippedCount === 0)) {
-      setError('先にプレビューを実行してください')
+      setError(t('explorer.preview_first'))
       return
     }
 
-    const scope = includeSubcollections ? '（サブコレクションを含む）' : ''
+    const scope = includeSubcollections ? t('explorer.scope_with_subcollections') : ''
     const confirmMessage =
       mode === 'create'
-        ? `${kindLabel}「${collectionPath}」全体にフィールド「${createField.trim()}」を追加します${scope}。よろしいですか？`
+        ? t('explorer.field_add_confirm', {
+            kind: kindLabel,
+            path: collectionPath,
+            field: createField.trim(),
+            scope
+          })
         : mode === 'update'
-          ? `${kindLabel}「${collectionPath}」全体のフィールド「${updateFieldName.trim()}」の値を変更します${scope}。よろしいですか？`
+          ? t('explorer.field_update_confirm', {
+              kind: kindLabel,
+              path: collectionPath,
+              field: updateFieldName.trim(),
+              scope
+            })
           : mode === 'rename'
-            ? `${kindLabel}「${collectionPath}」全体でフィールド「${fromField.trim()}」を「${toField.trim()}」にリネームします${scope}。よろしいですか？`
-            : `${kindLabel}「${collectionPath}」全体からフィールド「${deleteFieldName.trim()}」を削除します${scope}。よろしいですか？`
+            ? t('explorer.field_rename_confirm', {
+                kind: kindLabel,
+                path: collectionPath,
+                from: fromField.trim(),
+                to: toField.trim(),
+                scope
+              })
+            : t('explorer.field_delete_confirm', {
+                kind: kindLabel,
+                path: collectionPath,
+                field: deleteFieldName.trim(),
+                scope
+              })
 
     if (!(await confirmAction(confirmMessage))) {
       return
@@ -274,7 +300,9 @@ function FieldBulkRenameDialog({
       }
 
       if (result.data.skippedCount > 0) {
-        await confirmAction(formatCollisionMessage(result.data), { confirmLabel: '閉じる' })
+        await confirmAction(formatCollisionMessage(result.data), {
+          confirmLabel: t('explorer.close')
+        })
       }
 
       onCompleted()
@@ -289,7 +317,9 @@ function FieldBulkRenameDialog({
   }
 
   const canPreviewValue =
-    valueType === 'null' || Boolean((mode === 'create' ? createValue : updateValue).trim()) || valueType === 'boolean'
+    valueType === 'null' ||
+    Boolean((mode === 'create' ? createValue : updateValue).trim()) ||
+    valueType === 'boolean'
 
   const canPreview =
     mode === 'create'
@@ -303,7 +333,13 @@ function FieldBulkRenameDialog({
   const canApply = Boolean(preview && (preview.matchedCount > 0 || preview.skippedCount > 0))
 
   const applyLabel =
-    mode === 'create' ? '追加' : mode === 'update' ? '値変更' : mode === 'rename' ? 'リネーム' : '削除'
+    mode === 'create'
+      ? t('explorer.add')
+      : mode === 'update'
+        ? t('explorer.update_value')
+        : mode === 'rename'
+          ? t('explorer.rename')
+          : t('common.delete')
 
   const renderValueInputs = (
     fieldName: string,
@@ -347,7 +383,7 @@ function FieldBulkRenameDialog({
         className="bulk-actions__input"
         value={valueType}
         disabled={busy}
-        aria-label="型"
+        aria-label={t('explorer.type')}
         onChange={(event) => {
           const nextType = event.target.value as BulkFieldValueType
           setValueType(nextType)
@@ -371,7 +407,7 @@ function FieldBulkRenameDialog({
           className="bulk-actions__input"
           value={value || 'true'}
           disabled={busy}
-          aria-label="値"
+          aria-label={t('explorer.value')}
           onChange={(event) => {
             setValue(event.target.value)
             clearPreview()
@@ -384,10 +420,16 @@ function FieldBulkRenameDialog({
       ) : valueType === 'null' ? null : (
         <input
           className="bulk-actions__input"
-          type={valueType === 'number' ? 'number' : valueType === 'timestamp' ? 'datetime-local' : 'text'}
+          type={
+            valueType === 'number'
+              ? 'number'
+              : valueType === 'timestamp'
+                ? 'datetime-local'
+                : 'text'
+          }
           value={value}
           disabled={busy}
-          placeholder="値"
+          placeholder={t('explorer.value')}
           onChange={(event) => {
             setValue(event.target.value)
             clearPreview()
@@ -410,9 +452,9 @@ function FieldBulkRenameDialog({
         minHeight={360}
       >
         <header className="project-export-dialog__header">
-          <h2 className="project-export-dialog__title">フィールド一括</h2>
+          <h2 className="project-export-dialog__title">{t('explorer.field_bulk')}</h2>
           <p className="project-export-dialog__lead">
-            {kindLabel} <code>{collectionPath}</code> 全体のフィールドを新規／値変更／リネーム／削除します。
+            {t('explorer.field_bulk_lead', { kind: kindLabel, path: collectionPath })}
           </p>
         </header>
 
@@ -425,10 +467,13 @@ function FieldBulkRenameDialog({
           unit="percent"
           minFirst={120}
           minSecond={80}
-          ariaLabel="プレビューの高さ"
+          ariaLabel={t('explorer.preview_height')}
           first={
             <div className="field-bulk-split__form">
-              <div className="project-export-dialog__actions" style={{ justifyContent: 'flex-start' }}>
+              <div
+                className="project-export-dialog__actions"
+                style={{ justifyContent: 'flex-start' }}
+              >
                 <Button
                   variant={mode === 'create' ? 'primary' : undefined}
                   onClick={() => {
@@ -438,7 +483,7 @@ function FieldBulkRenameDialog({
                   }}
                   disabled={busy}
                 >
-                  新規
+                  {t('explorer.new')}
                 </Button>
                 <Button
                   variant={mode === 'update' ? 'primary' : undefined}
@@ -449,7 +494,7 @@ function FieldBulkRenameDialog({
                   }}
                   disabled={busy}
                 >
-                  値変更
+                  {t('explorer.update_value')}
                 </Button>
                 <Button
                   variant={mode === 'rename' ? 'primary' : undefined}
@@ -460,7 +505,7 @@ function FieldBulkRenameDialog({
                   }}
                   disabled={busy}
                 >
-                  リネーム
+                  {t('explorer.rename')}
                 </Button>
                 <Button
                   variant={mode === 'delete' ? 'danger' : undefined}
@@ -471,7 +516,7 @@ function FieldBulkRenameDialog({
                   }}
                   disabled={busy}
                 >
-                  削除
+                  {t('common.delete')}
                 </Button>
               </div>
 
@@ -486,73 +531,79 @@ function FieldBulkRenameDialog({
                     setError(null)
                   }}
                 />
-                サブコレクションを含む
+                {t('explorer.include_subcollections')}
               </label>
 
-              {mode === 'create'
-                ? renderValueInputs(createField, setCreateField, createValue, setCreateValue, 'フィールド名')
-                : mode === 'update'
-                  ? renderValueInputs(
-                      updateFieldName,
-                      setUpdateFieldName,
-                      updateValue,
-                      setUpdateValue,
-                      'フィールド名'
-                    )
-                  : mode === 'rename' ? (
-                    <div className="bulk-actions__update-row">
-                      <AutocompleteInput
-                        className="bulk-actions__field-wrap"
-                        fieldClassName="bulk-actions__input"
-                        value={fromField}
-                        items={fieldItems}
-                        disabled={busy}
-                        autoFocus
-                        placeholder="旧フィールド名"
-                        aria-label="旧フィールド名"
-                        onChange={(nextValue) => {
-                          setFromField(nextValue)
-                          clearPreview()
-                          setError(null)
-                        }}
-                      />
-                      <input
-                        className="bulk-actions__input"
-                        value={toField}
-                        disabled={busy}
-                        placeholder="新フィールド名"
-                        onChange={(event) => {
-                          setToField(event.target.value)
-                          clearPreview()
-                          setError(null)
-                        }}
-                      />
-                    </div>
-                  ) : (
-                    <div className="bulk-actions__update-row">
-                      <AutocompleteInput
-                        className="bulk-actions__field-wrap"
-                        fieldClassName="bulk-actions__input"
-                        value={deleteFieldName}
-                        items={fieldItems}
-                        disabled={busy}
-                        autoFocus
-                        placeholder="削除するフィールド名"
-                        aria-label="削除するフィールド名"
-                        onChange={(nextValue) => {
-                          setDeleteFieldName(nextValue)
-                          clearPreview()
-                          setError(null)
-                        }}
-                      />
-                    </div>
-                  )}
+              {mode === 'create' ? (
+                renderValueInputs(
+                  createField,
+                  setCreateField,
+                  createValue,
+                  setCreateValue,
+                  t('explorer.field_name')
+                )
+              ) : mode === 'update' ? (
+                renderValueInputs(
+                  updateFieldName,
+                  setUpdateFieldName,
+                  updateValue,
+                  setUpdateValue,
+                  t('explorer.field_name')
+                )
+              ) : mode === 'rename' ? (
+                <div className="bulk-actions__update-row">
+                  <AutocompleteInput
+                    className="bulk-actions__field-wrap"
+                    fieldClassName="bulk-actions__input"
+                    value={fromField}
+                    items={fieldItems}
+                    disabled={busy}
+                    autoFocus
+                    placeholder={t('explorer.old_field_name')}
+                    aria-label={t('explorer.old_field_name')}
+                    onChange={(nextValue) => {
+                      setFromField(nextValue)
+                      clearPreview()
+                      setError(null)
+                    }}
+                  />
+                  <input
+                    className="bulk-actions__input"
+                    value={toField}
+                    disabled={busy}
+                    placeholder={t('explorer.new_field_name')}
+                    onChange={(event) => {
+                      setToField(event.target.value)
+                      clearPreview()
+                      setError(null)
+                    }}
+                  />
+                </div>
+              ) : (
+                <div className="bulk-actions__update-row">
+                  <AutocompleteInput
+                    className="bulk-actions__field-wrap"
+                    fieldClassName="bulk-actions__input"
+                    value={deleteFieldName}
+                    items={fieldItems}
+                    disabled={busy}
+                    autoFocus
+                    placeholder={t('explorer.field_to_delete')}
+                    aria-label={t('explorer.field_to_delete')}
+                    onChange={(nextValue) => {
+                      setDeleteFieldName(nextValue)
+                      clearPreview()
+                      setError(null)
+                    }}
+                  />
+                </div>
+              )}
 
               {error && <p className="project-export-dialog__error">{error}</p>}
 
               {preview && preview.skippedCount > 0 && (
                 <p className="project-export-dialog__hint">
-                  衝突のためスキップ予定: {preview.skippedCount} 件
+                  {t('explorer.skip_planned', { count: preview.skippedCount })}
                 </p>
               )}
             </div>
@@ -562,7 +613,7 @@ function FieldBulkRenameDialog({
               {preview && (preview.items.length > 0 || preview.matchedCount > 0) ? (
                 <DiffPreviewPanel items={preview.items} matchedCount={preview.matchedCount} />
               ) : (
-                <p className="project-export-dialog__hint">プレビューすると差分がここに出ます</p>
+                <p className="project-export-dialog__hint">{t('explorer.preview_hint')}</p>
               )}
             </div>
           }
@@ -570,17 +621,17 @@ function FieldBulkRenameDialog({
 
         <div className="project-export-dialog__actions">
           <Button onClick={onClose} disabled={busy}>
-            キャンセル
+            {t('common.cancel')}
           </Button>
           <Button onClick={() => void handlePreview()} disabled={busy || !canPreview}>
-            プレビュー
+            {t('explorer.preview')}
           </Button>
           <Button
             variant={mode === 'delete' ? 'danger' : 'primary'}
             onClick={() => void handleApply()}
             disabled={busy || !canApply}
           >
-            {busy ? '実行中…' : applyLabel}
+            {busy ? t('explorer.running') : applyLabel}
           </Button>
         </div>
       </ResizeFrame>

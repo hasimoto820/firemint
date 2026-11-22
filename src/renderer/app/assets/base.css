@@ -105,3 +105,43 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+/*
+ * 入力欄の共通の見た目。クラスで指定していない入力欄が、ブラウザ既定の白い欄にならないようにする。
+ * :where() で優先度を 0 にしているので、各画面のクラスの指定がそのまま勝つ。
+ */
+:where(
+  input:not([type='checkbox'], [type='radio'], [type='color'], [type='range'], [type='file']),
+  select,
+  textarea
+) {
+  padding: 6px 8px;
+  border: 1px solid var(--ev-c-gray-1);
+  border-radius: 6px;
+  background: var(--ev-c-black-soft);
+  color: var(--ev-c-text-1);
+  font: inherit;
+  font-size: 13px;
+}
+
+:where(input, select, textarea)::placeholder {
+  color: var(--ev-c-text-3);
+}
+
+:where(input, select, textarea):focus-visible {
+  outline: none;
+  border-color: var(--ev-c-project-focus-border);
+}
+
+:where(input, select, textarea):disabled {
+  opacity: 0.6;
+}
+
+:root,
+:root[data-theme='dark'] {
+  color-scheme: dark;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+}

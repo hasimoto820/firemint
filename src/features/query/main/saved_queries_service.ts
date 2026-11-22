@@ -1,3 +1,4 @@
+import { tr } from '@shared/i18n/shared/current'
 import { logError, logInfo } from '@shared/logging/logger'
 import type {
   SavedQuery,
@@ -10,7 +11,7 @@ function toSavedQueryError<T>(error: unknown): SavedQueryResult<T> {
   logError('query:saved', 'operation failed', error)
   return {
     ok: false,
-    error: error instanceof Error ? error.message : 'Saved query operation failed'
+    error: error instanceof Error ? error.message : tr('ui.err_operation_failed')
   }
 }
 
@@ -40,22 +41,20 @@ export async function saveSavedQuery(
   try {
     const name = input.name.trim()
     if (!name) {
-      throw new Error('名前を入力してください')
+      throw new Error(tr('query.err_name_required'))
     }
 
     if (!input.source.trim()) {
-      throw new Error('クエリコードが空です')
+      throw new Error(tr('query.err_empty_code'))
     }
 
     if (!input.projectId.trim()) {
-      throw new Error('projectId がありません')
+      throw new Error(tr('query.err_no_project_id'))
     }
 
     const store = await loadSavedQueriesStore()
     const updatedAt = new Date().toISOString()
-    const existingIndex = input.id
-      ? store.queries.findIndex((query) => query.id === input.id)
-      : -1
+    const existingIndex = input.id ? store.queries.findIndex((query) => query.id === input.id) : -1
 
     let saved: SavedQuery
 
@@ -93,14 +92,14 @@ export async function saveSavedQuery(
 export async function deleteSavedQuery(id: string): Promise<SavedQueryResult<null>> {
   try {
     if (!id.trim()) {
-      throw new Error('id がありません')
+      throw new Error(tr('query.err_no_id'))
     }
 
     const store = await loadSavedQueriesStore()
     const next = store.queries.filter((query) => query.id !== id)
 
     if (next.length === store.queries.length) {
-      throw new Error('保存クエリが見つかりません')
+      throw new Error(tr('query.err_saved_not_found'))
     }
 
     await saveSavedQueriesStore({ version: 1, queries: next })

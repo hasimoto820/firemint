@@ -1,3 +1,4 @@
+import { tr } from '@shared/i18n/shared/current'
 import { useEffect, useState } from 'react'
 import type { TransportDraft } from '@features/transport/shared/transport'
 import type { TransportProgress, TransportValidation } from '@features/transport/shared/types'
@@ -23,13 +24,13 @@ type TransportViewProps = {
 function statusLabel(job: ScriptJobSnapshot): string {
   switch (job.status) {
     case 'running':
-      return '実行中'
+      return tr('dt.status_running')
     case 'succeeded':
-      return '完了'
+      return tr('dt.status_done')
     case 'failed':
-      return '失敗'
+      return tr('dt.status_failed')
     case 'canceled':
-      return '中止'
+      return tr('dt.status_canceled')
   }
 }
 
@@ -78,8 +79,8 @@ function projectOptionLabel(
 ): string {
   const kind = workspaceAuthLabel(entry.authType)
   const name = entry.label !== entry.id ? `${entry.label} — ${entry.id}` : entry.id
-  const readOnly = entry.readOnly ? '（read-only）' : ''
-  const blocked = writeBlockedReasons[entry.id] ? '（Firestore 書込不可）' : ''
+  const readOnly = entry.readOnly ? tr('tp.read_only_suffix') : ''
+  const blocked = writeBlockedReasons[entry.id] ? tr('tp.blocked_suffix') : ''
   return `${kind} · ${name}${readOnly}${blocked}`
 }
 
@@ -165,12 +166,12 @@ function TransportView({
 
   const buildInput = (): Parameters<typeof window.api.transport.validate>[0] | null => {
     if (!destinationId) {
-      setFormError('コピー先のプロジェクトを選んでください')
+      setFormError(t('tp.err_select_dest'))
       return null
     }
 
     if (destinationId === sourceProjectId) {
-      setFormError('コピー先は別のプロジェクトを指定してください')
+      setFormError(t('tp.err_same_project'))
       return null
     }
 
@@ -178,12 +179,12 @@ function TransportView({
       const sourcePath = sourceCollectionPath.trim()
       const destPath = draft.destinationCollectionPath.trim()
       if (!sourcePath) {
-        setFormError('左ツリーでコピー元のコレクションを選んでください')
+        setFormError(t('tp.err_pick_source'))
         return null
       }
 
       if (!destPath) {
-        setFormError('コピー先のコレクションを指定してください')
+        setFormError(t('tp.err_dest_collection'))
         return null
       }
 
@@ -198,7 +199,7 @@ function TransportView({
     }
 
     if (draft.selectedRoots.length === 0) {
-      setFormError('コピーするルートコレクションを選んでください')
+      setFormError(t('tp.err_select_roots'))
       return null
     }
 
@@ -213,7 +214,7 @@ function TransportView({
 
   const ensureDestinationLoaded = async (): Promise<string | null> => {
     if (!destinationId) {
-      setFormError('コピー先のプロジェクトを選んでください')
+      setFormError(t('tp.err_select_dest'))
       return null
     }
 
@@ -269,7 +270,7 @@ function TransportView({
     }
 
     if (destinationLocked) {
-      setFormError(destinationWriteBlockedReason ?? 'このプロジェクトは read-only です')
+      setFormError(destinationWriteBlockedReason ?? t('dt.err_read_only'))
       return
     }
 
@@ -317,13 +318,17 @@ function TransportView({
     draft.selectedRoots.length > 0 &&
     Boolean(destinationId) &&
     !destinationLocked
-  const canStart = !busy && !formDisabled && (draft.target === 'collection' ? canStartCollection : canStartProject)
-  const canValidate = !busy && !formDisabled && Boolean(destinationId) &&
+  const canStart =
+    !busy && !formDisabled && (draft.target === 'collection' ? canStartCollection : canStartProject)
+  const canValidate =
+    !busy &&
+    !formDisabled &&
+    Boolean(destinationId) &&
     (draft.target === 'collection'
       ? Boolean(sourceCollectionPath.trim()) && Boolean(draft.destinationCollectionPath.trim())
       : draft.selectedRoots.length > 0)
   const validateProgressLabel = validateProgress
-    ? `${validateProgress.processedCount} 件 / 衝突 ${validateProgress.skippedCount}${
+    ? `${t('tp.progress', { count: validateProgress.processedCount, collisions: validateProgress.skippedCount })}${
         validateProgress.detail ? ` / ${validateProgress.detail}` : ''
       }`
     : null
@@ -333,233 +338,235 @@ function TransportView({
     <div className="imp-exp-view imp-exp-view--job">
       <JobSplitLayout
         form={
-      <div className="imp-exp-form">
-        <h1 className="imp-exp-form__title">{t('menu.transport')}</h1>
-        <div className="imp-exp-form__toggles">
-          <ToggleBar
-            ariaLabel="対象"
-            value={draft.target}
-            disabled={formDisabled}
-            options={[
-              { id: 'collection', label: t('menu.collection') },
-              { id: 'project', label: t('menu.project') }
-            ]}
-            onChange={(target) => {
-              resetValidation({
-                target,
-                destinationCollectionPath:
-                  target === 'collection'
-                    ? draft.destinationCollectionPath || sourceCollectionPath
-                    : draft.destinationCollectionPath,
-                selectedRoots:
-                  target === 'project' && draft.selectedRoots.length === 0
-                    ? [...sourceRootCollections]
-                    : draft.selectedRoots
-              })
-            }}
-          />
-        </div>
+          <div className="imp-exp-form">
+            <h1 className="imp-exp-form__title">{t('menu.transport')}</h1>
+            <div className="imp-exp-form__toggles">
+              <ToggleBar
+                ariaLabel={t('dt.target')}
+                value={draft.target}
+                disabled={formDisabled}
+                options={[
+                  { id: 'collection', label: t('menu.collection') },
+                  { id: 'project', label: t('menu.project') }
+                ]}
+                onChange={(target) => {
+                  resetValidation({
+                    target,
+                    destinationCollectionPath:
+                      target === 'collection'
+                        ? draft.destinationCollectionPath || sourceCollectionPath
+                        : draft.destinationCollectionPath,
+                    selectedRoots:
+                      target === 'project' && draft.selectedRoots.length === 0
+                        ? [...sourceRootCollections]
+                        : draft.selectedRoots
+                  })
+                }}
+              />
+            </div>
 
-        <p className="imp-exp-form__lead">
-          コピー元は左ツリーの選択です。検証は任意です。衝突したドキュメントはスキップして先に進みます。
-        </p>
+            <p className="imp-exp-form__lead">{t('tp.lead')}</p>
 
-        <div className="imp-exp-form__hint-block">
-          <p className="imp-exp-form__hint">
-            コピー元 · {sourceKindLabel} · {sourceLabel || sourceProjectId}
-          </p>
-          {draft.target === 'collection' ? (
-            <p className="imp-exp-form__hint">
-              コレクション · {sourceCollectionPath || '（左ツリーで選んでください）'}
-            </p>
-          ) : null}
-        </div>
+            <div className="imp-exp-form__hint-block">
+              <p className="imp-exp-form__hint">
+                {t('tp.source')} · {sourceKindLabel} · {sourceLabel || sourceProjectId}
+              </p>
+              {draft.target === 'collection' ? (
+                <p className="imp-exp-form__hint">
+                  {t('explorer.kind_collection')} · {sourceCollectionPath || t('tp.pick_in_tree')}
+                </p>
+              ) : null}
+            </div>
 
-        <label className="imp-exp-form__field">
-          コピー先
-          <select
-            className="bulk-actions__input"
-            value={destinationId}
-            disabled={formDisabled || destinations.length === 0}
-            onChange={(event) => {
-              resetValidation({ destinationProjectId: event.target.value })
-            }}
-          >
-            {destinations.length === 0 ? (
-              <option value="">つながっている別プロジェクトがありません</option>
-            ) : (
-              destinations.map((entry) => (
-                <option key={entry.id} value={entry.id}>
-                  {projectOptionLabel(entry, writeBlockedReasons)}
-                </option>
-              ))
+            <label className="imp-exp-form__field">
+              {t('tp.destination')}
+              <select
+                className="bulk-actions__input"
+                value={destinationId}
+                disabled={formDisabled || destinations.length === 0}
+                onChange={(event) => {
+                  resetValidation({ destinationProjectId: event.target.value })
+                }}
+              >
+                {destinations.length === 0 ? (
+                  <option value="">{t('tp.no_other_projects')}</option>
+                ) : (
+                  destinations.map((entry) => (
+                    <option key={entry.id} value={entry.id}>
+                      {projectOptionLabel(entry, writeBlockedReasons)}
+                    </option>
+                  ))
+                )}
+              </select>
+            </label>
+
+            {draft.target === 'collection' && (
+              <label className="imp-exp-form__field">
+                {t('tp.dest_collection')}
+                <input
+                  className="bulk-actions__input"
+                  value={draft.destinationCollectionPath}
+                  disabled={formDisabled}
+                  placeholder={sourceCollectionPath || 'users'}
+                  aria-label={t('tp.dest_collection_path')}
+                  onChange={(event) => {
+                    resetValidation({ destinationCollectionPath: event.target.value })
+                  }}
+                />
+              </label>
             )}
-          </select>
-        </label>
 
-        {draft.target === 'collection' && (
-          <label className="imp-exp-form__field">
-            コピー先コレクション
-            <input
-              className="bulk-actions__input"
-              value={draft.destinationCollectionPath}
-              disabled={formDisabled}
-              placeholder={sourceCollectionPath || 'users'}
-              aria-label="コピー先コレクション path"
-              onChange={(event) => {
-                resetValidation({ destinationCollectionPath: event.target.value })
-              }}
-            />
-          </label>
-        )}
-
-        {draft.target === 'project' && (
-          <div className="imp-exp-form__roots">
-            {sourceRootCollections.length === 0 ? (
-              <p className="imp-exp-form__hint">ルートコレクションがありません。</p>
-            ) : (
-              <>
-                <label className="imp-exp-form__check">
-                  <input
-                    type="checkbox"
-                    checked={allSelected}
-                    disabled={formDisabled}
-                    onChange={() =>
-                      resetValidation({
-                        selectedRoots: allSelected ? [] : [...sourceRootCollections]
-                      })
-                    }
-                  />
-                  すべて選択（{selectedCount}/{sourceRootCollections.length}）
-                </label>
-                <ul className="imp-exp-form__root-list">
-                  {sourceRootCollections.map((rootId) => (
-                    <li key={rootId}>
-                      <label className="imp-exp-form__check">
-                        <input
-                          type="checkbox"
-                          checked={draft.selectedRoots.includes(rootId)}
-                          disabled={formDisabled}
-                          onChange={() => {
-                            const selected = new Set(draft.selectedRoots)
-                            if (selected.has(rootId)) {
-                              selected.delete(rootId)
-                            } else {
-                              selected.add(rootId)
-                            }
-                            resetValidation({ selectedRoots: Array.from(selected) })
-                          }}
-                        />
-                        {rootId}
-                      </label>
-                    </li>
-                  ))}
-                </ul>
-              </>
+            {draft.target === 'project' && (
+              <div className="imp-exp-form__roots">
+                {sourceRootCollections.length === 0 ? (
+                  <p className="imp-exp-form__hint">{t('dt.no_roots')}</p>
+                ) : (
+                  <>
+                    <label className="imp-exp-form__check">
+                      <input
+                        type="checkbox"
+                        checked={allSelected}
+                        disabled={formDisabled}
+                        onChange={() =>
+                          resetValidation({
+                            selectedRoots: allSelected ? [] : [...sourceRootCollections]
+                          })
+                        }
+                      />
+                      {t('dt.select_all_count', {
+                        selected: selectedCount,
+                        total: sourceRootCollections.length
+                      })}
+                    </label>
+                    <ul className="imp-exp-form__root-list">
+                      {sourceRootCollections.map((rootId) => (
+                        <li key={rootId}>
+                          <label className="imp-exp-form__check">
+                            <input
+                              type="checkbox"
+                              checked={draft.selectedRoots.includes(rootId)}
+                              disabled={formDisabled}
+                              onChange={() => {
+                                const selected = new Set(draft.selectedRoots)
+                                if (selected.has(rootId)) {
+                                  selected.delete(rootId)
+                                } else {
+                                  selected.add(rootId)
+                                }
+                                resetValidation({ selectedRoots: Array.from(selected) })
+                              }}
+                            />
+                            {rootId}
+                          </label>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+              </div>
             )}
+
+            <label className="imp-exp-form__check">
+              <input
+                type="checkbox"
+                checked={draft.includeSubcollections}
+                disabled={formDisabled}
+                onChange={(event) => {
+                  resetValidation({ includeSubcollections: event.target.checked })
+                }}
+              />
+              {t('explorer.include_subcollections')}
+            </label>
+
+            {destinationReadOnly ? (
+              <p className="simple-main__error">{t('dt.read_only_validate_only')}</p>
+            ) : destinationWriteBlockedReason ? (
+              <p className="simple-main__error">{destinationWriteBlockedReason}</p>
+            ) : null}
+
+            {draft.validation && (
+              <p className="imp-exp-form__hint">
+                {t('tp.validation_summary', {
+                  count: draft.validation.documentCount,
+                  writes: draft.validation.writeCount,
+                  collisions: draft.validation.collisionCount
+                })}
+                {draft.validation.collisionSamples.length > 0
+                  ? t('tp.examples', { list: draft.validation.collisionSamples.join(', ') })
+                  : ''}
+              </p>
+            )}
+
+            {validateProgressLabel && busy && (
+              <p className="imp-exp-form__hint">
+                {t('dt.validating_progress', { progress: validateProgressLabel })}
+              </p>
+            )}
+
+            {formError && <p className="simple-main__error">{formError}</p>}
+
+            <div className="imp-exp-form__actions">
+              <Button onClick={() => void handleValidate()} disabled={!canValidate}>
+                {busy && !jobRunning ? t('dt.validating') : t('tp.validate')}
+              </Button>
+              <Button variant="primary" onClick={() => void handleStart()} disabled={!canStart}>
+                {t('tp.run')}
+              </Button>
+            </div>
           </div>
-        )}
-
-        <label className="imp-exp-form__check">
-          <input
-            type="checkbox"
-            checked={draft.includeSubcollections}
-            disabled={formDisabled}
-            onChange={(event) => {
-              resetValidation({ includeSubcollections: event.target.checked })
-            }}
-          />
-          サブコレクションを含む
-        </label>
-
-        {destinationReadOnly ? (
-          <p className="simple-main__error">
-            このプロジェクトは read-only です。検証はできますが、実行はできません。
-          </p>
-        ) : destinationWriteBlockedReason ? (
-          <p className="simple-main__error">{destinationWriteBlockedReason}</p>
-        ) : null}
-
-        {draft.validation && (
-          <p className="imp-exp-form__hint">
-            件数: {draft.validation.documentCount} ／ 書込予定: {draft.validation.writeCount} ／
-            衝突: {draft.validation.collisionCount}
-            {draft.validation.collisionSamples.length > 0
-              ? `（例: ${draft.validation.collisionSamples.join(', ')}）`
-              : ''}
-          </p>
-        )}
-
-        {validateProgressLabel && busy && (
-          <p className="imp-exp-form__hint">検証中 {validateProgressLabel}</p>
-        )}
-
-        {formError && <p className="simple-main__error">{formError}</p>}
-
-        <div className="imp-exp-form__actions">
-          <Button onClick={() => void handleValidate()} disabled={!canValidate}>
-            {busy && !jobRunning ? '検証中…' : '検証'}
-          </Button>
-          <Button variant="primary" onClick={() => void handleStart()} disabled={!canStart}>
-            実行
-          </Button>
-        </div>
-      </div>
         }
         log={
-      job && job.kind === 'transport' ? (
-        <div className="imp-exp-job">
-          <header className="imp-exp-view__header">
-            <p className="simple-main__empty-title">{job.title}</p>
-            <p className={`imp-exp-view__status imp-exp-view__status--${job.status}`}>
-              {statusLabel(job)}
-              {job.detail ? ` · ${job.detail}` : ''}
-            </p>
-          </header>
-
-          <div className="imp-exp-view__progress" aria-label="進捗">
-            <div className="imp-exp-view__progress-bar" style={{ width: `${job.percent}%` }} />
-            <p className="imp-exp-view__progress-label">{job.percent}%</p>
-          </div>
-
-          {job.resultSummary && job.status === 'succeeded' && (
-            <p className="simple-main__success">{job.resultSummary}</p>
-          )}
-          {job.error && job.status === 'failed' && (
-            <p className="simple-main__error">{job.error}</p>
-          )}
-
-          {job.status === 'running' && (
-            <div className="imp-exp-view__actions">
-              <Button onClick={onCancel}>中止</Button>
-            </div>
-          )}
-
-          <section className="imp-exp-view__log" aria-label="ログ">
-            {job.logs.length === 0 ? (
-              <p className="simple-main__empty-hint">ログはまだありません</p>
-            ) : (
-              job.logs.map((line, index) => (
-                <p
-                  key={`${line.at}-${index}`}
-                  className={
-                    line.level === 'error'
-                      ? 'imp-exp-view__log-line imp-exp-view__log-line--error'
-                      : 'imp-exp-view__log-line'
-                  }
-                >
-                  <span className="imp-exp-view__log-time">{formatLogTime(line.at)}</span>
-                  {line.message}
+          job && job.kind === 'transport' ? (
+            <div className="imp-exp-job">
+              <header className="imp-exp-view__header">
+                <p className="simple-main__empty-title">{job.title}</p>
+                <p className={`imp-exp-view__status imp-exp-view__status--${job.status}`}>
+                  {statusLabel(job)}
+                  {job.detail ? ` · ${job.detail}` : ''}
                 </p>
-              ))
-            )}
-          </section>
-        </div>
-      ) : (
-        <p className="simple-main__empty-hint">
-          実行中は別のコレクションタブへ戻れます。進捗とログはここに出ます。
-        </p>
-      )
+              </header>
+
+              <div className="imp-exp-view__progress" aria-label={t('dt.progress')}>
+                <div className="imp-exp-view__progress-bar" style={{ width: `${job.percent}%` }} />
+                <p className="imp-exp-view__progress-label">{job.percent}%</p>
+              </div>
+
+              {job.resultSummary && job.status === 'succeeded' && (
+                <p className="simple-main__success">{job.resultSummary}</p>
+              )}
+              {job.error && job.status === 'failed' && (
+                <p className="simple-main__error">{job.error}</p>
+              )}
+
+              {job.status === 'running' && (
+                <div className="imp-exp-view__actions">
+                  <Button onClick={onCancel}>{t('dt.stop')}</Button>
+                </div>
+              )}
+
+              <section className="imp-exp-view__log" aria-label={t('dt.log')}>
+                {job.logs.length === 0 ? (
+                  <p className="simple-main__empty-hint">{t('dt.no_log')}</p>
+                ) : (
+                  job.logs.map((line, index) => (
+                    <p
+                      key={`${line.at}-${index}`}
+                      className={
+                        line.level === 'error'
+                          ? 'imp-exp-view__log-line imp-exp-view__log-line--error'
+                          : 'imp-exp-view__log-line'
+                      }
+                    >
+                      <span className="imp-exp-view__log-time">{formatLogTime(line.at)}</span>
+                      {line.message}
+                    </p>
+                  ))
+                )}
+              </section>
+            </div>
+          ) : (
+            <p className="simple-main__empty-hint">{t('dt.running_hint')}</p>
+          )
         }
       />
     </div>

@@ -1,3 +1,4 @@
+import { tr } from '@shared/i18n/shared/current'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { app, BrowserWindow, dialog, net, shell } from 'electron'
@@ -75,7 +76,7 @@ async function adoptTokens(tokens: FirebaseTokens): Promise<void> {
 
 async function getIdToken(): Promise<string> {
   if (!currentTokens) {
-    throw new Error('ログインしていません')
+    throw new Error(tr('account.err_not_signed_in'))
   }
   if (currentTokens.expiresAt - Date.now() < TOKEN_REFRESH_MARGIN_MS) {
     await adoptTokens(await refreshTokens(currentTokens.refreshToken))
@@ -235,13 +236,13 @@ export async function purchaseSubscription(): Promise<AccountPurchaseResult> {
   try {
     const { url } = await callFunction<{ url: string }>('windows_createCheckoutSession')
     if (!url.startsWith(CHECKOUT_URL_PREFIX)) {
-      throw new Error('購入画面の URL が正しくありません')
+      throw new Error(tr('account.err_bad_checkout_url'))
     }
     await shell.openExternal(url)
     return { ok: true }
   } catch (error) {
     logWarn('account', 'purchase failed', error)
-    return { ok: false, error: error instanceof Error ? error.message : '購入できませんでした' }
+    return { ok: false, error: error instanceof Error ? error.message : tr('account.err_purchase') }
   }
 }
 
@@ -253,7 +254,7 @@ export async function manageBilling(): Promise<AccountManageBillingResult> {
   try {
     const { url } = await callFunction<{ url: string }>('windows_createPortalSession')
     if (!url.startsWith(PORTAL_URL_PREFIX)) {
-      throw new Error('支払いの管理画面の URL が正しくありません')
+      throw new Error(tr('account.err_bad_portal_url'))
     }
     await shell.openExternal(url)
     return { ok: true }
@@ -318,7 +319,7 @@ export async function addAccountMember(email: string): Promise<AccountMemberResu
     return { ok: true }
   } catch (error) {
     logWarn('account', 'addMember failed', error)
-    return { ok: false, error: functionErrorMessage(error, '追加できませんでした') }
+    return { ok: false, error: functionErrorMessage(error, tr('account.err_add_member')) }
   }
 }
 
@@ -330,7 +331,7 @@ export async function removeAccountMember(memberId: string): Promise<AccountMemb
     return { ok: true }
   } catch (error) {
     logWarn('account', 'removeMember failed', error)
-    return { ok: false, error: functionErrorMessage(error, '外せませんでした') }
+    return { ok: false, error: functionErrorMessage(error, tr('account.err_remove_member')) }
   }
 }
 
@@ -342,14 +343,14 @@ export async function removeAccountMember(memberId: string): Promise<AccountMemb
 export async function leaveAccount(): Promise<AccountMemberResult> {
   const uid = currentTokens?.uid
   if (!uid) {
-    return { ok: false, error: 'ログインしていません' }
+    return { ok: false, error: tr('account.err_not_signed_in') }
   }
   try {
     await callFunction('removeMember', { uid })
     logInfo('account', 'left account')
   } catch (error) {
     logWarn('account', 'leave account failed', error)
-    return { ok: false, error: functionErrorMessage(error, '脱退できませんでした') }
+    return { ok: false, error: functionErrorMessage(error, tr('account.err_leave')) }
   }
 
   // ここから先は、抜けた後の後始末。失敗しても、脱退そのものは済んでいる
@@ -636,7 +637,7 @@ export function getAccountStatus(): AccountStatus {
 export async function signInWithGoogle(): Promise<AccountSignInResult> {
   try {
     if (!currentTokens || currentEmail) {
-      throw new Error('今の状態では Google ログインできません')
+      throw new Error(tr('account.err_google_unavailable'))
     }
 
     const googleIdToken = await requestGoogleIdToken()
@@ -655,7 +656,7 @@ export async function signInWithGoogle(): Promise<AccountSignInResult> {
       }
       const switched = await signInWithGoogleIdToken(googleIdToken)
       if (!switched) {
-        throw new Error('Google でログインできませんでした')
+        throw new Error(tr('account.err_google_sign_in'))
       }
       await adoptTokens(switched)
       currentCache = await registerDevice(switched.uid)
@@ -671,7 +672,7 @@ export async function signInWithGoogle(): Promise<AccountSignInResult> {
     logWarn('account', 'google sign-in failed', error)
     return {
       ok: false,
-      error: error instanceof Error ? error.message : 'Google ログインに失敗しました'
+      error: error instanceof Error ? error.message : tr('account.err_google_sign_in_failed')
     }
   }
 }

@@ -1,3 +1,4 @@
+import { useI18n } from '@shared/i18n/renderer/I18nProvider'
 import { useState } from 'react'
 import { useFieldAutocompleteItems } from '@features/autocomplete/renderer/hooks'
 import type { DiffPreviewItem } from '@features/bulk_operations/shared/types'
@@ -33,6 +34,7 @@ function BulkActionsPanel({
   onOperationComplete,
   onError
 }: BulkActionsPanelProps): React.JSX.Element | null {
+  const { t } = useI18n()
   const [field, setField] = useState('')
   const [value, setValue] = useState('')
   const [previewItems, setPreviewItems] = useState<DiffPreviewItem[] | null>(null)
@@ -73,7 +75,7 @@ function BulkActionsPanel({
 
   const handleApplyUpdate = async (): Promise<void> => {
     if (!previewItems || previewItems.length === 0) {
-      onError('先にプレビューを実行してください')
+      onError(t('explorer.preview_first'))
       return
     }
 
@@ -139,26 +141,33 @@ function BulkActionsPanel({
   return (
     <section className="bulk-actions">
       <div className="bulk-actions__header">
-        <h3 className="bulk-actions__title">{selectedPaths.length} 件選択中</h3>
+        <h3 className="bulk-actions__title">
+          {t('ui.selected_count', { count: selectedPaths.length })}
+        </h3>
         <Button onClick={onClearSelection} disabled={loading}>
-          選択解除
+          {t('ui.clear_selection')}
         </Button>
       </div>
 
-      <p className="bulk-actions__batch">バッチ: {formatBatchMessage(selectedPaths.length)}</p>
+      <p className="bulk-actions__batch">
+        {t('ui.batch_label', { info: formatBatchMessage(selectedPaths.length) })}
+      </p>
 
       <div className="bulk-actions__delete">
         <Button variant="danger" onClick={() => void handleDelete()} disabled={loading}>
-          削除
+          {t('common.delete')}
         </Button>
         <span className="bulk-actions__cost">
-          書込 {deleteEstimate.writeCount} 件 / {deleteEstimate.batchCount} バッチ / 概算{' '}
-          {formatCostUsd(deleteEstimate.estimatedCostUsd)}
+          {t('ui.delete_cost', {
+            writes: deleteEstimate.writeCount,
+            batches: deleteEstimate.batchCount,
+            cost: formatCostUsd(deleteEstimate.estimatedCostUsd)
+          })}
         </span>
       </div>
 
       <div className="bulk-actions__update">
-        <h4 className="bulk-actions__subtitle">フィールド一括更新</h4>
+        <h4 className="bulk-actions__subtitle">{t('ui.bulk_update_title')}</h4>
         <div className="bulk-actions__update-row">
           <AutocompleteInput
             className="bulk-actions__field-wrap"
@@ -167,7 +176,7 @@ function BulkActionsPanel({
             items={fieldItems}
             disabled={loading}
             placeholder="field"
-            aria-label="一括更新するフィールド名"
+            aria-label={t('ui.bulk_update_field_aria')}
             onChange={(next) => {
               setField(next)
               setPreviewItems(null)
@@ -180,24 +189,28 @@ function BulkActionsPanel({
               setValue(event.target.value)
               setPreviewItems(null)
             }}
-            placeholder='value（例: "new", 123, true, null）'
+            placeholder={t('ui.bulk_value_placeholder')}
             disabled={loading}
           />
           <Button onClick={() => void handlePreview()} disabled={loading || !field.trim()}>
-            プレビュー
+            {t('ui.preview')}
           </Button>
           <Button
             variant="primary"
             onClick={() => void handleApplyUpdate()}
             disabled={loading || !previewItems?.length}
           >
-            一括更新
+            {t('ui.bulk_update')}
           </Button>
         </div>
         <p className="bulk-actions__cost">
-          プレビュー: 読取 {previewEstimate.readCount} 件 / 概算{' '}
-          {formatCostUsd(previewEstimate.estimatedCostUsd)} — 更新: 書込 {updateEstimate.writeCount}{' '}
-          件 / {updateEstimate.batchCount} バッチ / 概算 {formatCostUsd(updateEstimate.estimatedCostUsd)}
+          {t('ui.update_cost', {
+            reads: previewEstimate.readCount,
+            previewCost: formatCostUsd(previewEstimate.estimatedCostUsd),
+            writes: updateEstimate.writeCount,
+            batches: updateEstimate.batchCount,
+            cost: formatCostUsd(updateEstimate.estimatedCostUsd)
+          })}
         </p>
       </div>
 

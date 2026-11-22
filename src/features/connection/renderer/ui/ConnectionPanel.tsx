@@ -1,3 +1,4 @@
+import { useI18n } from '@shared/i18n/renderer/I18nProvider'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ConnectResult, ConnectionStatus } from '@features/connection/shared/types'
 import { workspaceAuthLabel, type WorkspaceState } from '@features/workspace/shared/types'
@@ -16,6 +17,7 @@ function ConnectionPanel({
   onRequestGoogleConnect,
   refreshToken = 0
 }: ConnectionPanelProps): React.JSX.Element {
+  const { t } = useI18n()
   const [mode, setMode] = useState<ConnectMode>('list')
   const [workspace, setWorkspace] = useState<WorkspaceState | null>(null)
   const [selectedFile, setSelectedFile] = useState<string | null>(null)
@@ -81,7 +83,7 @@ function ConnectionPanel({
       await refreshWorkspace()
       onConnected?.()
     } catch (error) {
-      setError(error instanceof Error ? error.message : '接続に失敗しました')
+      setError(error instanceof Error ? error.message : t('conn.err_connect'))
     } finally {
       setLoading(false)
     }
@@ -89,7 +91,7 @@ function ConnectionPanel({
 
   const handleJsonConnect = async (): Promise<void> => {
     if (!selectedFile) {
-      setError('サービスアカウント JSON を選択してください')
+      setError(t('conn.err_select_sa'))
       return
     }
 
@@ -100,7 +102,7 @@ function ConnectionPanel({
       const result = await window.api.connection.connect(selectedFile)
       await applyConnectResult(result)
     } catch (error) {
-      setError(error instanceof Error ? error.message : '接続に失敗しました')
+      setError(error instanceof Error ? error.message : t('conn.err_connect'))
       setStatus(null)
       setRootCollections([])
     } finally {
@@ -130,7 +132,7 @@ function ConnectionPanel({
   return (
     <section className="connection-panel">
       <h1 className="connection-panel__brand">FireMint</h1>
-      <p className="connection-panel__lead">Firestore に接続</p>
+      <p className="connection-panel__lead">{t('conn.connect_lead')}</p>
 
       <div className="connection-panel__mode">
         <button
@@ -143,7 +145,7 @@ function ConnectionPanel({
           onClick={() => setMode('list')}
           disabled={loading}
         >
-          リスト
+          {t('conn.list')}
         </button>
         <button
           type="button"
@@ -167,17 +169,15 @@ function ConnectionPanel({
           onClick={() => setMode('json')}
           disabled={loading}
         >
-          サービスアカウント JSON
+          {t('conn.sa_json')}
         </button>
       </div>
 
       {mode === 'list' && (
         <div className="connection-panel__list">
-          <p className="connection-panel__hint">登録済みをクリックして接続します。</p>
+          <p className="connection-panel__hint">{t('conn.click_to_connect')}</p>
           {entries.length === 0 ? (
-            <p className="connection-panel__empty">
-              登録済みがありません。Google またはサービスアカウント JSON で接続してください。
-            </p>
+            <p className="connection-panel__empty">{t('conn.no_saved')}</p>
           ) : (
             <ul className="workspace-panel__list">
               {entries.map((entry) => {
@@ -221,14 +221,14 @@ function ConnectionPanel({
       {mode === 'json' && (
         <div className="connection-panel__actions">
           <button type="button" onClick={() => void handleSelectFile()} disabled={loading}>
-            JSON を選択
+            {t('conn.select_json')}
           </button>
           <button
             type="button"
             onClick={() => void handleJsonConnect()}
             disabled={loading || !selectedFile}
           >
-            接続
+            {t('conn.connect')}
           </button>
         </div>
       )}
@@ -240,7 +240,7 @@ function ConnectionPanel({
             onClick={() => onRequestGoogleConnect?.()}
             disabled={loading || !onRequestGoogleConnect}
           >
-            接続
+            {t('conn.connect')}
           </button>
         </div>
       )}
@@ -248,35 +248,35 @@ function ConnectionPanel({
       {status && (
         <div className="connection-panel__actions">
           <button type="button" onClick={() => void handleDisconnect()} disabled={loading}>
-            切断
+            {t('common.disconnect')}
           </button>
         </div>
       )}
 
       {mode === 'json' && selectedFile && (
-        <p className="connection-panel__file">選択: {selectedFile}</p>
+        <p className="connection-panel__file">{t('conn.selected', { file: selectedFile })}</p>
       )}
-      {loading && <p className="connection-panel__loading">接続中...</p>}
+      {loading && <p className="connection-panel__loading">{t('conn.connecting')}</p>}
       {error && <p className="connection-panel__error">{error}</p>}
 
       {status && (
         <div className="connection-panel__status">
           <p>
-            プロジェクト: <strong>{status.projectId}</strong>
+            {t('conn.project_label')} <strong>{status.projectId}</strong>
           </p>
           <p>
             {status.authType === 'emulator'
               ? 'Emulator'
               : status.authType === 'google'
-                ? 'Google アカウント'
-                : 'サービスアカウント'}
+                ? t('conn.google_account')
+                : t('conn.service_account')}
             : {status.clientEmail}
           </p>
           {status.writeBlockedReason && (
             <p className="connection-panel__warning">{status.writeBlockedReason}</p>
           )}
           <div>
-            <p>ルートコレクション ({rootCollections.length})</p>
+            <p>{t('conn.root_collections', { count: rootCollections.length })}</p>
             {rootCollections.length > 0 ? (
               <ul>
                 {rootCollections.map((name) => (
@@ -284,7 +284,7 @@ function ConnectionPanel({
                 ))}
               </ul>
             ) : (
-              <p>（コレクションなし、または権限不足）</p>
+              <p>{t('conn.no_collections_or_permission')}</p>
             )}
           </div>
         </div>

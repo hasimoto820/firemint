@@ -1,3 +1,4 @@
+import { tr } from '@shared/i18n/shared/current'
 import { createWriteStream, type WriteStream } from 'fs'
 import { mkdir, mkdtemp, rename, rm, writeFile } from 'fs/promises'
 import { tmpdir } from 'os'
@@ -31,12 +32,12 @@ const PAGE_SIZE = 500
 const FLUSH_BYTES = 1024 * 1024
 
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : 'エクスポートに失敗しました'
+  return error instanceof Error ? error.message : tr('dt.err_export_failed')
 }
 
 function ensureConnected(projectId: string): void {
   if (!isFirestoreConnected(projectId)) {
-    throw new Error(`Firestore is not connected: ${projectId}`)
+    throw new Error(tr('ui.err_not_connected', { projectId: projectId }))
   }
 }
 
@@ -91,10 +92,10 @@ function defaultExportDirectory(): string {
 function normalizeFileName(fileName: string, format: TransferFormat): string {
   const trimmed = fileName.trim()
   if (!trimmed) {
-    throw new Error('ファイル名を入れてください')
+    throw new Error(tr('dt.err_file_name_required'))
   }
   if (/[\\/:*?"<>|]/.test(trimmed)) {
-    throw new Error('ファイル名に使えない文字があります（\\ / : * ? " < > |）')
+    throw new Error(tr('dt.err_file_name_chars'))
   }
   const ext = `.${extensionOf(format)}`
   return trimmed.toLowerCase().endsWith(ext) ? trimmed : `${trimmed}${ext}`
@@ -123,10 +124,10 @@ export async function chooseExportPath(
   const format = input.format ?? 'official'
   const ext = extensionOf(format)
   const options = {
-    title: format === 'jsonl' ? 'JSON を保存' : 'ZIP を保存',
+    title: format === 'jsonl' ? tr('dt.save_json') : tr('dt.save_zip'),
     defaultPath: defaultExportPath(input),
     // 押してもまだ保存しない（保存はエクスポートの時）ので「選択」
-    buttonLabel: '選択',
+    buttonLabel: tr('dt.select'),
     filters: [{ name: format === 'jsonl' ? 'JSON Lines' : 'ZIP', extensions: [ext] }]
   }
 
@@ -219,7 +220,7 @@ async function* iterateScope(
   if (input.kind === 'group') {
     const collectionId = input.collectionId?.trim()
     if (!collectionId) {
-      throw new Error('グループ名（コレクション ID）を指定してください')
+      throw new Error(tr('dt.err_group_required'))
     }
     yield* iterateGroup(db, collectionId, signal)
     return
@@ -228,7 +229,7 @@ async function* iterateScope(
   if (input.kind === 'collection') {
     const collectionPath = input.collectionPath?.trim()
     if (!collectionPath) {
-      throw new Error('コレクション path を指定してください')
+      throw new Error(tr('explorer.err_collection_path_required'))
     }
     yield* iterateCollection(db, collectionPath, input.includeSubcollections ?? false, signal)
     return
@@ -236,7 +237,7 @@ async function* iterateScope(
 
   const roots = input.rootCollectionIds ?? []
   if (roots.length === 0) {
-    throw new Error('エクスポートするルートコレクションを選んでください')
+    throw new Error(tr('dt.err_select_roots'))
   }
   for (const rootId of roots) {
     yield* iterateCollection(db, rootId, input.includeSubcollections ?? true, signal)
@@ -345,7 +346,7 @@ export async function exportOfficialDump(
       processedCount: 0,
       totalCount: 0,
       percent: 5,
-      detail: 'ドキュメントを読み込み中…'
+      detail: tr('dt.reading_documents')
     })
 
     const projectId = exportProjectId(input.projectId)
@@ -404,7 +405,7 @@ export async function exportOfficialDump(
     sink = null
 
     if (documentCount === 0) {
-      throw new Error('エクスポートするドキュメントがありません')
+      throw new Error(tr('dt.err_nothing_to_export'))
     }
 
     onProgress?.({
@@ -444,7 +445,7 @@ export async function exportOfficialDump(
     logError('data_transfer:export', 'export failed', error)
     return {
       ok: false,
-      error: canceled ? 'エクスポートをキャンセルしました' : errorMessage(error),
+      error: canceled ? tr('dt.export_canceled') : errorMessage(error),
       canceled
     }
   } finally {

@@ -1,3 +1,4 @@
+import { useI18n } from '@shared/i18n/renderer/I18nProvider'
 import Button from '@shared/ui/Button'
 import type { SavedQuery } from '@features/query/shared/types'
 
@@ -28,6 +29,7 @@ function SavedQueriesBar({
   onSave,
   onDelete
 }: SavedQueriesBarProps): React.JSX.Element {
+  const { t } = useI18n()
   return (
     <div className="saved-queries-bar">
       <label className="saved-queries-bar__label">
@@ -37,9 +39,9 @@ function SavedQueriesBar({
           value={selectedId ?? ''}
           disabled={loading}
           onChange={(event) => onSelect(event.target.value || null)}
-          aria-label="保存済みクエリ"
+          aria-label={t('query.saved_queries')}
         >
-          <option value="">（新規 / 選択）</option>
+          <option value="">{t('query.new_or_select')}</option>
           {queries.map((query) => (
             <option key={query.id} value={query.id}>
               {query.name}
@@ -48,25 +50,25 @@ function SavedQueriesBar({
         </select>
       </label>
       <label className="saved-queries-bar__label">
-        名前
+        {t('query.name')}
         <input
           className="saved-queries-bar__name"
           value={name}
           disabled={loading}
-          placeholder="保存名"
+          placeholder={t('query.save_name')}
           onChange={(event) => onNameChange(event.target.value)}
-          aria-label="保存名"
+          aria-label={t('query.save_name')}
         />
       </label>
       <div className="saved-queries-bar__actions">
         <Button disabled={loading || !selectedId} onClick={onLoad}>
-          読込
+          {t('query.load')}
         </Button>
         <Button disabled={loading} onClick={onSave}>
-          保存
+          {t('common.save')}
         </Button>
         <Button disabled={loading || !selectedId} onClick={onDelete}>
-          削除
+          {t('common.delete')}
         </Button>
       </div>
     </div>

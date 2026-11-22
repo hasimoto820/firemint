@@ -1,14 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import {
-  AutocompleteProvider,
-  useAutocompleteApi
-} from '@features/autocomplete/renderer/hooks'
+import { AutocompleteProvider, useAutocompleteApi } from '@features/autocomplete/renderer/hooks'
 import type { BulkFieldMode } from '@features/bulk_operations/shared/types'
 import AuthUsersView from '@features/auth_users/renderer/ui/AuthUsersView'
-import {
-  isFirestoreWriteDisabled,
-  type ConnectionStatus
-} from '@features/connection/shared/types'
+import { isFirestoreWriteDisabled, type ConnectionStatus } from '@features/connection/shared/types'
 import type { WorkspaceEntry } from '@features/workspace/shared/types'
 import type { EmulatorPageMode } from '@features/emulator/shared/types'
 import { DEFAULT_EMULATOR_HOST } from '@features/connection/shared/emulator'
@@ -190,9 +184,9 @@ function FirestorePageInner({
     null
   )
   const [duplicateDocumentPath, setDuplicateDocumentPath] = useState<string | null>(null)
-  const [createSubcollectionDocumentPath, setCreateSubcollectionDocumentPath] = useState<string | null>(
-    null
-  )
+  const [createSubcollectionDocumentPath, setCreateSubcollectionDocumentPath] = useState<
+    string | null
+  >(null)
   const [deleteSubcollectionPath, setDeleteSubcollectionPath] = useState<string | null>(null)
   const [dialogProjectId, setDialogProjectId] = useState(projectId)
   const [impExpJob, setImpExpJob] = useState<ScriptJobSnapshot | null>(null)
@@ -200,8 +194,7 @@ function FirestorePageInner({
   const [transportDraft, setTransportDraft] = useState<TransportDraft>(() => createTransportDraft())
   const [diffDraft, setDiffDraft] = useState<DiffDraft>(() => createDiffDraft())
   const [lastCollectionPath, setLastCollectionPath] = useState('')
-  const [emulatorImpExpMode, setEmulatorImpExpMode] =
-    useState<EmulatorPageMode>('import-project')
+  const [emulatorImpExpMode, setEmulatorImpExpMode] = useState<EmulatorPageMode>('import-project')
   const lastCollectionPathRef = useRef<string | null>(null)
   const impExpJobRef = useRef<ScriptJobSnapshot | null>(null)
   impExpJobRef.current = impExpJob
@@ -350,10 +343,7 @@ function FirestorePageInner({
       return
     }
 
-    if (
-      impExpJob.kind !== 'import_official' &&
-      impExpJob.kind !== 'transport'
-    ) {
+    if (impExpJob.kind !== 'import_official' && impExpJob.kind !== 'transport') {
       return
     }
 
@@ -688,8 +678,8 @@ function FirestorePageInner({
       const segments = trimmed.split('/').filter(Boolean)
 
       if (segments.length === 0 || segments.length % 2 !== 0) {
-        await confirmAction(`ドキュメント path が不正です: ${documentPath}`, {
-          confirmLabel: '閉じる'
+        await confirmAction(t('ui.err_bad_document_path', { path: documentPath }), {
+          confirmLabel: t('ui.close')
         })
         return
       }
@@ -701,8 +691,8 @@ function FirestorePageInner({
 
       const result = await window.api.explorer.getDocument(targetProjectId, trimmed)
       if (!result.ok) {
-        await confirmAction(result.error || 'ドキュメントを開けません', {
-          confirmLabel: '閉じる'
+        await confirmAction(result.error || t('ui.err_open_document'), {
+          confirmLabel: t('ui.close')
         })
         return
       }
@@ -713,7 +703,7 @@ function FirestorePageInner({
         projectId: targetProjectId
       })
     },
-    [openCollection, projectId]
+    [openCollection, projectId, t]
   )
 
   const handleRequestDuplicateDocument = useCallback(
@@ -727,7 +717,10 @@ function FirestorePageInner({
         return
       }
 
-      openCollection(collectionPath, { selectedDocumentPath: documentPath, projectId: targetProjectId })
+      openCollection(collectionPath, {
+        selectedDocumentPath: documentPath,
+        projectId: targetProjectId
+      })
       setDialogProjectId(targetProjectId)
       setDuplicateDocumentPath(documentPath)
     },
@@ -793,7 +786,10 @@ function FirestorePageInner({
         return
       }
 
-      openCollection(collectionPath, { selectedDocumentPath: documentPath, projectId: targetProjectId })
+      openCollection(collectionPath, {
+        selectedDocumentPath: documentPath,
+        projectId: targetProjectId
+      })
       setDialogProjectId(targetProjectId)
       setCreateSubcollectionDocumentPath(documentPath)
     },
@@ -815,7 +811,7 @@ function FirestorePageInner({
       }
 
       if (outcome.status === 'error') {
-        await confirmAction(outcome.error, { confirmLabel: '閉じる' })
+        await confirmAction(outcome.error, { confirmLabel: t('ui.close') })
         return
       }
 
@@ -829,7 +825,7 @@ function FirestorePageInner({
         projectId: targetProjectId
       })
     },
-    [autocomplete, isReadOnlyProject, loadRootCollections, openCollection, projectId]
+    [autocomplete, isReadOnlyProject, loadRootCollections, openCollection, projectId, t]
   )
 
   const handleRequestDeleteSubcollection = useCallback(
@@ -929,13 +925,13 @@ function FirestorePageInner({
       const kindLabel = collectionKindLabel(collectionPath)
 
       await confirmAction(
-        `ドキュメントが無くなったため、${kindLabel}「${collectionName}」はツリーから外れました`,
-        { confirmLabel: '閉じる' }
+        t('ui.collection_became_empty', { kind: kindLabel, name: collectionName }),
+        { confirmLabel: t('ui.close') }
       )
 
       handleSubcollectionDeleted(collectionPath, targetProjectId)
     },
-    [dialogProjectId, handleSubcollectionDeleted]
+    [dialogProjectId, handleSubcollectionDeleted, t]
   )
 
   const handleRequestDeleteDocument = useCallback(
@@ -944,7 +940,7 @@ function FirestorePageInner({
         return
       }
 
-      if (!(await confirmAction('このドキュメントを削除しますか？'))) {
+      if (!(await confirmAction(t('explorer.delete_document_confirm')))) {
         return
       }
 
@@ -956,7 +952,7 @@ function FirestorePageInner({
       const result = await window.api.explorer.deleteDocument(targetProjectId, documentPath)
 
       if (!result.ok) {
-        await confirmAction(result.error, { confirmLabel: '閉じる' })
+        await confirmAction(result.error, { confirmLabel: t('ui.close') })
         return
       }
 
@@ -972,16 +968,13 @@ function FirestorePageInner({
       setCollectionDataReloadToken((token) => token + 1)
       openCollection(collectionPath, { selectedDocumentPath: null, projectId: targetProjectId })
     },
-    [handleCollectionBecameEmpty, isReadOnlyProject, openCollection, projectId]
+    [handleCollectionBecameEmpty, isReadOnlyProject, openCollection, projectId, t]
   )
 
   const handleCollectionCreated = useCallback(
     (collectionPath: string, documentId: string): void => {
       autocomplete.addCollectionPaths(dialogProjectId, [collectionPath])
-      const reload =
-        dialogProjectId === projectId
-          ? loadRootCollections()
-          : Promise.resolve()
+      const reload = dialogProjectId === projectId ? loadRootCollections() : Promise.resolve()
       void reload.then(() => {
         openCollection(collectionPath, {
           selectedDocumentPath: `${collectionPath}/${documentId}`,
@@ -1015,8 +1008,11 @@ function FirestorePageInner({
         setImpExpDraft((current) => ({
           ...current,
           collectionPath:
-            remapFirestorePath(current.collectionPath, sourceCollectionPath, targetCollectionPath) ??
-            current.collectionPath
+            remapFirestorePath(
+              current.collectionPath,
+              sourceCollectionPath,
+              targetCollectionPath
+            ) ?? current.collectionPath
         }))
       }
 
@@ -1084,13 +1080,13 @@ function FirestorePageInner({
       return true
     }
 
-    const accepted = await confirmAction('Imp/Exp の処理中です。中止してタブを閉じますか？')
+    const accepted = await confirmAction(t('ui.impexp_running_close'))
     if (accepted) {
       void window.api.scriptRunner.cancel()
     }
 
     return accepted
-  }, [])
+  }, [t])
 
   const handleCancelImpExp = useCallback((): void => {
     void window.api.scriptRunner.cancel()
@@ -1135,17 +1131,20 @@ function FirestorePageInner({
     []
   )
 
-  const handleCreateGroup = useCallback((pane: WorkspacePaneId, tabId: string): void => {
-    setTabGroups((current) => {
-      const group = createTabGroup(
-        pane,
-        nextTabGroupColor(current.filter((item) => item.pane === pane)),
-        nextGroupSerialTitle(current, t('tab.group'))
-      )
-      setTabs((tabsCurrent) => assignTabGroup(tabsCurrent, pane, tabId, group.id))
-      return [...current, group]
-    })
-  }, [t])
+  const handleCreateGroup = useCallback(
+    (pane: WorkspacePaneId, tabId: string): void => {
+      setTabGroups((current) => {
+        const group = createTabGroup(
+          pane,
+          nextTabGroupColor(current.filter((item) => item.pane === pane)),
+          nextGroupSerialTitle(current, t('tab.group'))
+        )
+        setTabs((tabsCurrent) => assignTabGroup(tabsCurrent, pane, tabId, group.id))
+        return [...current, group]
+      })
+    },
+    [t]
+  )
 
   const handleJoinGroup = useCallback(
     (pane: WorkspacePaneId, tabId: string, groupId: string): void => {
@@ -1204,7 +1203,9 @@ function FirestorePageInner({
       setTabGroups((current) => current.filter((group) => group.id !== groupId))
 
       if (pane === 'primary') {
-        setPrimaryActiveId((active) => (active && ids.has(active) ? (neighbor?.id ?? null) : active))
+        setPrimaryActiveId((active) =>
+          active && ids.has(active) ? (neighbor?.id ?? null) : active
+        )
       } else {
         setSecondaryActiveId((active) =>
           active && ids.has(active) ? (neighbor?.id ?? null) : active
@@ -1342,8 +1343,7 @@ function FirestorePageInner({
       closeOtherTabs: handleCloseOtherTabs,
       canCloseTab: Boolean(focusedActiveId),
       canCloseOtherTabs:
-        Boolean(focusedTab) &&
-        tabsInPane(tabs, focusedTab?.pane ?? 'primary').length > 1,
+        Boolean(focusedTab) && tabsInPane(tabs, focusedTab?.pane ?? 'primary').length > 1,
       splitEnabled,
       impExpActive: Boolean(
         focusedTab && (isImpExpTab(focusedTab) || isEmulatorImpExpTab(focusedTab))
@@ -1393,40 +1393,37 @@ function FirestorePageInner({
     [updateTab]
   )
 
-  const handlePaneCollectionChange = useCallback(
-    (tabId: string, collectionPath: string): void => {
-      setTabs((current) =>
-        current.map((tab) =>
-          tab.id === tabId
-            ? retargetCollectionTab(tab, {
-                projectId: tab.projectId,
-                collectionPath,
-                selectedDocumentPath: null
-              })
-            : tab
-        )
+  const handlePaneCollectionChange = useCallback((tabId: string, collectionPath: string): void => {
+    setTabs((current) =>
+      current.map((tab) =>
+        tab.id === tabId
+          ? retargetCollectionTab(tab, {
+              projectId: tab.projectId,
+              collectionPath,
+              selectedDocumentPath: null
+            })
+          : tab
       )
-    },
-    []
-  )
+    )
+  }, [])
 
   const paletteItems = useMemo((): CommandPaletteItem[] => {
     const items: CommandPaletteItem[] = [
       {
         id: 'view-simple',
-        group: '表示',
-        label: 'Simple モード',
+        group: t('ui.grp_view'),
+        label: t('ui.simple_mode'),
         run: () => onNavigate('simple')
       },
       {
         id: 'view-query',
-        group: '表示',
-        label: 'Query モード',
+        group: t('ui.grp_view'),
+        label: t('ui.query_mode'),
         run: () => onNavigate('query')
       },
       {
         id: 'open-imp-exp',
-        group: 'タブ',
+        group: t('ui.grp_tab'),
         label: IMP_EXP_TAB_LABEL,
         detail: 'Import / Export',
         run: () => {
@@ -1439,28 +1436,28 @@ function FirestorePageInner({
       },
       {
         id: 'open-transport',
-        group: 'タブ',
+        group: t('ui.grp_tab'),
         label: TRANSPORT_TAB_LABEL,
-        detail: 'プロジェクト間コピー',
+        detail: t('ui.copy_between_projects'),
         run: () => openTransport()
       },
       {
         id: 'open-diff',
-        group: 'タブ',
+        group: t('ui.grp_tab'),
         label: DIFF_TAB_LABEL,
-        detail: 'コレクション ↔ JSON',
+        detail: t('ui.collection_json'),
         run: () => openDiff()
       },
       {
         id: 'toggle-split',
-        group: 'レイアウト',
-        label: splitEnabled ? 'Split View を解除' : 'Split View を開く',
+        group: t('ui.grp_layout'),
+        label: splitEnabled ? t('ui.split_close') : t('ui.split_open'),
         run: () => handleToggleSplit()
       },
       {
         id: 'close-tab',
-        group: 'タブ',
-        label: 'アクティブタブを閉じる',
+        group: t('ui.grp_tab'),
+        label: t('ui.close_active_tab'),
         run: () => {
           if (focusedActiveId) {
             handleCloseTab(focusedActiveId)
@@ -1469,8 +1466,8 @@ function FirestorePageInner({
       },
       {
         id: 'close-other-tabs',
-        group: 'タブ',
-        label: '他のタブを閉じる（同じペイン）',
+        group: t('ui.grp_tab'),
+        label: t('ui.close_other_tabs_pane'),
         run: () => handleCloseOtherTabs()
       }
     ]
@@ -1478,9 +1475,9 @@ function FirestorePageInner({
     for (const collection of rootCollections) {
       items.push({
         id: `open-root-${collection}`,
-        group: 'コレクション',
+        group: t('explorer.kind_collection'),
         label: collection,
-        detail: 'フォーカス中ペインで開く',
+        detail: t('ui.open_in_focused_pane'),
         run: () => openCollection(collection)
       })
     }
@@ -1492,7 +1489,7 @@ function FirestorePageInner({
       )
       items.push({
         id: `focus-tab-${tab.id}`,
-        group: '開いているタブ',
+        group: t('ui.grp_open_tabs'),
         label,
         detail: isImpExpTab(tab)
           ? IMP_EXP_TAB_LABEL
@@ -1502,7 +1499,10 @@ function FirestorePageInner({
               ? TRANSPORT_TAB_LABEL
               : isDiffTab(tab)
                 ? DIFF_TAB_LABEL
-                : `${tab.collectionPath}（${tab.pane === 'primary' ? '左' : '右'}）`,
+                : t('ui.path_in_pane', {
+                    path: tab.collectionPath,
+                    pane: tab.pane === 'primary' ? t('ui.left') : t('ui.right')
+                  }),
         run: () => activateInPane(tab.id, tab.pane)
       })
 
@@ -1510,7 +1510,7 @@ function FirestorePageInner({
         items.push({
           id: `move-right-${tab.id}`,
           group: 'Split',
-          label: `右ペインへ移す: ${label}`,
+          label: t('ui.move_to_right', { label }),
           detail: isImpExpTab(tab)
             ? IMP_EXP_TAB_LABEL
             : isEmulatorImpExpTab(tab)
@@ -1528,7 +1528,7 @@ function FirestorePageInner({
         items.push({
           id: `move-left-${tab.id}`,
           group: 'Split',
-          label: `左ペインへ移す: ${label}`,
+          label: t('ui.move_to_left', { label }),
           detail: isImpExpTab(tab)
             ? IMP_EXP_TAB_LABEL
             : isEmulatorImpExpTab(tab)
@@ -1562,7 +1562,8 @@ function FirestorePageInner({
     showProjectLabel,
     splitEnabled,
     status.authType,
-    tabs
+    tabs,
+    t
   ])
 
   const renderEditorGroup = (
@@ -1584,7 +1585,7 @@ function FirestorePageInner({
           tabs={paneTabs}
           groups={tabGroups.filter((group) => group.pane === pane)}
           activeTabId={activeId}
-          ariaLabel={pane === 'primary' ? '左ペインのタブ' : '右ペインのタブ'}
+          ariaLabel={pane === 'primary' ? t('ui.left_pane_tabs') : t('ui.right_pane_tabs')}
           impExpBusy={impExpJob?.status === 'running'}
           projectLabelFor={projectLabelFor}
           showProjectLabel={showProjectLabel}
@@ -1628,9 +1629,7 @@ function FirestorePageInner({
           }
           tab={active}
           pane={pane}
-          menuEnabled={
-            focusedPane === pane && isCollectionTab(active) && active.view === 'simple'
-          }
+          menuEnabled={focusedPane === pane && isCollectionTab(active) && active.view === 'simple'}
           impExpJob={impExpJob}
           impExpDraft={impExpDraft}
           rootCollections={rootCollections}
@@ -1646,9 +1645,7 @@ function FirestorePageInner({
           emulatorPageMode={emulatorImpExpMode}
           onEmulatorModeChange={setEmulatorImpExpMode}
           emulatorHost={emulatorHost}
-          emulatorDestinationPoolId={
-            status.authType === 'emulator' ? status.projectId : null
-          }
+          emulatorDestinationPoolId={status.authType === 'emulator' ? status.projectId : null}
           emulatorDestinationLabel={
             status.authType === 'emulator'
               ? (focusedEntry?.label ?? focusedEntry?.emulatorProjectId ?? null)
@@ -1669,7 +1666,9 @@ function FirestorePageInner({
           onRequestDuplicateDocument={(path) =>
             handleRequestDuplicateDocument(path, active.projectId)
           }
-          onRequestRenameCollection={(path) => handleRequestRenameCollection(path, active.projectId)}
+          onRequestRenameCollection={(path) =>
+            handleRequestRenameCollection(path, active.projectId)
+          }
           onRequestCreateSubcollection={(path) =>
             handleRequestCreateSubcollection(path, active.projectId)
           }
@@ -1687,7 +1686,9 @@ function FirestorePageInner({
               setTreeContentReloadToken((token) => token + 1)
             }
           }}
-          onCollectionBecameEmpty={(path) => void handleCollectionBecameEmpty(path, active.projectId)}
+          onCollectionBecameEmpty={(path) =>
+            void handleCollectionBecameEmpty(path, active.projectId)
+          }
           onOpenDocumentPath={(path) => void handleOpenDocumentPath(path, active.projectId)}
           onQueryDraftChange={(patch) => updateTab(active.id, patch)}
           onSimpleStateChange={(patch) => updateTabSimpleState(active.id, patch)}
@@ -1700,12 +1701,9 @@ function FirestorePageInner({
       ) : (
         <div className="firestore-split__pane-empty">
           <p className="simple-main__empty-title">
-            {pane === 'primary' ? '左ペイン' : '右ペイン'}
+            {pane === 'primary' ? t('ui.left_pane') : t('ui.right_pane')}
           </p>
-          <p className="simple-main__empty-hint">
-            このペインをクリックしてフォーカスし、ツリーまたは Command Palette
-            からコレクションを開くと、ここにタブが追加されます。
-          </p>
+          <p className="simple-main__empty-hint">{t('ui.pane_empty_hint')}</p>
         </div>
       )}
     </div>
@@ -1754,7 +1752,7 @@ function FirestorePageInner({
                 unit="percent"
                 minFirst={220}
                 minSecond={220}
-                ariaLabel="左右ペインの幅"
+                ariaLabel={t('ui.pane_width')}
                 first={renderEditorGroup('primary', primaryTabs, primaryActiveId, primaryTab)}
                 second={renderEditorGroup(
                   'secondary',
@@ -1843,7 +1841,11 @@ function FirestorePageInner({
         />
       )}
 
-      <CommandPalette open={paletteOpen} items={paletteItems} onClose={() => setPaletteOpen(false)} />
+      <CommandPalette
+        open={paletteOpen}
+        items={paletteItems}
+        onClose={() => setPaletteOpen(false)}
+      />
     </>
   )
 }

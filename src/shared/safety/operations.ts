@@ -1,3 +1,4 @@
+import { tr } from '@shared/i18n/shared/current'
 export const FIRESTORE_BATCH_LIMIT = 500
 
 export type OperationEstimate = {
@@ -7,10 +8,7 @@ export type OperationEstimate = {
   estimatedCostUsd: number
 }
 
-export function calculateBatchCount(
-  itemCount: number,
-  batchSize = FIRESTORE_BATCH_LIMIT
-): number {
+export function calculateBatchCount(itemCount: number, batchSize = FIRESTORE_BATCH_LIMIT): number {
   if (itemCount <= 0) {
     return 0
   }
@@ -65,18 +63,15 @@ export function formatBatchMessage(itemCount: number, batchSize = FIRESTORE_BATC
   const batchCount = calculateBatchCount(itemCount, batchSize)
 
   if (itemCount <= batchSize) {
-    return `${itemCount} 件（1 バッチ）`
+    return tr('ui.batch_one', { count: itemCount })
   }
 
-  return `${itemCount} 件 → ${batchCount} バッチ（各最大 ${batchSize} 件）`
+  return tr('ui.batch_many', { count: itemCount, batches: batchCount, size: batchSize })
 }
 
-export function buildDestructiveConfirmMessage(
-  action: 'delete' | 'update',
-  count: number
-): string {
-  const actionLabel = action === 'delete' ? '削除' : '一括更新'
+export function buildDestructiveConfirmMessage(action: 'delete' | 'update', count: number): string {
+  const actionLabel = action === 'delete' ? tr('ui.action_delete') : tr('ui.action_update')
   const batchInfo = formatBatchMessage(count)
 
-  return `${count} 件のドキュメントを${actionLabel}します。\n${batchInfo}`
+  return `${tr('ui.destructive_confirm', { count, action: actionLabel })}\n${batchInfo}`
 }

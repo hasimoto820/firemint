@@ -1,3 +1,4 @@
+import { tr } from '@shared/i18n/shared/current'
 let focusedProjectId: string | null = null
 
 export function getFocusedProjectId(): string | null {
@@ -10,7 +11,7 @@ export function setFocusedProjectId(projectId: string | null): void {
 
 export function requireFocusedProjectId(): string {
   if (!focusedProjectId) {
-    throw new Error('プロジェクトが選択されていません')
+    throw new Error(tr('ui.err_no_project_selected'))
   }
 
   return focusedProjectId

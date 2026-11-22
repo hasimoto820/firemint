@@ -29,13 +29,18 @@ function readVarint(buffer: Buffer, offset: number): { value: bigint; offset: nu
     }
     shift += 7n
     if (shift > 63n) {
-      throw new Error('varint が長すぎます')
+      throw new Error('varint is too long')
     }
   }
-  throw new Error('varint が途切れています')
+  throw new Error('varint is truncated')
 }
 
-function decodeFields(buffer: Buffer, start: number, end: number, stopOnEndGroup: number | null): {
+function decodeFields(
+  buffer: Buffer,
+  start: number,
+  end: number,
+  stopOnEndGroup: number | null
+): {
   fields: ProtoField[]
   offset: number
 } {
@@ -52,7 +57,7 @@ function decodeFields(buffer: Buffer, start: number, end: number, stopOnEndGroup
       if (stopOnEndGroup !== null && id === stopOnEndGroup) {
         return { fields, offset }
       }
-      throw new Error(`想定外の end-group field=${id}`)
+      throw new Error(`unexpected end-group field=${id}`)
     }
 
     if (wire === WIRE_VARINT) {
@@ -64,7 +69,7 @@ function decodeFields(buffer: Buffer, start: number, end: number, stopOnEndGroup
 
     if (wire === WIRE_FIXED64) {
       if (offset + 8 > end) {
-        throw new Error('fixed64 が途切れています')
+        throw new Error('fixed64 is truncated')
       }
       fields.push({ id, value: { kind: 'fixed64', value: buffer.subarray(offset, offset + 8) } })
       offset += 8
@@ -73,7 +78,7 @@ function decodeFields(buffer: Buffer, start: number, end: number, stopOnEndGroup
 
     if (wire === WIRE_FIXED32) {
       if (offset + 4 > end) {
-        throw new Error('fixed32 が途切れています')
+        throw new Error('fixed32 is truncated')
       }
       fields.push({ id, value: { kind: 'fixed32', value: buffer.readUInt32LE(offset) } })
       offset += 4
@@ -85,7 +90,7 @@ function decodeFields(buffer: Buffer, start: number, end: number, stopOnEndGroup
       offset = length.offset
       const size = Number(length.value)
       if (offset + size > end) {
-        throw new Error('length-delimited が途切れています')
+        throw new Error('length-delimited is truncated')
       }
       fields.push({
         id,
@@ -102,7 +107,7 @@ function decodeFields(buffer: Buffer, start: number, end: number, stopOnEndGroup
       continue
     }
 
-    throw new Error(`未対応の wire type=${wire}`)
+    throw new Error(`unsupported wire type=${wire}`)
   }
 
   return { fields, offset }

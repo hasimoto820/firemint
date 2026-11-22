@@ -1,7 +1,13 @@
+import { tr } from '@shared/i18n/shared/current'
 import type { QueryDocumentSnapshot, WriteBatch } from 'firebase-admin/firestore'
 import { FieldValue } from 'firebase-admin/firestore'
 import { getFirestore, isFirestoreConnected } from '@shared/firestore/client'
-import { getCollectionRef, getDocumentRef, joinCollectionPath, joinDocumentPath } from '@shared/firestore/paths'
+import {
+  getCollectionRef,
+  getDocumentRef,
+  joinCollectionPath,
+  joinDocumentPath
+} from '@shared/firestore/paths'
 import { deserializeFirestoreValue } from '@shared/firestore/serialize'
 import { parseQueryLiteral } from '@shared/firestore/value_parse'
 import { calculateBatchCount, FIRESTORE_BATCH_LIMIT } from '@shared/safety/operations'
@@ -28,7 +34,7 @@ const COLLISION_PATH_LIMIT = 80
 
 function ensureConnected(projectId: string): void {
   if (!isFirestoreConnected(projectId)) {
-    throw new Error(`Firestore is not connected: ${projectId}`)
+    throw new Error(tr('ui.err_not_connected', { projectId: projectId }))
   }
 }
 
@@ -36,7 +42,7 @@ function toBulkError<T>(error: unknown): BulkResult<T> {
   logError('bulk_operations', 'operation failed', error)
   return {
     ok: false,
-    error: error instanceof Error ? error.message : 'Bulk operation failed'
+    error: error instanceof Error ? error.message : tr('ui.err_operation_failed')
   }
 }
 
@@ -44,7 +50,7 @@ function validateDocumentPaths(documentPaths: string[]): string[] {
   const uniquePaths = Array.from(new Set(documentPaths.map((path) => path.trim()).filter(Boolean)))
 
   if (uniquePaths.length === 0) {
-    throw new Error('対象ドキュメントを選択してください')
+    throw new Error(tr('bulk.err_select_docs'))
   }
 
   return uniquePaths
@@ -54,7 +60,7 @@ function validateField(field: string): string {
   const trimmed = field.trim()
 
   if (!trimmed) {
-    throw new Error('更新フィールド名を入力してください')
+    throw new Error(tr('bulk.err_field_required'))
   }
 
   return trimmed
@@ -64,7 +70,7 @@ function validateCollectionPath(collectionPath: string): string {
   const trimmed = collectionPath.trim()
 
   if (!trimmed) {
-    throw new Error('コレクション path を指定してください')
+    throw new Error(tr('explorer.err_collection_path_required'))
   }
 
   return trimmed
@@ -194,12 +200,12 @@ function parseTypedFieldValue(valueType: BulkFieldValueType, rawValue: string): 
       return false
     }
 
-    throw new Error('boolean は true または false を指定してください')
+    throw new Error(tr('bulk.err_boolean'))
   }
 
   if (valueType === 'number') {
     if (trimmed === '' || Number.isNaN(Number(trimmed))) {
-      throw new Error('number の値が不正です')
+      throw new Error(tr('bulk.err_number'))
     }
 
     return Number(trimmed)
@@ -208,15 +214,19 @@ function parseTypedFieldValue(valueType: BulkFieldValueType, rawValue: string): 
   const timestamp = new Date(trimmed)
 
   if (Number.isNaN(timestamp.getTime())) {
-    throw new Error('timestamp の値が不正です')
+    throw new Error(tr('bulk.err_timestamp'))
   }
 
   return timestamp
 }
 
-function toWriteResult(affectedCount: number, collisionPaths: string[], skippedCount: number): BulkFieldWriteResult {
+function toWriteResult(
+  affectedCount: number,
+  collisionPaths: string[],
+  skippedCount: number
+): BulkFieldWriteResult {
   if (affectedCount === 0 && skippedCount === 0) {
-    throw new Error('対象ドキュメントがありません')
+    throw new Error(tr('bulk.err_no_docs'))
   }
 
   return {
@@ -263,7 +273,7 @@ export async function previewBulkUpdateFieldValue(
     )
 
     if (matchedCount === 0) {
-      throw new Error('対象ドキュメントがありません')
+      throw new Error(tr('bulk.err_no_docs'))
     }
 
     return {
@@ -369,7 +379,7 @@ export async function previewBulkUpdateField(
     }
 
     if (previewItems.length === 0) {
-      throw new Error('プレビュー対象のドキュメントが見つかりません')
+      throw new Error(tr('bulk.err_preview_not_found'))
     }
 
     return { ok: true, data: previewItems }
@@ -417,7 +427,10 @@ export async function bulkDelete(
 
     const documentPaths = validateDocumentPaths(input.documentPaths)
 
-    logInfo('bulk_operations', `bulkDelete projectId=${input.projectId} count=${documentPaths.length}`)
+    logInfo(
+      'bulk_operations',
+      `bulkDelete projectId=${input.projectId} count=${documentPaths.length}`
+    )
 
     const summary = await commitInBatches(input.projectId, documentPaths, (batch, documentPath) => {
       batch.delete(getDocumentRef(documentPath, input.projectId))
@@ -454,26 +467,31 @@ export async function previewBulkCreateField(
       `previewBulkCreateField projectId=${input.projectId} path=${collectionPath} field=${field} includeSubcollections=${includeSubcollections}`
     )
 
-    await walkScopedDocuments(input.projectId, collectionPath, includeSubcollections, (documentPath, data) => {
-      if (field in data) {
-        skippedCount += 1
-        rememberCollision(collisionPaths, documentPath)
-        return
-      }
+    await walkScopedDocuments(
+      input.projectId,
+      collectionPath,
+      includeSubcollections,
+      (documentPath, data) => {
+        if (field in data) {
+          skippedCount += 1
+          rememberCollision(collisionPaths, documentPath)
+          return
+        }
 
-      matchedCount += 1
-      if (previewItems.length < PREVIEW_LIMIT) {
-        previewItems.push({
-          documentPath,
-          field,
-          before: null,
-          after: formatPreviewValue(parsedValue)
-        })
+        matchedCount += 1
+        if (previewItems.length < PREVIEW_LIMIT) {
+          previewItems.push({
+            documentPath,
+            field,
+            before: null,
+            after: formatPreviewValue(parsedValue)
+          })
+        }
       }
-    })
+    )
 
     if (matchedCount === 0 && skippedCount === 0) {
-      throw new Error('対象ドキュメントがありません')
+      throw new Error(tr('bulk.err_no_docs'))
     }
 
     return { ok: true, data: { items: previewItems, matchedCount, skippedCount, collisionPaths } }
@@ -523,19 +541,24 @@ export async function bulkCreateField(
       pendingPaths = []
     }
 
-    await walkScopedDocuments(input.projectId, collectionPath, includeSubcollections, async (documentPath, data) => {
-      if (field in data) {
-        skippedCount += 1
-        rememberCollision(collisionPaths, documentPath)
-        return
-      }
+    await walkScopedDocuments(
+      input.projectId,
+      collectionPath,
+      includeSubcollections,
+      async (documentPath, data) => {
+        if (field in data) {
+          skippedCount += 1
+          rememberCollision(collisionPaths, documentPath)
+          return
+        }
 
-      pendingPaths.push(documentPath)
+        pendingPaths.push(documentPath)
 
-      if (pendingPaths.length >= FIRESTORE_BATCH_LIMIT) {
-        await flush()
+        if (pendingPaths.length >= FIRESTORE_BATCH_LIMIT) {
+          await flush()
+        }
       }
-    })
+    )
 
     await flush()
 
@@ -557,7 +580,7 @@ export async function previewBulkRenameField(
     const includeSubcollections = input.includeSubcollections === true
 
     if (fromField === toField) {
-      throw new Error('変更先フィールド名は別の名前を指定してください')
+      throw new Error(tr('bulk.err_same_field'))
     }
 
     const previewItems: DiffPreviewItem[] = []
@@ -570,30 +593,35 @@ export async function previewBulkRenameField(
       `previewBulkRenameField projectId=${input.projectId} path=${collectionPath} from=${fromField} to=${toField} includeSubcollections=${includeSubcollections}`
     )
 
-    await walkScopedDocuments(input.projectId, collectionPath, includeSubcollections, (documentPath, data) => {
-      if (!(fromField in data)) {
-        return
-      }
+    await walkScopedDocuments(
+      input.projectId,
+      collectionPath,
+      includeSubcollections,
+      (documentPath, data) => {
+        if (!(fromField in data)) {
+          return
+        }
 
-      if (toField in data) {
-        skippedCount += 1
-        rememberCollision(collisionPaths, documentPath)
-        return
-      }
+        if (toField in data) {
+          skippedCount += 1
+          rememberCollision(collisionPaths, documentPath)
+          return
+        }
 
-      matchedCount += 1
-      if (previewItems.length < PREVIEW_LIMIT) {
-        previewItems.push({
-          documentPath,
-          field: `${fromField} → ${toField}`,
-          before: formatPreviewValue(data[fromField]),
-          after: formatPreviewValue(data[fromField])
-        })
+        matchedCount += 1
+        if (previewItems.length < PREVIEW_LIMIT) {
+          previewItems.push({
+            documentPath,
+            field: `${fromField} → ${toField}`,
+            before: formatPreviewValue(data[fromField]),
+            after: formatPreviewValue(data[fromField])
+          })
+        }
       }
-    })
+    )
 
     if (matchedCount === 0 && skippedCount === 0) {
-      throw new Error('リネーム対象のフィールドを持つドキュメントがありません')
+      throw new Error(tr('bulk.err_no_rename_target'))
     }
 
     return { ok: true, data: { items: previewItems, matchedCount, skippedCount, collisionPaths } }
@@ -615,7 +643,7 @@ export async function bulkRenameField(
     const includeSubcollections = input.includeSubcollections === true
 
     if (fromField === toField) {
-      throw new Error('変更先フィールド名は別の名前を指定してください')
+      throw new Error(tr('bulk.err_same_field'))
     }
 
     logInfo(
@@ -647,26 +675,31 @@ export async function bulkRenameField(
       pending = []
     }
 
-    await walkScopedDocuments(input.projectId, collectionPath, includeSubcollections, async (documentPath, data) => {
-      if (!(fromField in data)) {
-        return
-      }
+    await walkScopedDocuments(
+      input.projectId,
+      collectionPath,
+      includeSubcollections,
+      async (documentPath, data) => {
+        if (!(fromField in data)) {
+          return
+        }
 
-      if (toField in data) {
-        skippedCount += 1
-        rememberCollision(collisionPaths, documentPath)
-        return
-      }
+        if (toField in data) {
+          skippedCount += 1
+          rememberCollision(collisionPaths, documentPath)
+          return
+        }
 
-      pending.push({
-        path: documentPath,
-        value: data[fromField]
-      })
+        pending.push({
+          path: documentPath,
+          value: data[fromField]
+        })
 
-      if (pending.length >= FIRESTORE_BATCH_LIMIT) {
-        await flush()
+        if (pending.length >= FIRESTORE_BATCH_LIMIT) {
+          await flush()
+        }
       }
-    })
+    )
 
     await flush()
 
@@ -693,24 +726,29 @@ export async function previewBulkDeleteField(
       `previewBulkDeleteField projectId=${input.projectId} path=${collectionPath} field=${field} includeSubcollections=${includeSubcollections}`
     )
 
-    await walkScopedDocuments(input.projectId, collectionPath, includeSubcollections, (documentPath, data) => {
-      if (!(field in data)) {
-        return
-      }
+    await walkScopedDocuments(
+      input.projectId,
+      collectionPath,
+      includeSubcollections,
+      (documentPath, data) => {
+        if (!(field in data)) {
+          return
+        }
 
-      matchedCount += 1
-      if (previewItems.length < PREVIEW_LIMIT) {
-        previewItems.push({
-          documentPath,
-          field,
-          before: formatPreviewValue(data[field]),
-          after: null
-        })
+        matchedCount += 1
+        if (previewItems.length < PREVIEW_LIMIT) {
+          previewItems.push({
+            documentPath,
+            field,
+            before: formatPreviewValue(data[field]),
+            after: null
+          })
+        }
       }
-    })
+    )
 
     if (matchedCount === 0) {
-      throw new Error('削除対象のフィールドを持つドキュメントがありません')
+      throw new Error(tr('bulk.err_no_delete_target'))
     }
 
     return {
@@ -759,22 +797,27 @@ export async function bulkDeleteField(
       pendingPaths = []
     }
 
-    await walkScopedDocuments(input.projectId, collectionPath, includeSubcollections, async (documentPath, data) => {
-      if (!(field in data)) {
-        return
-      }
+    await walkScopedDocuments(
+      input.projectId,
+      collectionPath,
+      includeSubcollections,
+      async (documentPath, data) => {
+        if (!(field in data)) {
+          return
+        }
 
-      pendingPaths.push(documentPath)
+        pendingPaths.push(documentPath)
 
-      if (pendingPaths.length >= FIRESTORE_BATCH_LIMIT) {
-        await flush()
+        if (pendingPaths.length >= FIRESTORE_BATCH_LIMIT) {
+          await flush()
+        }
       }
-    })
+    )
 
     await flush()
 
     if (affectedCount === 0) {
-      throw new Error('削除対象のフィールドを持つドキュメントがありません')
+      throw new Error(tr('bulk.err_no_delete_target'))
     }
 
     return {

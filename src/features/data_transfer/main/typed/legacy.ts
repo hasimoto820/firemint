@@ -1,3 +1,4 @@
+import { tr } from '@shared/i18n/shared/current'
 import type { TypedFields, TypedValue } from '../../shared/typed_value'
 import { isoToTimestamp, timestampToIso } from './timestamp'
 
@@ -75,7 +76,7 @@ export function legacyToTyped(value: unknown): TypedValue {
       return { doubleValue: Number(value.value) }
     return { mapValue: { fields: legacyToTypedFields(value) } }
   }
-  throw new Error(`読めない値です: ${typeof value}`)
+  throw new Error(tr('dt.err_unreadable_value_type', { type: typeof value }))
 }
 
 export function legacyToTypedFields(data: Record<string, unknown>): TypedFields {

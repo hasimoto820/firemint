@@ -1,3 +1,4 @@
+import { tr } from '@shared/i18n/shared/current'
 import type { BrowserWindow } from 'electron'
 import { dialog } from 'electron'
 import { basename } from 'path'
@@ -29,12 +30,13 @@ const VERIFY_CHUNK = 100
 
 function ensureConnected(projectId: string): void {
   if (!isFirestoreConnected(projectId)) {
-    throw new Error(`Firestore is not connected: ${projectId}`)
+    throw new Error(tr('ui.err_not_connected', { projectId: projectId }))
   }
 }
 
-const NO_SOURCE_PROJECT_MESSAGE =
-  'ファイルから projectId が取れません。Emulator にプロジェクトとして入れられません。'
+function noSourceProjectMessage(): string {
+  return tr('dt.err_no_source_project')
+}
 
 type WriteTarget = Pick<OfficialImportInput, 'projectId' | 'emulatorHost' | 'emulatorProjectId'>
 
@@ -42,7 +44,7 @@ type WriteTarget = Pick<OfficialImportInput, 'projectId' | 'emulatorHost' | 'emu
 function newEmulatorProjectId(target: WriteTarget, sourceProjectId: string | null): string {
   const id = target.emulatorProjectId?.trim() || sourceProjectId
   if (!id) {
-    throw new Error(NO_SOURCE_PROJECT_MESSAGE)
+    throw new Error(noSourceProjectMessage())
   }
   return id
 }
@@ -118,7 +120,7 @@ async function countSource(
     }
   })
   if (count === 0) {
-    throw new Error('ファイルにドキュメントがありません')
+    throw new Error(tr('dt.err_file_empty_docs'))
   }
   return count
 }
@@ -129,12 +131,11 @@ export async function selectOfficialDump(
   const choice = window
     ? await dialog.showMessageBox(window, {
         type: 'question',
-        buttons: ['ファイル（ZIP / JSONL）', 'フォルダ', 'キャンセル'],
+        buttons: [tr('dt.file_zip_jsonl'), tr('dt.folder'), tr('common.cancel')],
         defaultId: 0,
         cancelId: 2,
-        message: 'インポートするファイルを選ぶ',
-        detail:
-          '公式ダンプ（zip、またはコンソール / gcloud / Emulator のフォルダ）か、JSON（.jsonl）。'
+        message: tr('dt.choose_import_file'),
+        detail: tr('dt.choose_import_detail')
       })
     : { response: 0 }
 
@@ -145,12 +146,12 @@ export async function selectOfficialDump(
   const options =
     choice.response === 0
       ? {
-          title: 'ファイルを選択',
+          title: tr('dt.select_file'),
           properties: ['openFile' as const],
           filters: [{ name: 'ZIP / JSONL', extensions: ['zip', 'jsonl'] }]
         }
       : {
-          title: 'フォルダを選択',
+          title: tr('dt.select_folder'),
           properties: ['openDirectory' as const]
         }
 
@@ -181,7 +182,7 @@ export async function inspectImportFile(filePath: string): Promise<ImportFileInf
     }
   } catch (error) {
     logError('data_transfer:import', `inspectImportFile failed path=${filePath}`, error)
-    return { ok: false, error: errorMessage(error, 'ファイルを読めませんでした') }
+    return { ok: false, error: errorMessage(error, tr('dt.err_read_file')) }
   } finally {
     await source?.close()
   }
@@ -208,7 +209,7 @@ export async function validateOfficialImport(
       processedCount: 0,
       totalCount: 0,
       percent: 2,
-      detail: 'ファイルを開いています…'
+      detail: tr('dt.opening_file')
     })
     source = await openImportSource(input.dumpPath)
     const totalCount = await countSource(source, onProgress, signal)
@@ -329,7 +330,7 @@ export async function validateOfficialImport(
     logError('data_transfer:import', 'validateOfficialImport failed', error)
     return {
       ok: false,
-      error: canceled ? '検証をキャンセルしました' : errorMessage(error, '検証に失敗しました'),
+      error: canceled ? tr('dt.validate_canceled') : errorMessage(error, tr('dt.err_validate')),
       canceled
     }
   } finally {
@@ -367,7 +368,7 @@ export async function importOfficialDump(
       processedCount: 0,
       totalCount: 0,
       percent: 2,
-      detail: 'ファイルを開いています…'
+      detail: tr('dt.opening_file')
     })
     source = await openImportSource(input.dumpPath)
     const totalCount = await countSource(source, onProgress, signal)
@@ -408,7 +409,7 @@ export async function importOfficialDump(
       if (entry.kind === 'bad') {
         activeWriter.countFailed(entry.label)
       } else if (seen.has(entry.document.path)) {
-        activeWriter.countSkipped(`${entry.document.path}（同じパスの 2 回目以降）`)
+        activeWriter.countSkipped(tr('dt.duplicate_path', { path: entry.document.path }))
       } else {
         seen.add(entry.document.path)
         await activeWriter.add(entry.document)
@@ -437,9 +438,7 @@ export async function importOfficialDump(
     return { ok: true, data: snapshotSummary(null) as OfficialImportSummary }
   } catch (error) {
     const canceled = isCanceledError(error)
-    const message = canceled
-      ? 'インポートをキャンセルしました'
-      : errorMessage(error, 'インポートに失敗しました')
+    const message = canceled ? tr('dt.import_canceled') : errorMessage(error, tr('dt.err_import'))
     logError('data_transfer:import', 'importOfficialDump failed', error)
     return {
       ok: false,

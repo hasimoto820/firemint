@@ -1,3 +1,4 @@
+import { tr } from '@shared/i18n/shared/current'
 import { mkdtemp, readdir, readFile, rm, stat } from 'fs/promises'
 import { tmpdir } from 'os'
 import { basename, join } from 'path'
@@ -10,7 +11,7 @@ import { listOutputFiles } from './list_output_files'
 import { logError, logInfo } from '@shared/logging/logger'
 
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : 'ダンプの読み込みに失敗しました'
+  return error instanceof Error ? error.message : tr('dt.err_read_dump')
 }
 
 async function readFirebaseExportProjectId(inputDir: string): Promise<string | null> {
@@ -77,7 +78,7 @@ function documentsFromOutput(
         }
       }
     } catch (error) {
-      logError('data_transfer:official', `entity を解けませんでした file=${filePath}`, error)
+      logError('data_transfer:official', `could not decode entity file=${filePath}`, error)
     }
   }
 
@@ -109,7 +110,7 @@ function pickSourceProjectId(projectIds: string[]): string | null {
 async function readFromRoot(sourcePath: string, dumpRoot: string): Promise<OfficialDumpSummary> {
   const outputFiles = await listOutputFiles(dumpRoot)
   if (outputFiles.length === 0 && !(await isOfficialDumpRoot(dumpRoot))) {
-    throw new Error('ダンプではありません（output-* または overall_export_metadata がありません）')
+    throw new Error(tr('dt.err_not_dump'))
   }
 
   const documents: ExportDocument[] = []
@@ -143,7 +144,7 @@ async function readFromRoot(sourcePath: string, dumpRoot: string): Promise<Offic
 export async function readOfficialDump(inputPath: string): Promise<OfficialDumpReadResult> {
   const trimmed = inputPath.trim()
   if (!trimmed) {
-    return { ok: false, error: 'パスが空です' }
+    return { ok: false, error: tr('dt.err_empty_path') }
   }
 
   let tempDir: string | null = null
@@ -161,7 +162,7 @@ export async function readOfficialDump(inputPath: string): Promise<OfficialDumpR
     } else if (info.isFile()) {
       dumpRoot = trimmed
     } else {
-      return { ok: false, error: 'フォルダまたは zip を指定してください' }
+      return { ok: false, error: tr('dt.err_folder_or_zip') }
     }
 
     const data = await readFromRoot(trimmed, dumpRoot)

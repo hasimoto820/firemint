@@ -1,3 +1,4 @@
+import { tr } from '@shared/i18n/shared/current'
 import { DocumentReference, GeoPoint, Timestamp } from '@google-cloud/firestore'
 import type { TypedFields, TypedValue } from '../../shared/typed_value'
 
@@ -50,7 +51,7 @@ export function fromSdkValue(value: unknown): TypedValue {
     return { mapValue: { fields: fromSdkData(value as Record<string, unknown>) } }
   }
 
-  throw new Error(`読めない値です: ${typeof value}`)
+  throw new Error(tr('dt.err_unreadable_value_type', { type: typeof value }))
 }
 
 export function fromSdkData(data: Record<string, unknown>): TypedFields {

@@ -40,6 +40,8 @@ export type GoogleSignInResult =
   | {
       ok: false
       error: string
+      /** 本人がサインインをやめた時。エラーとして出さない */
+      canceled?: boolean
     }
 
 /** この PC に保存してある Google アカウント（Firestore の接続用） */
@@ -53,4 +55,3 @@ export type GoogleConnectProjectInput = {
   accountEmail: string
   projectId: string
 }
-

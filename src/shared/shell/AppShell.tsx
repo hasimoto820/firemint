@@ -24,7 +24,7 @@ function AppShell({ header, sidebar, main }: AppShellProps): React.JSX.Element {
           unit="px"
           minFirst={160}
           minSecond={360}
-          ariaLabel="サイドバーの幅"
+          ariaLabel={t('ui.sidebar_width')}
           first={
             <aside
               className={

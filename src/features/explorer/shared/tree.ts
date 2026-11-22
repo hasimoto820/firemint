@@ -1,3 +1,4 @@
+import { tr } from '@shared/i18n/shared/current'
 export type TreeNodeKind = 'collection' | 'document'
 
 export type TreeNode = {
@@ -39,8 +40,10 @@ export function isSubcollectionPath(collectionPath: string): boolean {
   return segments.length >= 3 && segments.length % 2 === 1
 }
 
-export function collectionKindLabel(collectionPath: string): 'コレクション' | 'サブコレクション' {
-  return isSubcollectionPath(collectionPath) ? 'サブコレクション' : 'コレクション'
+export function collectionKindLabel(collectionPath: string): string {
+  return isSubcollectionPath(collectionPath)
+    ? tr('explorer.kind_subcollection')
+    : tr('explorer.kind_collection')
 }
 
 export function parentDocumentPathOfSubcollection(collectionPath: string): string {
@@ -54,10 +57,7 @@ export function parentDocumentPathOfSubcollection(collectionPath: string): strin
 }
 
 /** `user` → `user_1`。`user_1` があれば `user_2`。path の親は維持する。 */
-export function nextDuplicateCollectionPath(
-  collectionPath: string,
-  siblingIds: string[]
-): string {
+export function nextDuplicateCollectionPath(collectionPath: string, siblingIds: string[]): string {
   const segments = collectionPath.split('/').filter(Boolean)
   const name = segments[segments.length - 1] ?? collectionPath
   const taken = new Set(siblingIds)

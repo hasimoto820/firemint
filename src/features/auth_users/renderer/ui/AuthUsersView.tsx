@@ -72,7 +72,7 @@ function AuthUsersView({ projectId, readOnly }: AuthUsersViewProps): React.JSX.E
       setEditingUid(null)
       setDraft(null)
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'ユーザー一覧の取得に失敗しました')
+      setError(error instanceof Error ? error.message : t('auth.err_list'))
       setUsers([])
       setPageToken(null)
     } finally {
@@ -176,12 +176,12 @@ function AuthUsersView({ projectId, readOnly }: AuthUsersViewProps): React.JSX.E
     try {
       const parsed = JSON.parse(draft.customClaimsText || '{}') as unknown
       if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
-        setError('customClaims は JSON オブジェクトにしてください')
+        setError(t('auth.err_claims_object'))
         return
       }
       customClaims = parsed as Record<string, unknown>
     } catch {
-      setError('customClaims の JSON が不正です')
+      setError(t('auth.err_claims_json'))
       return
     }
 
@@ -220,8 +220,8 @@ function AuthUsersView({ projectId, readOnly }: AuthUsersViewProps): React.JSX.E
       return
     }
 
-    const label = disabled ? '無効化' : '有効化'
-    if (!(await confirmAction(`選択した ${selected.size} 件を${label}しますか？`))) {
+    const label = disabled ? t('auth.disable') : t('auth.enable')
+    if (!(await confirmAction(t('auth.toggle_confirm', { count: selected.size, action: label })))) {
       return
     }
 
@@ -241,7 +241,12 @@ function AuthUsersView({ projectId, readOnly }: AuthUsersViewProps): React.JSX.E
       }
 
       if (result.data.failureCount > 0) {
-        setError(`${result.data.failureCount} 件失敗（成功 ${result.data.successCount}）`)
+        setError(
+          t('auth.partial_failure', {
+            failed: result.data.failureCount,
+            succeeded: result.data.successCount
+          })
+        )
       }
 
       await loadFirstPage()
@@ -255,11 +260,7 @@ function AuthUsersView({ projectId, readOnly }: AuthUsersViewProps): React.JSX.E
       return
     }
 
-    if (
-      !(await confirmAction(
-        `選択した ${selected.size} 件のユーザーを削除しますか？（取り消せません）`
-      ))
-    ) {
+    if (!(await confirmAction(t('auth.delete_confirm', { count: selected.size })))) {
       return
     }
 
@@ -278,7 +279,12 @@ function AuthUsersView({ projectId, readOnly }: AuthUsersViewProps): React.JSX.E
       }
 
       if (result.data.failureCount > 0) {
-        setError(`${result.data.failureCount} 件失敗（成功 ${result.data.successCount}）`)
+        setError(
+          t('auth.partial_failure', {
+            failed: result.data.failureCount,
+            succeeded: result.data.successCount
+          })
+        )
       }
 
       await loadFirstPage()
@@ -305,7 +311,9 @@ function AuthUsersView({ projectId, readOnly }: AuthUsersViewProps): React.JSX.E
         return
       }
 
-      window.alert(`${result.data.exportedCount} 件を保存しました\n${result.data.filePath}`)
+      window.alert(
+        `${t('auth.exported', { count: result.data.exportedCount })}\n${result.data.filePath}`
+      )
     } finally {
       setBusy(false)
     }
@@ -388,157 +396,157 @@ function AuthUsersView({ projectId, readOnly }: AuthUsersViewProps): React.JSX.E
         unit="percent"
         minFirst={260}
         minSecond={240}
-        ariaLabel="ユーザー詳細の幅"
+        ariaLabel={t('auth.detail_width')}
         first={
-        <div className="auth-users__table-wrap">
-          <table className="auth-users__table">
-            <thead>
-              <tr>
-                <th>
-                  <input
-                    type="checkbox"
-                    checked={
-                      filtered.length > 0 && filtered.every((user) => selected.has(user.uid))
-                    }
-                    onChange={toggleSelectAllVisible}
-                    disabled={busy || filtered.length === 0}
-                    aria-label="表示中を全選択"
-                  />
-                </th>
-                <th>email</th>
-                <th>uid</th>
-                <th>{t('auth_users.status')}</th>
-                <th>{t('auth_users.providers')}</th>
-                <th>{t('auth_users.last_sign_in')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((user) => (
-                <tr
-                  key={user.uid}
-                  className={
-                    editingUid === user.uid
-                      ? 'auth-users__row auth-users__row--active'
-                      : 'auth-users__row'
-                  }
-                  onClick={() => openEdit(user)}
-                >
-                  <td onClick={(event) => event.stopPropagation()}>
+          <div className="auth-users__table-wrap">
+            <table className="auth-users__table">
+              <thead>
+                <tr>
+                  <th>
                     <input
                       type="checkbox"
-                      checked={selected.has(user.uid)}
-                      onChange={() => toggleSelect(user.uid)}
-                      disabled={busy}
-                      aria-label={`${user.email ?? user.uid} を選択`}
+                      checked={
+                        filtered.length > 0 && filtered.every((user) => selected.has(user.uid))
+                      }
+                      onChange={toggleSelectAllVisible}
+                      disabled={busy || filtered.length === 0}
+                      aria-label={t('auth.select_all_shown')}
                     />
-                  </td>
-                  <td>{user.email ?? '—'}</td>
-                  <td className="auth-users__mono">{user.uid}</td>
-                  <td>{user.disabled ? 'disabled' : 'active'}</td>
-                  <td>{user.providerIds.join(', ') || '—'}</td>
-                  <td>{user.lastSignInTime ?? '—'}</td>
+                  </th>
+                  <th>email</th>
+                  <th>uid</th>
+                  <th>{t('auth_users.status')}</th>
+                  <th>{t('auth_users.providers')}</th>
+                  <th>{t('auth_users.last_sign_in')}</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {filtered.map((user) => (
+                  <tr
+                    key={user.uid}
+                    className={
+                      editingUid === user.uid
+                        ? 'auth-users__row auth-users__row--active'
+                        : 'auth-users__row'
+                    }
+                    onClick={() => openEdit(user)}
+                  >
+                    <td onClick={(event) => event.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={selected.has(user.uid)}
+                        onChange={() => toggleSelect(user.uid)}
+                        disabled={busy}
+                        aria-label={t('auth.select_user', { name: user.email ?? user.uid })}
+                      />
+                    </td>
+                    <td>{user.email ?? '—'}</td>
+                    <td className="auth-users__mono">{user.uid}</td>
+                    <td>{user.disabled ? 'disabled' : 'active'}</td>
+                    <td>{user.providerIds.join(', ') || '—'}</td>
+                    <td>{user.lastSignInTime ?? '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
 
-          {filtered.length === 0 && !loading && (
-            <p className="auth-users__empty">{t('auth_users.empty')}</p>
-          )}
+            {filtered.length === 0 && !loading && (
+              <p className="auth-users__empty">{t('auth_users.empty')}</p>
+            )}
 
-          {pageToken && (
-            <div className="auth-users__more">
-              <Button onClick={() => void loadMore()} disabled={loading || busy}>
-                {t('auth_users.load_more')}
-              </Button>
-            </div>
-          )}
-        </div>
-        }
-        second={
-        <aside className="auth-users__detail">
-          {!editingUser || !draft ? (
-            <p className="auth-users__empty">{t('auth_users.edit_hint')}</p>
-          ) : (
-            <>
-              <h3 className="auth-users__detail-title">{t('auth_users.edit_title')}</h3>
-              <p className="auth-users__mono">{editingUser.uid}</p>
-
-              <label className="auth-users__field">
-                email
-                <input
-                  value={draft.email}
-                  onChange={(event) => setDraft({ ...draft, email: event.target.value })}
-                  disabled={readOnly || busy}
-                />
-              </label>
-              <label className="auth-users__field">
-                displayName
-                <input
-                  value={draft.displayName}
-                  onChange={(event) => setDraft({ ...draft, displayName: event.target.value })}
-                  disabled={readOnly || busy}
-                />
-              </label>
-              <label className="auth-users__field">
-                phoneNumber
-                <input
-                  value={draft.phoneNumber}
-                  onChange={(event) => setDraft({ ...draft, phoneNumber: event.target.value })}
-                  disabled={readOnly || busy}
-                />
-              </label>
-              <label className="auth-users__field">
-                新しい password（空なら変更なし）
-                <input
-                  type="password"
-                  value={draft.password}
-                  onChange={(event) => setDraft({ ...draft, password: event.target.value })}
-                  disabled={readOnly || busy}
-                  autoComplete="new-password"
-                />
-              </label>
-              <label className="auth-users__check">
-                <input
-                  type="checkbox"
-                  checked={draft.emailVerified}
-                  onChange={(event) =>
-                    setDraft({ ...draft, emailVerified: event.target.checked })
-                  }
-                  disabled={readOnly || busy}
-                />
-                emailVerified
-              </label>
-              <label className="auth-users__check">
-                <input
-                  type="checkbox"
-                  checked={draft.disabled}
-                  onChange={(event) => setDraft({ ...draft, disabled: event.target.checked })}
-                  disabled={readOnly || busy}
-                />
-                disabled
-              </label>
-              <label className="auth-users__field">
-                customClaims（JSON）
-                <textarea
-                  className="auth-users__claims"
-                  value={draft.customClaimsText}
-                  onChange={(event) =>
-                    setDraft({ ...draft, customClaimsText: event.target.value })
-                  }
-                  disabled={readOnly || busy}
-                  rows={8}
-                />
-              </label>
-
-              <div className="auth-users__detail-actions">
-                <Button onClick={() => void handleSave()} disabled={readOnly || busy}>
-                  {t('common.save')}
+            {pageToken && (
+              <div className="auth-users__more">
+                <Button onClick={() => void loadMore()} disabled={loading || busy}>
+                  {t('auth_users.load_more')}
                 </Button>
               </div>
-            </>
-          )}
-        </aside>
+            )}
+          </div>
+        }
+        second={
+          <aside className="auth-users__detail">
+            {!editingUser || !draft ? (
+              <p className="auth-users__empty">{t('auth_users.edit_hint')}</p>
+            ) : (
+              <>
+                <h3 className="auth-users__detail-title">{t('auth_users.edit_title')}</h3>
+                <p className="auth-users__mono">{editingUser.uid}</p>
+
+                <label className="auth-users__field">
+                  email
+                  <input
+                    value={draft.email}
+                    onChange={(event) => setDraft({ ...draft, email: event.target.value })}
+                    disabled={readOnly || busy}
+                  />
+                </label>
+                <label className="auth-users__field">
+                  displayName
+                  <input
+                    value={draft.displayName}
+                    onChange={(event) => setDraft({ ...draft, displayName: event.target.value })}
+                    disabled={readOnly || busy}
+                  />
+                </label>
+                <label className="auth-users__field">
+                  phoneNumber
+                  <input
+                    value={draft.phoneNumber}
+                    onChange={(event) => setDraft({ ...draft, phoneNumber: event.target.value })}
+                    disabled={readOnly || busy}
+                  />
+                </label>
+                <label className="auth-users__field">
+                  {t('auth.new_password')}
+                  <input
+                    type="password"
+                    value={draft.password}
+                    onChange={(event) => setDraft({ ...draft, password: event.target.value })}
+                    disabled={readOnly || busy}
+                    autoComplete="new-password"
+                  />
+                </label>
+                <label className="auth-users__check">
+                  <input
+                    type="checkbox"
+                    checked={draft.emailVerified}
+                    onChange={(event) =>
+                      setDraft({ ...draft, emailVerified: event.target.checked })
+                    }
+                    disabled={readOnly || busy}
+                  />
+                  emailVerified
+                </label>
+                <label className="auth-users__check">
+                  <input
+                    type="checkbox"
+                    checked={draft.disabled}
+                    onChange={(event) => setDraft({ ...draft, disabled: event.target.checked })}
+                    disabled={readOnly || busy}
+                  />
+                  disabled
+                </label>
+                <label className="auth-users__field">
+                  customClaims（JSON）
+                  <textarea
+                    className="auth-users__claims"
+                    value={draft.customClaimsText}
+                    onChange={(event) =>
+                      setDraft({ ...draft, customClaimsText: event.target.value })
+                    }
+                    disabled={readOnly || busy}
+                    rows={8}
+                  />
+                </label>
+
+                <div className="auth-users__detail-actions">
+                  <Button onClick={() => void handleSave()} disabled={readOnly || busy}>
+                    {t('common.save')}
+                  </Button>
+                </div>
+              </>
+            )}
+          </aside>
         }
       />
     </div>

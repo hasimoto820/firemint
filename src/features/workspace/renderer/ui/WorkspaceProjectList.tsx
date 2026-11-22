@@ -282,9 +282,7 @@ function WorkspaceProjectList({
           <li key={entry.id} className="project-list__entry">
             <div
               className={
-                isFocused
-                  ? 'project-list__row project-list__row--focused'
-                  : 'project-list__row'
+                isFocused ? 'project-list__row project-list__row--focused' : 'project-list__row'
               }
             >
               {treeMode && (
@@ -322,14 +320,12 @@ function WorkspaceProjectList({
               <button
                 type="button"
                 className={
-                  isOpen
-                    ? 'project-list__gear project-list__gear--open'
-                    : 'project-list__gear'
+                  isOpen ? 'project-list__gear project-list__gear--open' : 'project-list__gear'
                 }
                 onClick={() => handleToggleSettings(entry)}
                 disabled={busy}
-                title="プロジェクト設定"
-                aria-label="プロジェクト設定"
+                title={t('workspace.project_settings')}
+                aria-label={t('workspace.project_settings')}
                 aria-expanded={isOpen}
               >
                 ⚙
@@ -370,10 +366,7 @@ function WorkspaceProjectList({
                   <Button onClick={() => void handleSaveMeta(entry.id)} disabled={busy}>
                     {t('common.save')}
                   </Button>
-                  <Button
-                    onClick={() => void handleDisconnect(entry.id)}
-                    disabled={busy}
-                  >
+                  <Button onClick={() => void handleDisconnect(entry.id)} disabled={busy}>
                     {t('common.disconnect')}
                   </Button>
                   {entry.authType === 'emulator' ? (
@@ -481,9 +474,7 @@ function WorkspaceProjectList({
 
       {error && <p className="project-list__error">{error}</p>}
 
-      {entries.length === 0 && (
-        <p className="project-list__empty">{t('workspace.no_connected')}</p>
-      )}
+      {entries.length === 0 && <p className="project-list__empty">{t('workspace.no_connected')}</p>}
 
       {treeMode ? (
         <SplitPane
@@ -494,7 +485,7 @@ function WorkspaceProjectList({
           unit="percent"
           minFirst={72}
           minSecond={120}
-          ariaLabel="プロジェクト一覧の高さ"
+          ariaLabel={t('workspace.list_height')}
           first={
             <div className="project-list__items-wrap" data-area="projects" tabIndex={-1}>
               {entryList}

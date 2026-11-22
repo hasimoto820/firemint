@@ -1,3 +1,4 @@
+import { tr } from '@shared/i18n/shared/current'
 import { BrowserWindow, dialog, ipcMain, type IpcMainInvokeEvent } from 'electron'
 import { IPC_CHANNELS } from '@shared/ipc/channels'
 import type { WindowConfirmInput, WindowConfirmResult } from '@shared/ipc/types'
@@ -53,7 +54,7 @@ export function registerWindowHandlers(): void {
     async (event, input: WindowConfirmInput): Promise<WindowConfirmResult> => {
       const window = getSenderWindow(event)
       const confirmLabel = input.confirmLabel?.trim() || 'OK'
-      const cancelLabel = input.cancelLabel?.trim() || 'キャンセル'
+      const cancelLabel = input.cancelLabel?.trim() || tr('common.cancel')
       const options = {
         type: 'question' as const,
         buttons: [confirmLabel, cancelLabel],
@@ -83,4 +84,3 @@ export function registerWindowHandlers(): void {
     }
   )
 }
-

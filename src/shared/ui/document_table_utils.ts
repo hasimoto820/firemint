@@ -1,3 +1,4 @@
+import { tr } from '@shared/i18n/shared/current'
 import type { DocumentSummary } from '@features/explorer/shared/types'
 
 import { formatDisplayValue, formatTimestampIso, isTimestampValue } from './firestore_display'
@@ -44,11 +45,26 @@ export const TABLE_FILTER_OPERATORS: { value: TableFilterOperator; label: string
   { value: '<=', label: '<=' },
   { value: '>', label: '>' },
   { value: '>=', label: '>=' },
-  { value: 'contains', label: '部分一致' },
+  {
+    value: 'contains',
+    get label() {
+      return tr('ui.op_contains')
+    }
+  },
   { value: 'in', label: 'in' },
   { value: 'array-contains', label: 'array contains' },
-  { value: 'exists', label: '存在する' },
-  { value: 'not-exists', label: '存在しない' }
+  {
+    value: 'exists',
+    get label() {
+      return tr('ui.op_exists')
+    }
+  },
+  {
+    value: 'not-exists',
+    get label() {
+      return tr('ui.op_not_exists')
+    }
+  }
 ]
 
 export function isUnaryFilterOperator(operator: TableFilterOperator): boolean {
@@ -92,10 +108,7 @@ export function collectDataColumns(documents: DocumentSummary[]): string[] {
   return Array.from(columns).sort()
 }
 
-export function buildDefaultColumnOrder(
-  documents: DocumentSummary[],
-  showPath: boolean
-): string[] {
+export function buildDefaultColumnOrder(documents: DocumentSummary[], showPath: boolean): string[] {
   const dataColumns = collectDataColumns(documents)
   const base = showPath
     ? ['id', 'path', 'createTime', 'updateTime']
@@ -199,7 +212,9 @@ function toComparable(value: unknown): Comparable {
 
   if (isTimestampValue(value)) {
     const ms = Date.parse(value.iso)
-    return Number.isNaN(ms) ? { kind: 'string', value: value.iso.toLowerCase() } : { kind: 'date', value: ms }
+    return Number.isNaN(ms)
+      ? { kind: 'string', value: value.iso.toLowerCase() }
+      : { kind: 'date', value: ms }
   }
 
   if (typeof value === 'number' && Number.isFinite(value)) {
@@ -384,9 +399,7 @@ function fieldEqualsFilterValue(
   candidateRaw: unknown
 ): boolean {
   const candidateText =
-    typeof candidateRaw === 'string'
-      ? candidateRaw.trim()
-      : formatDisplayValue(candidateRaw).trim()
+    typeof candidateRaw === 'string' ? candidateRaw.trim() : formatDisplayValue(candidateRaw).trim()
 
   if (!candidateText) {
     return false
@@ -413,11 +426,7 @@ function fieldEqualsFilterValue(
   return compared === 0
 }
 
-function matchesInOperator(
-  document: DocumentSummary,
-  field: string,
-  rawList: string
-): boolean {
+function matchesInOperator(document: DocumentSummary, field: string, rawList: string): boolean {
   const list = parseFilterList(rawList)
 
   if (!list || list.length === 0) {
@@ -444,10 +453,7 @@ function documentHasField(document: DocumentSummary, field: string): boolean {
   return Object.prototype.hasOwnProperty.call(document.data ?? {}, field)
 }
 
-export function matchesFilterClause(
-  document: DocumentSummary,
-  clause: TableFilterClause
-): boolean {
+export function matchesFilterClause(document: DocumentSummary, clause: TableFilterClause): boolean {
   const field = clause.field.trim()
   const value = clause.value.trim()
 
@@ -534,10 +540,7 @@ function compareValues(left: string, right: string, direction: SortDirection): n
   return direction === 'asc' ? result : -result
 }
 
-export function sortDocuments(
-  documents: DocumentSummary[],
-  sort: SortState
-): DocumentSummary[] {
+export function sortDocuments(documents: DocumentSummary[], sort: SortState): DocumentSummary[] {
   if (!sort) {
     return documents
   }

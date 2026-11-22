@@ -1,3 +1,4 @@
+import { tr } from '@shared/i18n/shared/current'
 import type { DocumentSnapshot, QueryDocumentSnapshot } from 'firebase-admin/firestore'
 import { getFirestore, getWriteBlockedReason, isFirestoreConnected } from '@shared/firestore/client'
 import { formatUnavailableFirestoreMessage } from '@shared/firestore/native_check'
@@ -9,10 +10,7 @@ import {
   joinCollectionPath,
   joinDocumentPath
 } from '@shared/firestore/paths'
-import {
-  deserializeDocumentData,
-  serializeFirestoreValue
-} from '@shared/firestore/serialize'
+import { deserializeDocumentData, serializeFirestoreValue } from '@shared/firestore/serialize'
 import { logError, logInfo } from '@shared/logging/logger'
 import { ensureFirestoreWritable } from '@features/workspace/main/guard'
 import { LIST_DOCUMENTS_PAGE_SIZE } from '@features/explorer/shared/types'
@@ -39,7 +37,7 @@ import type {
 
 function ensureConnected(projectId: string): void {
   if (!isFirestoreConnected(projectId)) {
-    throw new Error(`Firestore is not connected: ${projectId}`)
+    throw new Error(tr('ui.err_not_connected', { projectId: projectId }))
   }
 }
 
@@ -47,18 +45,18 @@ function assertCollectionId(collectionId: string, label: string): string {
   const trimmed = collectionId.trim()
 
   if (!trimmed) {
-    throw new Error(`${label}を入力してください`)
+    throw new Error(tr('explorer.err_enter_name', { label }))
   }
 
   if (trimmed.includes('/')) {
-    throw new Error(`${label}に / は使えません`)
+    throw new Error(tr('explorer.err_no_slash', { label }))
   }
 
   return trimmed
 }
 
 function assertSubcollectionId(subcollectionId: string): string {
-  return assertCollectionId(subcollectionId, 'サブコレクション名')
+  return assertCollectionId(subcollectionId, tr('explorer.label_subcollection_name'))
 }
 
 const BATCH_LIMIT = 500
@@ -66,7 +64,7 @@ const PAGE_SIZE = 500
 
 function toExplorerError<T>(error: unknown): ExplorerResult<T> {
   logError('explorer', 'operation failed', error)
-  const message = error instanceof Error ? error.message : 'Explorer operation failed'
+  const message = error instanceof Error ? error.message : tr('ui.err_operation_failed')
   return {
     ok: false,
     error: formatUnavailableFirestoreMessage(message) ?? message
@@ -87,7 +85,7 @@ class DocumentConflictError extends Error {
   readonly code = 'conflict' as const
 
   constructor(readonly currentUpdateTime: string | null) {
-    super('Document was modified elsewhere')
+    super(tr('ui.err_modified_elsewhere'))
     this.name = 'DocumentConflictError'
   }
 }
@@ -160,10 +158,7 @@ export async function listDocuments(
     if (unavailable) {
       return unavailable
     }
-    const pageSize = Math.min(
-      Math.max(options.pageSize ?? LIST_DOCUMENTS_PAGE_SIZE, 1),
-      500
-    )
+    const pageSize = Math.min(Math.max(options.pageSize ?? LIST_DOCUMENTS_PAGE_SIZE, 1), 500)
     const startAfterId = options.startAfterId?.trim() || null
     logInfo(
       'explorer',
@@ -182,8 +177,7 @@ export async function listDocuments(
     const hasMore = snapshot.docs.length > pageSize
     const pageDocs = hasMore ? snapshot.docs.slice(0, pageSize) : snapshot.docs
     const documents = pageDocs.map((doc) => toDocumentSummaryFromSnapshot(collectionPath, doc))
-    const nextCursor =
-      hasMore && pageDocs.length > 0 ? pageDocs[pageDocs.length - 1].id : null
+    const nextCursor = hasMore && pageDocs.length > 0 ? pageDocs[pageDocs.length - 1].id : null
 
     return {
       ok: true,
@@ -223,7 +217,7 @@ export async function getDocument(
     const snapshot = await getDocumentRef(documentPath, projectId).get()
 
     if (!snapshot.exists) {
-      throw new Error('Document not found')
+      throw new Error(tr('ui.err_document_not_found'))
     }
 
     const segments = documentPath.split('/').filter(Boolean)
@@ -293,7 +287,7 @@ export async function updateDocument(input: UpdateDocumentInput): Promise<Explor
       )
       return {
         ok: false,
-        error: 'Document was modified elsewhere',
+        error: tr('ui.err_modified_elsewhere'),
         code: 'conflict',
         currentUpdateTime: error.currentUpdateTime
       }
@@ -361,7 +355,7 @@ export async function duplicateDocument(
     const snapshot = await getDocumentRef(input.documentPath, input.projectId).get()
 
     if (!snapshot.exists) {
-      throw new Error('Document not found')
+      throw new Error(tr('ui.err_document_not_found'))
     }
 
     const segments = input.documentPath.split('/').filter(Boolean)
@@ -374,7 +368,7 @@ export async function duplicateDocument(
     const existing = await targetRef.get()
 
     if (existing.exists) {
-      throw new Error('複製先のドキュメント ID は既に存在します')
+      throw new Error(tr('explorer.err_duplicate_target_exists'))
     }
 
     await targetRef.set(snapshot.data() as Record<string, unknown>)
@@ -404,11 +398,11 @@ export async function duplicateCollection(
     const targetCollectionPath = input.targetCollectionPath.trim()
 
     if (!sourceCollectionPath || !targetCollectionPath) {
-      throw new Error('コレクション path を指定してください')
+      throw new Error(tr('explorer.err_collection_path_required'))
     }
 
     if (sourceCollectionPath === targetCollectionPath) {
-      throw new Error('複製先は別のコレクション path を指定してください')
+      throw new Error(tr('explorer.err_duplicate_same_path'))
     }
 
     const includeSubcollections = input.includeSubcollections === true
@@ -423,7 +417,7 @@ export async function duplicateCollection(
       .get()
 
     if (!targetSnapshot.empty) {
-      throw new Error('複製先コレクションは空である必要があります')
+      throw new Error(tr('explorer.err_duplicate_target_not_empty'))
     }
 
     const copiedCount = await copyCollectionRecursive(
@@ -434,7 +428,7 @@ export async function duplicateCollection(
     )
 
     if (copiedCount === 0) {
-      throw new Error('複製元のコレクションにドキュメントがありません')
+      throw new Error(tr('explorer.err_duplicate_source_empty'))
     }
 
     return {
@@ -578,25 +572,25 @@ export async function renameCollection(
     const targetCollectionPath = input.targetCollectionPath.trim()
 
     if (!sourceCollectionPath || !targetCollectionPath) {
-      throw new Error('コレクション path を指定してください')
+      throw new Error(tr('explorer.err_collection_path_required'))
     }
 
     assertCollectionPath(sourceCollectionPath)
     assertCollectionPath(targetCollectionPath)
 
     if (sourceCollectionPath === targetCollectionPath) {
-      throw new Error('リネーム先は別のコレクション path を指定してください')
+      throw new Error(tr('explorer.err_rename_same_path'))
     }
 
     const sourceSegments = sourceCollectionPath.split('/').filter(Boolean)
     const targetSegments = targetCollectionPath.split('/').filter(Boolean)
 
     if (sourceSegments.length !== targetSegments.length) {
-      throw new Error('リネームではコレクション階層の深さを変えられません')
+      throw new Error(tr('explorer.err_rename_depth'))
     }
 
     if (targetCollectionPath.startsWith(`${sourceCollectionPath}/`)) {
-      throw new Error('リネーム先を元コレクションの配下にはできません')
+      throw new Error(tr('explorer.err_rename_into_self'))
     }
 
     logInfo(
@@ -609,7 +603,7 @@ export async function renameCollection(
       .get()
 
     if (sourceSnapshot.empty) {
-      throw new Error('リネーム元のコレクションにドキュメントがありません')
+      throw new Error(tr('explorer.err_rename_source_empty'))
     }
 
     const targetSnapshot = await getCollectionRef(targetCollectionPath, input.projectId)
@@ -617,7 +611,7 @@ export async function renameCollection(
       .get()
 
     if (!targetSnapshot.empty) {
-      throw new Error('リネーム先コレクションは空である必要があります')
+      throw new Error(tr('explorer.err_rename_target_not_empty'))
     }
 
     const movedCount = await copyCollectionRecursive(
@@ -647,7 +641,10 @@ export async function createCollection(
     ensureConnected(input.projectId)
     ensureFirestoreWritable(input.projectId)
 
-    const collectionId = assertCollectionId(input.collectionId, 'コレクション名')
+    const collectionId = assertCollectionId(
+      input.collectionId,
+      tr('explorer.label_collection_name')
+    )
     assertCollectionPath(collectionId)
 
     logInfo('explorer', `createCollection projectId=${input.projectId} id=${collectionId}`)
@@ -655,7 +652,7 @@ export async function createCollection(
     const existing = await getCollectionRef(collectionId, input.projectId).limit(1).get()
 
     if (!existing.empty) {
-      throw new Error('同名のコレクションが既に存在します')
+      throw new Error(tr('explorer.err_collection_exists'))
     }
 
     const createResult = await createDocument({
@@ -703,13 +700,16 @@ export async function createSubcollection(
     const documentSnapshot = await getDocumentRef(documentPath, input.projectId).get()
 
     if (!documentSnapshot.exists) {
-      throw new Error('親ドキュメントが見つかりません')
+      throw new Error(tr('explorer.err_parent_not_found'))
     }
 
-    const existingSubcollections = await getDocumentRef(documentPath, input.projectId).listCollections()
+    const existingSubcollections = await getDocumentRef(
+      documentPath,
+      input.projectId
+    ).listCollections()
 
     if (existingSubcollections.some((collection) => collection.id === subcollectionId)) {
-      throw new Error('同名のサブコレクションが既に存在します')
+      throw new Error(tr('explorer.err_subcollection_exists'))
     }
 
     const createResult = await createDocument({
@@ -744,7 +744,7 @@ export async function deleteCollection(
     const collectionPath = input.collectionPath.trim()
 
     if (!collectionPath) {
-      throw new Error('コレクション path を指定してください')
+      throw new Error(tr('explorer.err_collection_path_required'))
     }
 
     assertCollectionPath(collectionPath)

@@ -7,6 +7,7 @@ import {
   type AppSettings,
   type Theme
 } from '@shared/settings/shared/types'
+import { setCurrentLocale } from '@shared/i18n/shared/current'
 import type { Locale } from '@shared/i18n/shared/types'
 
 const STORE_FILE_NAME = 'settings.json'
@@ -20,8 +21,12 @@ export async function loadSettings(): Promise<AppSettings> {
 
   try {
     const raw = await readFile(storePath, 'utf-8')
-    return normalizeSettings(JSON.parse(raw) as unknown)
+    const settings = normalizeSettings(JSON.parse(raw) as unknown)
+    // main の tr() も、設定の言語に合わせる
+    setCurrentLocale(settings.locale)
+    return settings
   } catch {
+    setCurrentLocale(DEFAULT_SETTINGS.locale)
     return { ...DEFAULT_SETTINGS }
   }
 }
@@ -40,6 +45,7 @@ export async function setLocale(locale: Locale): Promise<AppSettings> {
   const current = await loadSettings()
   const next: AppSettings = { ...current, locale }
   await saveSettings(next)
+  setCurrentLocale(locale)
   return next
 }
 

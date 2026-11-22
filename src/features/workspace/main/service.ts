@@ -1,3 +1,4 @@
+import { tr } from '@shared/i18n/shared/current'
 import {
   disconnectFirestore,
   getConnectionInfo,
@@ -51,7 +52,7 @@ function toWorkspaceError<T>(error: unknown): WorkspaceResult<T> {
   logError('workspace', 'operation failed', error)
   return {
     ok: false,
-    error: error instanceof Error ? error.message : 'Workspace operation failed'
+    error: error instanceof Error ? error.message : tr('ui.err_operation_failed')
   }
 }
 
@@ -346,7 +347,7 @@ export async function loadProject(
   const entry = getWorkspaceEntry(projectId)
 
   if (!entry) {
-    return { ok: false, error: 'プロジェクトが登録されていません' }
+    return { ok: false, error: tr('workspace.err_not_registered') }
   }
 
   if (isFirestoreConnected(projectId)) {
@@ -503,7 +504,7 @@ export async function updateEntry(
   const entry = getWorkspaceEntry(projectId)
 
   if (!entry) {
-    return { ok: false, error: 'プロジェクトが登録されていません' }
+    return { ok: false, error: tr('workspace.err_not_registered') }
   }
 
   const updated: WorkspaceEntry = {
@@ -539,7 +540,7 @@ export async function setFocusedProject(
   const entry = getWorkspaceEntry(projectId)
 
   if (!entry) {
-    return { ok: false, error: 'プロジェクトが登録されていません' }
+    return { ok: false, error: tr('workspace.err_not_registered') }
   }
 
   if (options?.exclusive) {

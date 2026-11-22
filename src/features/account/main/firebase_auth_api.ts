@@ -1,3 +1,4 @@
+import { tr } from '@shared/i18n/shared/current'
 import { net } from 'electron'
 import { FIREBASE_API_KEY } from './firebase_config'
 
@@ -46,7 +47,7 @@ export async function signUpAnonymous(): Promise<FirebaseTokens> {
   )
 
   if (!response.ok) {
-    throw new Error(`匿名ユーザーを作成できませんでした: ${await readErrorMessage(response)}`)
+    throw new Error(tr('account.err_anonymous', { message: await readErrorMessage(response) }))
   }
 
   const body = (await response.json()) as {
@@ -95,7 +96,7 @@ export async function signInWithGoogleIdToken(
     if (currentIdToken && ALREADY_LINKED_MESSAGES.includes(message)) {
       return null
     }
-    throw new Error(`Google でログインできませんでした: ${message}`)
+    throw new Error(tr('account.err_google_sign_in_detail', { message }))
   }
 
   const body = (await response.json()) as {
@@ -131,7 +132,7 @@ export async function refreshTokens(refreshToken: string): Promise<FirebaseToken
     if (INVALID_SESSION_MESSAGES.includes(message)) {
       throw new InvalidSessionError(message)
     }
-    throw new Error(`ログイン情報を更新できませんでした: ${message}`)
+    throw new Error(tr('account.err_refresh', { message }))
   }
 
   const body = (await response.json()) as {

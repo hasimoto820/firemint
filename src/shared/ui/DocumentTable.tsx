@@ -1,3 +1,5 @@
+import { tr } from '@shared/i18n/shared/current'
+import { useI18n } from '@shared/i18n/renderer/I18nProvider'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFieldAutocompleteItems } from '@features/autocomplete/renderer/hooks'
 import type { DocumentSummary } from '@features/explorer/shared/types'
@@ -62,16 +64,16 @@ type DocumentTableProps = {
 function filterValuePlaceholder(operator: TableFilterOperator): string {
   switch (operator) {
     case 'in':
-      return '例: ["a","b"] または a, b'
+      return tr('ui.ph_in')
     case 'array-contains':
-      return '配列内の1値（例: beta）'
+      return tr('ui.ph_array_contains')
     case 'contains':
-      return '部分一致する文字列'
+      return tr('ui.ph_contains')
     case 'exists':
     case 'not-exists':
-      return '（不要）'
+      return tr('ui.ph_none')
     default:
-      return '値を入力'
+      return tr('ui.ph_value')
   }
 }
 
@@ -84,6 +86,7 @@ function DocumentTablePagingControls({
   paging: DocumentTablePaging
   countLabel: string
 }): React.JSX.Element {
+  const { t } = useI18n()
   const [pageInput, setPageInput] = useState(String(paging.pageNumber))
 
   useEffect(() => {
@@ -109,8 +112,8 @@ function DocumentTablePagingControls({
         className="document-table-panel__page-btn"
         onClick={paging.onFirst}
         disabled={navDisabled || !paging.hasPrev}
-        aria-label="最初のページ"
-        title="最初"
+        aria-label={t('ui.first_page')}
+        title={t('ui.first')}
       >
         «
       </button>
@@ -119,8 +122,8 @@ function DocumentTablePagingControls({
         className="document-table-panel__page-btn"
         onClick={paging.onPrev}
         disabled={navDisabled || !paging.hasPrev}
-        aria-label="前のページ"
-        title="前へ"
+        aria-label={t('ui.prev_page')}
+        title={t('ui.prev')}
       >
         ‹
       </button>
@@ -130,8 +133,8 @@ function DocumentTablePagingControls({
         className="document-table-panel__page-btn"
         onClick={paging.onNext}
         disabled={navDisabled || !paging.hasNext}
-        aria-label="次のページ"
-        title="次へ"
+        aria-label={t('ui.next_page')}
+        title={t('ui.next')}
       >
         ›
       </button>
@@ -140,13 +143,13 @@ function DocumentTablePagingControls({
         className="document-table-panel__page-btn"
         onClick={paging.onLast}
         disabled={navDisabled || !paging.hasLast || !paging.onLast}
-        aria-label="最後のページ"
-        title="最後"
+        aria-label={t('ui.last_page')}
+        title={t('ui.last')}
       >
         »
       </button>
       <label className="document-table-panel__page-jump">
-        <span className="document-table-panel__page-jump-label">ページ</span>
+        <span className="document-table-panel__page-jump-label">{t('ui.page')}</span>
         <input
           className="document-table-panel__page-input"
           type="number"
@@ -154,7 +157,7 @@ function DocumentTablePagingControls({
           inputMode="numeric"
           value={pageInput}
           disabled={navDisabled}
-          aria-label="ページ番号"
+          aria-label={t('ui.page_number')}
           onChange={(event) => setPageInput(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === 'Enter') {
@@ -169,7 +172,7 @@ function DocumentTablePagingControls({
           onClick={submitGoToPage}
           disabled={navDisabled}
         >
-          移動
+          {t('ui.go')}
         </button>
       </label>
       {paging.seeking && (
@@ -183,7 +186,7 @@ function DocumentTablePagingControls({
             onClick={paging.onCancelSeek}
             disabled={!paging.onCancelSeek}
           >
-            停止
+            {t('ui.stop')}
           </button>
         </>
       )}
@@ -227,6 +230,7 @@ function DocumentTable({
   initialViewState = null,
   onViewStateChange
 }: DocumentTableProps): React.JSX.Element {
+  const { t } = useI18n()
   const [columnOrder, setColumnOrder] = useState<string[]>(
     () => initialViewState?.columnOrder ?? []
   )
@@ -342,10 +346,10 @@ function DocumentTable({
           {paging ? (
             <DocumentTablePagingControls paging={paging} countLabel={paging.rangeLabel} />
           ) : (
-            <span className="document-table-panel__count">0 件</span>
+            <span className="document-table-panel__count">{t('ui.zero_items')}</span>
           )}
         </div>
-        <p className="document-table__empty">ドキュメントがありません</p>
+        <p className="document-table__empty">{t('ui.no_documents')}</p>
       </div>
     )
   }
@@ -354,7 +358,7 @@ function DocumentTable({
     <div className="document-table-panel">
       <div className="document-table-panel__toolbar">
         <Button onClick={() => setShowColumnPanel((current) => !current)}>
-          {showColumnPanel ? '列設定を閉じる' : '列設定'}
+          {showColumnPanel ? t('ui.columns_close') : t('ui.columns')}
         </Button>
         <button
           type="button"
@@ -362,7 +366,7 @@ function DocumentTable({
           onClick={addFilterClause}
           disabled={filterClauses.length >= MAX_FILTER_CLAUSES}
         >
-          + フィルタ
+          {t('ui.add_filter')}
         </button>
         {paging ? (
           <DocumentTablePagingControls
@@ -370,13 +374,17 @@ function DocumentTable({
             countLabel={
               filterClauses.some((clause) => isFilterClauseActive(clause)) &&
               displayedDocuments.length !== documents.length
-                ? `このページ ${displayedDocuments.length}/${documents.length} · ${paging.rangeLabel}`
+                ? t('ui.this_page', {
+                    shown: displayedDocuments.length,
+                    total: documents.length,
+                    range: paging.rangeLabel
+                  })
                 : paging.rangeLabel
             }
           />
         ) : (
           <span className="document-table-panel__count">
-            {displayedDocuments.length} / {documents.length} 件
+            {t('ui.shown_of', { shown: displayedDocuments.length, total: documents.length })}
           </span>
         )}
       </div>
@@ -390,7 +398,7 @@ function DocumentTable({
               value={clause.field}
               items={fieldItems}
               placeholder="field"
-              aria-label="フィルタ対象フィールド"
+              aria-label={t('ui.filter_field')}
               onChange={(next) => updateFilterClause(clause.id, { field: next })}
             />
             <select
@@ -401,7 +409,7 @@ function DocumentTable({
                   operator: event.target.value as TableFilterOperator
                 })
               }
-              aria-label="フィルタ演算子"
+              aria-label={t('ui.filter_operator')}
             >
               {TABLE_FILTER_OPERATORS.map((operator) => (
                 <option key={operator.value} value={operator.value}>
@@ -414,14 +422,14 @@ function DocumentTable({
               value={isUnaryFilterOperator(clause.operator) ? '' : clause.value}
               onChange={(event) => updateFilterClause(clause.id, { value: event.target.value })}
               placeholder={filterValuePlaceholder(clause.operator)}
-              aria-label="フィルタ値"
+              aria-label={t('ui.filter_value')}
               disabled={isUnaryFilterOperator(clause.operator)}
             />
             <button
               type="button"
               className="document-filter-bar__remove"
               onClick={() => removeFilterClause(clause.id)}
-              aria-label="フィルタを削除"
+              aria-label={t('ui.remove_filter')}
             >
               ×
             </button>
@@ -446,7 +454,7 @@ function DocumentTable({
                   type="button"
                   className="document-table-panel__move"
                   onClick={() => setColumnOrder((current) => moveColumn(current, column, 'up'))}
-                  aria-label={`${column} を上へ`}
+                  aria-label={t('ui.move_up', { column })}
                 >
                   ↑
                 </button>
@@ -454,7 +462,7 @@ function DocumentTable({
                   type="button"
                   className="document-table-panel__move"
                   onClick={() => setColumnOrder((current) => moveColumn(current, column, 'down'))}
-                  aria-label={`${column} を下へ`}
+                  aria-label={t('ui.move_down', { column })}
                 >
                   ↓
                 </button>
@@ -480,7 +488,7 @@ function DocumentTable({
                     type="checkbox"
                     checked={allSelected}
                     onChange={(event) => onBulkToggleAll?.(event.target.checked)}
-                    aria-label="全選択"
+                    aria-label={t('ui.select_all')}
                   />
                 </th>
               )}
@@ -496,7 +504,7 @@ function DocumentTable({
                     {sortIndicator(sort, column)}
                   </button>
                   <ColumnResizeHandle
-                    ariaLabel={`${column} 列の幅`}
+                    ariaLabel={t('ui.column_width', { column })}
                     onResize={(delta) => resizeBy(column, delta)}
                     onReset={() => reset(column)}
                   />
@@ -511,7 +519,7 @@ function DocumentTable({
                   colSpan={visibleColumns.length + (selectable ? 1 : 0)}
                   className="document-table__empty"
                 >
-                  フィルタに一致するドキュメントがありません
+                  {t('ui.no_filter_match')}
                 </td>
               </tr>
             ) : (
@@ -536,9 +544,7 @@ function DocumentTable({
                         <input
                           type="checkbox"
                           checked={bulkSelected}
-                          onChange={(event) =>
-                            onBulkToggle?.(document.path, event.target.checked)
-                          }
+                          onChange={(event) => onBulkToggle?.(document.path, event.target.checked)}
                           aria-label={`Select ${document.id}`}
                         />
                       </td>

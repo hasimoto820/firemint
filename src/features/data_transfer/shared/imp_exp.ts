@@ -1,3 +1,4 @@
+import { tr } from '@shared/i18n/shared/current'
 import type {
   ImportFileInfo,
   ImportWriteMode,
@@ -49,14 +50,14 @@ export function joinFilePath(folder: string, fileName: string): string {
 }
 
 export function formatLabel(format: TransferFormat): string {
-  return format === 'jsonl' ? 'JSON（.jsonl）' : '公式ダンプ'
+  return format === 'jsonl' ? tr('dt.json_jsonl') : tr('dt.official_dump')
 }
 
 /** 書き方の説明。targetLabel は書き込む側の呼び名（クラウド / Emulator） */
 export function writeModeHint(writeMode: ImportWriteMode, targetLabel: string): string {
   return writeMode === 'append'
-    ? `${targetLabel}に無いドキュメントだけを作ります。既にあるドキュメントには触れません。`
-    : `ファイルにあるドキュメントは、ファイルの中身で丸ごと置き換わります。${targetLabel}にだけあるフィールドは消えます。`
+    ? tr('dt.hint_append', { target: targetLabel.trim() })
+    : tr('dt.hint_overwrite', { target: targetLabel.trim() })
 }
 
 export function lastPathSegment(path: string): string {
@@ -105,9 +106,7 @@ export function applyImpExpIntent(
           : draft.collectionPath,
     acceptMismatch: false,
     selectedRoots:
-      direction === 'export' &&
-      target === 'project' &&
-      draft.selectedRoots.length === 0
+      direction === 'export' && target === 'project' && draft.selectedRoots.length === 0
         ? rootCollectionIds
         : draft.selectedRoots,
     projectValidation: switched ? null : draft.projectValidation

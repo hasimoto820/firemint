@@ -1,3 +1,4 @@
+import { useI18n } from '@shared/i18n/renderer/I18nProvider'
 import { useMemo } from 'react'
 import { useOptionalAutocompleteApi } from '@features/autocomplete/renderer/hooks'
 import type { QueryGroupTab } from '@features/query/shared/types'
@@ -27,6 +28,7 @@ function QueryEditor({
   onSelectGroupTab,
   onRun
 }: QueryEditorProps): React.JSX.Element {
+  const { t } = useI18n()
   const autocomplete = useOptionalAutocompleteApi()
 
   const items = useMemo(() => {
@@ -38,7 +40,7 @@ function QueryEditor({
     <div className="query-editor">
       <div className="query-editor__toolbar">
         <span className="query-editor__title">JS Query</span>
-        <nav className="app-nav query-editor__group-tabs" aria-label="グループタブ">
+        <nav className="app-nav query-editor__group-tabs" aria-label={t('query.group_tabs')}>
           <button
             type="button"
             className={
@@ -51,7 +53,9 @@ function QueryEditor({
           </button>
           <button
             type="button"
-            className={groupTab === 'group' ? 'app-nav__item app-nav__item--active' : 'app-nav__item'}
+            className={
+              groupTab === 'group' ? 'app-nav__item app-nav__item--active' : 'app-nav__item'
+            }
             disabled={loading}
             onClick={() => onSelectGroupTab('group')}
           >
@@ -70,7 +74,7 @@ function QueryEditor({
         disabled={loading}
         className="query-editor__field-wrap"
         fieldClassName="query-editor__source"
-        aria-label="JS Query コード"
+        aria-label={t('query.code_aria')}
         onChange={onChange}
         onMetaEnter={() => {
           if (!loading) {

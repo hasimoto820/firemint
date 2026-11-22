@@ -1,3 +1,4 @@
+import { tr } from '@shared/i18n/shared/current'
 import type {
   DocumentSnapshot,
   QueryDocumentSnapshot,
@@ -15,7 +16,7 @@ const RUN_TIMEOUT_MS = 30_000
 
 function ensureConnected(projectId: string): void {
   if (!isFirestoreConnected(projectId)) {
-    throw new Error(`Firestore is not connected: ${projectId}`)
+    throw new Error(tr('ui.err_not_connected', { projectId: projectId }))
   }
 }
 
@@ -23,7 +24,7 @@ function toQueryError(error: unknown): QueryExecuteResult {
   logError('query', 'operation failed', error)
   return {
     ok: false,
-    error: error instanceof Error ? error.message : 'Query operation failed'
+    error: error instanceof Error ? error.message : tr('ui.err_operation_failed')
   }
 }
 
@@ -73,9 +74,7 @@ function normalizeRunResult(value: unknown): DocumentSummary[] {
   }
 
   if (looksLikeUnevaluatedQuery(value)) {
-    throw new Error(
-      'Query オブジェクトが返されました。.get() した結果（QuerySnapshot）を return してください'
-    )
+    throw new Error(tr('query.err_unevaluated'))
   }
 
   if (isQuerySnapshotLike(value)) {
@@ -105,17 +104,13 @@ function normalizeRunResult(value: unknown): DocumentSummary[] {
         continue
       }
 
-      throw new Error(
-        '配列の要素は DocumentSnapshot である必要があります（QuerySnapshot を return する方が簡単です）'
-      )
+      throw new Error(tr('query.err_array_items'))
     }
 
     return documents.slice(0, MAX_RESULT_DOCS)
   }
 
-  throw new Error(
-    'run() は QuerySnapshot / DocumentSnapshot / それらの配列を return してください'
-  )
+  throw new Error(tr('query.err_return_type'))
 }
 
 async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
@@ -126,7 +121,7 @@ async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
       promise,
       new Promise<T>((_resolve, reject) => {
         timer = setTimeout(() => {
-          reject(new Error(`クエリがタイムアウトしました（${ms / 1000} 秒）`))
+          reject(new Error(tr('query.err_timeout', { seconds: ms / 1000 })))
         }, ms)
       })
     ])
@@ -146,7 +141,7 @@ function buildRunner(source: string): (db: unknown, adminSdk: unknown) => Promis
 return (async () => {
 ${source}
 if (typeof run !== 'function') {
-  throw new Error('async function run() を定義してください');
+  throw new Error(${JSON.stringify(tr('query.err_define_run'))});
 }
 return await run();
 })();`
@@ -162,25 +157,28 @@ return await run();
 export async function executeJsQuery(input: JsQueryInput): Promise<QueryExecuteResult> {
   try {
     if (!input || typeof input.projectId !== 'string') {
-      throw new Error('projectId がありません')
+      throw new Error(tr('query.err_no_project_id'))
     }
 
     if (!input.source || typeof input.source !== 'string') {
-      throw new Error('クエリコードが空です')
+      throw new Error(tr('query.err_empty_code'))
     }
 
     ensureConnected(input.projectId)
 
     const source = input.source.trim()
     if (!source) {
-      throw new Error('クエリコードが空です')
+      throw new Error(tr('query.err_empty_code'))
     }
 
     logInfo('query', `executeJsQuery projectId=${input.projectId} sourceLength=${source.length}`)
 
     const db = getFirestore(input.projectId)
     const runner = buildRunner(source)
-    const raw = await withTimeout(Promise.resolve().then(() => runner(db, admin)), RUN_TIMEOUT_MS)
+    const raw = await withTimeout(
+      Promise.resolve().then(() => runner(db, admin)),
+      RUN_TIMEOUT_MS
+    )
     const documents = normalizeRunResult(raw)
 
     logInfo('query', `executeJsQuery ok docs=${documents.length}`)

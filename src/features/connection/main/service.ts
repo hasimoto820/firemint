@@ -1,3 +1,4 @@
+import { tr } from '@shared/i18n/shared/current'
 import {
   getConnectionInfo,
   getFirestore,
@@ -25,7 +26,7 @@ import type {
 import { loadGoogleOAuthConfig } from './google_oauth_config'
 import {
   cancelGoogleOAuthLogin,
-  GOOGLE_OAUTH_CANCELED_MESSAGE,
+  googleOAuthCanceledMessage,
   runGoogleOAuthLogin
 } from './google_oauth'
 import { saveGoogleRefreshToken } from './google_token_store'
@@ -33,7 +34,7 @@ import { saveGoogleRefreshToken } from './google_token_store'
 const CONNECT_TIMEOUT_MS = 30_000
 
 function formatConnectionError(error: unknown): string {
-  const message = error instanceof Error ? error.message : 'Connection failed'
+  const message = error instanceof Error ? error.message : tr('ui.err_operation_failed')
   const unavailable = formatUnavailableFirestoreMessage(message)
 
   if (unavailable) {
@@ -41,11 +42,11 @@ function formatConnectionError(error: unknown): string {
   }
 
   if (message.includes('unable to verify') || message.includes('UNABLE_TO_VERIFY')) {
-    return 'SSL 証明書の検証に失敗しました。社内プロキシ環境の場合は config/extra_ca.pem に CA 証明書を置いてください。'
+    return tr('conn.err_ssl')
   }
 
   if (message.includes('ENOTFOUND') || message.includes('ETIMEDOUT')) {
-    return 'ネットワークエラー。インターネット接続を確認してください。'
+    return tr('conn.err_network')
   }
 
   // API 未有効は gRPC code 7 / HTTP 403 扱いになることがあるので、汎用「権限なし」より先に判定する
@@ -54,7 +55,7 @@ function formatConnectionError(error: unknown): string {
     message.includes('Firestore API has not been used') ||
     (message.includes('firestore.googleapis.com') && message.includes('disabled'))
   ) {
-    return 'このプロジェクトで Cloud Firestore API が有効になっていません。'
+    return tr('conn.err_api_disabled')
   }
 
   // プロジェクト ID に含まれる "403"（例: colorpanda-19403）に誤反応しない
@@ -63,19 +64,15 @@ function formatConnectionError(error: unknown): string {
     /\b403\b/.test(message) ||
     message.includes('Forbidden')
   ) {
-    return '権限がありません。アカウントまたはサービスアカウントの権限を確認してください。'
+    return tr('conn.err_permission')
   }
 
   if (message.includes('INVALID_ARGUMENT') || message.includes('Invalid service account')) {
-    return 'JSON の形式が正しくありません。サービスアカウントキーか確認してください。'
+    return tr('conn.err_sa_json')
   }
 
   if (message.includes('NOT_FOUND')) {
-    return 'このプロジェクトに Firestore データベースがありません。'
-  }
-
-  if (message.includes('タイムアウト')) {
-    return message
+    return tr('ui.native_missing')
   }
 
   return message
@@ -86,9 +83,10 @@ function formatEmulatorError(error: unknown): string {
 
   if (
     message.includes('HOST:PORT') ||
-    message.includes('host と projectId') ||
-    message.includes('projectId を指定') ||
-    message.includes('接続情報が不足')
+    message === tr('ui.err_emulator_host_required') ||
+    message === tr('ui.err_project_id_required') ||
+    message === tr('conn.err_emulator_info') ||
+    message === tr('emu.err_info_missing')
   ) {
     return message
   }
@@ -98,10 +96,10 @@ function formatEmulatorError(error: unknown): string {
     message.includes('ECONNRESET') ||
     message.includes('ENOTFOUND') ||
     message.includes('UNAVAILABLE') ||
-    message.includes('タイムアウト') ||
+    message === tr('conn.err_timeout') ||
     /timeout/i.test(message)
   ) {
-    return 'Emulator に接続できません。HOST:PORT と起動状態を確認してください。'
+    return tr('conn.err_emulator_unreachable')
   }
 
   return message
@@ -114,7 +112,10 @@ async function listRootCollectionsWithTimeout(projectId: string): Promise<string
     logInfo('connection', `listCollections skipped: ${unavailable} projectId=${projectId}`)
     return []
   }
-  logInfo('connection', `listCollections start projectId=${projectId} timeout=${CONNECT_TIMEOUT_MS}ms`)
+  logInfo(
+    'connection',
+    `listCollections start projectId=${projectId} timeout=${CONNECT_TIMEOUT_MS}ms`
+  )
   const startedAt = Date.now()
 
   const collectionsPromise = getFirestore(projectId)
@@ -139,7 +140,7 @@ async function listRootCollectionsWithTimeout(projectId: string): Promise<string
         'connection',
         `listCollections timeout after ${CONNECT_TIMEOUT_MS}ms (elapsed=${Date.now() - startedAt}ms)`
       )
-      reject(new Error('接続がタイムアウトしました。Firestore の有効化とネットワークを確認してください。'))
+      reject(new Error(tr('conn.err_timeout')))
     }, CONNECT_TIMEOUT_MS)
   })
 
@@ -205,11 +206,11 @@ export async function signInWithGoogle(): Promise<GoogleSignInResult> {
     }
   } catch (error) {
     const message = formatConnectionError(error)
-    if (error instanceof Error && error.message === GOOGLE_OAUTH_CANCELED_MESSAGE) {
+    if (error instanceof Error && error.message === googleOAuthCanceledMessage()) {
       logInfo('connection', 'google sign-in canceled')
-    } else {
-      logError('connection', 'google sign-in failed', error)
+      return { ok: false, error: message, canceled: true }
     }
+    logError('connection', 'google sign-in failed', error)
     return {
       ok: false,
       error: message

@@ -1,3 +1,4 @@
+import { tr } from '@shared/i18n/shared/current'
 import { app } from 'electron'
 import { readFile } from 'fs/promises'
 import { join } from 'path'
@@ -31,16 +32,14 @@ export async function loadGoogleOAuthConfig(): Promise<GoogleOAuthConfig> {
     const clientSecret = parsed.clientSecret?.trim()
 
     if (!clientId || !clientSecret) {
-      throw new Error('google_oauth.json に clientId / clientSecret がありません')
+      throw new Error(tr('conn.err_oauth_json'))
     }
 
     logInfo('connection:google', 'oauth config loaded from config/google_oauth.json')
     return { clientId, clientSecret }
   } catch (error) {
     if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
-      throw new Error(
-        'Google OAuth 設定がありません。config/google_oauth.json を置くか、FIREMINT_GOOGLE_CLIENT_ID / FIREMINT_GOOGLE_CLIENT_SECRET を設定してください。'
-      )
+      throw new Error(tr('conn.err_oauth_config'))
     }
 
     throw error

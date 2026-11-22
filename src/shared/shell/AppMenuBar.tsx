@@ -1,3 +1,4 @@
+import { useI18n } from '@shared/i18n/renderer/I18nProvider'
 import { useEffect, useRef, useState } from 'react'
 import type { AppMenuEntry, AppMenuSection } from './app_menu'
 
@@ -18,6 +19,7 @@ function indentClass(indent?: boolean | 1 | 2): string {
 }
 
 function AppMenuBar({ menus }: AppMenuBarProps): React.JSX.Element {
+  const { t } = useI18n()
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const barRef = useRef<HTMLElement>(null)
 
@@ -63,7 +65,7 @@ function AppMenuBar({ menus }: AppMenuBarProps): React.JSX.Element {
   }
 
   return (
-    <nav ref={barRef} className="app-menu-bar" aria-label="Application menu" data-area="menu">
+    <nav ref={barRef} className="app-menu-bar" aria-label={t('ui.app_menu')} data-area="menu">
       {menus.map((section) => {
         const isOpen = openMenuId === section.id
 

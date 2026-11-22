@@ -1,3 +1,4 @@
+import { tr } from '@shared/i18n/shared/current'
 import http from 'http'
 import { shell } from 'electron'
 import { OAuth2Client } from 'google-auth-library'
@@ -28,7 +29,7 @@ function getFreePort(): Promise<number> {
 
       if (!address || typeof address === 'string') {
         server.close()
-        reject(new Error('OAuth 用ポートを確保できませんでした'))
+        reject(new Error(tr('conn.err_oauth_port')))
         return
       }
 
@@ -64,13 +65,16 @@ async function fetchAccountEmail(accessToken: string): Promise<string> {
   )
 
   if (!data.email) {
-    throw new Error('Google アカウントの email を取得できませんでした')
+    throw new Error(tr('conn.err_no_email'))
   }
 
   return data.email
 }
 
-export const GOOGLE_OAUTH_CANCELED_MESSAGE = 'Google 認証をキャンセルしました'
+/** キャンセルの時のメッセージ。比べる側も同じ関数で作るので、言語が変わっても一致する */
+export function googleOAuthCanceledMessage(): string {
+  return tr('conn.google_canceled')
+}
 
 type ActiveOAuthSession = {
   cancel: () => void
@@ -119,7 +123,7 @@ export async function runGoogleOAuthLogin(config: GoogleOAuthConfig): Promise<{
       }
 
       if (!value) {
-        reject(new Error('OAuth に失敗しました'))
+        reject(new Error(tr('conn.err_oauth')))
         return
       }
 
@@ -128,7 +132,7 @@ export async function runGoogleOAuthLogin(config: GoogleOAuthConfig): Promise<{
 
     const cancel = (): void => {
       logInfo('connection:google', 'oauth canceled by user')
-      finish(new Error(GOOGLE_OAUTH_CANCELED_MESSAGE))
+      finish(new Error(googleOAuthCanceledMessage()))
     }
 
     activeOAuth = { cancel }
@@ -137,7 +141,7 @@ export async function runGoogleOAuthLogin(config: GoogleOAuthConfig): Promise<{
       void (async () => {
         try {
           if (!req.url) {
-            throw new Error('不正な OAuth コールバックです')
+            throw new Error(tr('conn.err_bad_callback'))
           }
 
           const url = new URL(req.url, `http://127.0.0.1:${port}`)
@@ -152,27 +156,25 @@ export async function runGoogleOAuthLogin(config: GoogleOAuthConfig): Promise<{
 
           if (errorParam) {
             await sendOAuthCallbackPage(res, 400, 'failed', errorParam)
-            finish(new Error(`Google 認証がキャンセルまたは失敗しました: ${errorParam}`))
+            finish(new Error(tr('conn.err_google_failed', { error: errorParam })))
             return
           }
 
           const code = url.searchParams.get('code')
 
           if (!code) {
-            throw new Error('認可コードがありません')
+            throw new Error(tr('conn.err_no_code'))
           }
 
           const tokenResponse = await client.getToken(code)
           const tokens = tokenResponse.tokens
 
           if (!tokens.access_token) {
-            throw new Error('access_token を取得できませんでした')
+            throw new Error(tr('conn.err_no_access_token'))
           }
 
           if (!tokens.refresh_token) {
-            throw new Error(
-              'refresh_token を取得できませんでした。Google Cloud の同意画面で再同意するか、prompt=consent を確認してください。'
-            )
+            throw new Error(tr('conn.err_no_refresh_token'))
           }
 
           const email = await fetchAccountEmail(tokens.access_token)
@@ -186,7 +188,7 @@ export async function runGoogleOAuthLogin(config: GoogleOAuthConfig): Promise<{
           })
         } catch (error) {
           await sendOAuthCallbackPage(res, 500, 'failed')
-          finish(error instanceof Error ? error : new Error('OAuth コールバック処理に失敗しました'))
+          finish(error instanceof Error ? error : new Error(tr('conn.err_callback')))
         }
       })()
     })
@@ -203,13 +205,13 @@ export async function runGoogleOAuthLogin(config: GoogleOAuthConfig): Promise<{
       })
 
       void shell.openExternal(authUrl).catch((error: unknown) => {
-        finish(error instanceof Error ? error : new Error('ブラウザを開けませんでした'))
+        finish(error instanceof Error ? error : new Error(tr('conn.err_open_browser')))
       })
     })
 
     const timeoutId = setTimeout(
       () => {
-        finish(new Error('Google 認証がタイムアウトしました（5分）'))
+        finish(new Error(tr('conn.err_google_timeout')))
       },
       5 * 60 * 1000
     )
@@ -226,7 +228,7 @@ export async function refreshGoogleAccessToken(
   const token = typeof response.token === 'string' ? response.token : (response.token ?? null)
 
   if (!token) {
-    throw new Error('access_token の更新に失敗しました。再サインインしてください。')
+    throw new Error(tr('conn.err_refresh'))
   }
 
   return token

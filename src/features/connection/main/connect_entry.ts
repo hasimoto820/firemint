@@ -1,3 +1,4 @@
+import { tr } from '@shared/i18n/shared/current'
 import { readFile } from 'fs/promises'
 import {
   connectFirestore,
@@ -20,7 +21,7 @@ export async function connectWorkspaceEntry(
 ): Promise<FirestoreConnectionInfo> {
   if (entry.authType === 'google') {
     if (!entry.googleAccountKey || !entry.googleAccountEmail) {
-      throw new Error('Google 接続情報が不足しています。再サインインしてください。')
+      throw new Error(tr('conn.err_google_info'))
     }
 
     return connectGoogleProject({
@@ -32,7 +33,7 @@ export async function connectWorkspaceEntry(
 
   if (entry.authType === 'emulator') {
     if (!entry.emulatorHost || !entry.emulatorProjectId) {
-      throw new Error('Emulator 接続情報が不足しています')
+      throw new Error(tr('conn.err_emulator_info'))
     }
 
     return connectEmulator({
@@ -43,7 +44,7 @@ export async function connectWorkspaceEntry(
   }
 
   if (!entry.serviceAccountPath) {
-    throw new Error('サービスアカウント path がありません')
+    throw new Error(tr('conn.err_sa_path'))
   }
 
   return connectServiceAccountFile(entry.serviceAccountPath)
@@ -66,7 +67,7 @@ export async function connectGoogleProject(input: {
   const refreshToken = await loadGoogleRefreshToken(input.accountKey)
 
   if (!refreshToken) {
-    throw new Error('保存済みの Google トークンがありません。再サインインしてください。')
+    throw new Error(tr('conn.err_no_token'))
   }
 
   const oauth = await loadGoogleOAuthConfig()

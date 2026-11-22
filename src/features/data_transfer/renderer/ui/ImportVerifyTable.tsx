@@ -1,3 +1,5 @@
+import { tr } from '@shared/i18n/shared/current'
+import { useI18n } from '@shared/i18n/renderer/I18nProvider'
 import type {
   ImportVerifyRow,
   OfficialImportValidation
@@ -16,8 +18,9 @@ function isVerifyRowDanger(row: ImportVerifyRow): boolean {
 
 /** 詳細は「ドキュメント数 / 差分ドキュメント数」、簡易は「ドキュメント数」 */
 function VerifySideCell({ side }: { side: ImportVerifyRow['cloud'] }): React.JSX.Element {
+  const { t } = useI18n()
   if (!side) {
-    return <td className="imp-exp-verify__empty">（なし）</td>
+    return <td className="imp-exp-verify__empty">{t('explorer.none')}</td>
   }
   return (
     <td>
@@ -36,26 +39,28 @@ function VerifySideCell({ side }: { side: ImportVerifyRow['cloud'] }): React.JSX
 
 function ImportVerifyTable({
   validation,
-  targetLabel = 'クラウド'
+  targetLabel = tr('dt.cloud')
 }: {
   validation: OfficialImportValidation
   targetLabel?: string
 }): React.JSX.Element {
+  const { t } = useI18n()
   return (
-    <section className="imp-exp-verify" aria-label="検証結果">
+    <section className="imp-exp-verify" aria-label={t('dt.validation_result')}>
       <p className="imp-exp-verify__summary">
-        {validation.level === 'detailed' ? '詳細検証' : '簡易検証'}
-        {' ／ '}ファイル {validation.documentCount.toLocaleString()} 件
+        {validation.level === 'detailed' ? t('dt.detailed_validate') : t('dt.quick_validate')}
+        {' ／ '}
+        {t('dt.file_count', { count: validation.documentCount.toLocaleString() })}
         {validation.changedCount !== null
-          ? ` ／ 中身が違うドキュメント ${validation.changedCount.toLocaleString()} 件`
+          ? ` ／ ${t('dt.changed_count', { count: validation.changedCount.toLocaleString() })}`
           : ''}
       </p>
       <table className="imp-exp-verify__table">
         <thead>
           <tr>
-            <th>コレクション</th>
+            <th>{t('explorer.kind_collection')}</th>
             <th>{targetLabel}</th>
-            <th>ファイル</th>
+            <th>{t('dt.file')}</th>
           </tr>
         </thead>
         <tbody>
@@ -72,10 +77,9 @@ function ImportVerifyTable({
         </tbody>
       </table>
       <p className="imp-exp-form__hint">
-        {validation.level === 'detailed'
-          ? '＊詳細検証：ドキュメント数 / 差分ドキュメント数'
-          : '＊簡易検証：ドキュメント数'}
-        <br />＊{targetLabel}にだけあるコレクション / ドキュメントは、実行しても消えません。
+        {validation.level === 'detailed' ? t('dt.note_detailed') : t('dt.note_quick')}
+        <br />
+        {t('dt.note_only_target', { target: targetLabel.trim() })}
       </p>
     </section>
   )

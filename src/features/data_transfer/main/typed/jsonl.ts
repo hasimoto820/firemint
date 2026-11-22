@@ -1,3 +1,4 @@
+import { tr } from '@shared/i18n/shared/current'
 import type { TransferScopeKind } from '../../shared/official'
 import type { TypedDocument, TypedFields, TypedValue } from '../../shared/typed_value'
 import { isoToTimestamp, timestampToIso } from './timestamp'
@@ -120,7 +121,7 @@ function decodeValue(value: unknown): TypedValue {
   if (value instanceof JsonNumber) return decodeNumber(value.source)
   if (Array.isArray(value)) return { arrayValue: { values: value.map(decodeValue) } }
   if (!isPlainRecord(value)) {
-    throw new Error('読めない値です')
+    throw new Error(tr('dt.err_unreadable_value'))
   }
 
   const type = value.__firemint_type
@@ -142,7 +143,7 @@ function decodeValue(value: unknown): TypedValue {
   if (type === 'double' && ['NaN', 'Infinity', '-Infinity'].includes(value.value as string)) {
     return { doubleValue: Number(value.value) }
   }
-  throw new Error(`__firemint_type の値が読めません: ${String(type)}`)
+  throw new Error(tr('dt.err_bad_type', { type: String(type) }))
 }
 
 function decodeFields(record: Record<string, unknown>): TypedFields {
@@ -159,13 +160,13 @@ export function parseJsonlHeader(line: string): JsonlHeader {
   try {
     parsed = JSON.parse(line)
   } catch {
-    throw new Error('1 行目が見出しではありません')
+    throw new Error(tr('dt.err_no_header'))
   }
   if (!isPlainRecord(parsed) || parsed.kind !== JSONL_KIND) {
-    throw new Error(`1 行目が見出しではありません（kind が ${JSONL_KIND} ではない）`)
+    throw new Error(tr('dt.err_header_kind', { kind: JSONL_KIND }))
   }
   if (parsed.version !== JSONL_VERSION) {
-    throw new Error(`対応していない version です: ${String(parsed.version)}`)
+    throw new Error(tr('dt.err_version', { version: String(parsed.version) }))
   }
   return parsed as JsonlHeader
 }
@@ -179,11 +180,11 @@ export function scopeKindOf(header: JsonlHeader): TransferScopeKind | null {
 export function parseJsonlDocument(line: string): TypedDocument {
   const parsed = parseKeepingNumbers(line)
   if (!isPlainRecord(parsed) || typeof parsed.path !== 'string' || !isPlainRecord(parsed.data)) {
-    throw new Error('path と data がありません')
+    throw new Error(tr('dt.err_no_path_data'))
   }
   const segments = parsed.path.split('/').filter(Boolean)
   if (segments.length < 2 || segments.length % 2 !== 0) {
-    throw new Error(`ドキュメントのパスではありません: ${parsed.path}`)
+    throw new Error(tr('dt.err_not_doc_path', { path: parsed.path }))
   }
   return { path: segments.join('/'), fields: decodeFields(parsed.data) }
 }

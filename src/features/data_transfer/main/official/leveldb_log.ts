@@ -16,7 +16,10 @@ class LeveldbEofError extends Error {
   }
 }
 
-function readHeader(buffer: Buffer, offset: number): {
+function readHeader(
+  buffer: Buffer,
+  offset: number
+): {
   crc: number
   length: number
   type: number
@@ -93,7 +96,7 @@ export function readLeveldbRecords(buffer: Buffer, checkCrc = false): Buffer[] {
     }
 
     if (checkCrc && !crcMatches(header.type, data, header.crc)) {
-      throw new Error(`leveldb CRC が一致しません offset=${offset - HEADER_LENGTH - header.length}`)
+      throw new Error(`leveldb CRC mismatch offset=${offset - HEADER_LENGTH - header.length}`)
     }
 
     if (header.type === RECORD_FULL) {

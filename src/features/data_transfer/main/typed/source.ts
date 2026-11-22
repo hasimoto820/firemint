@@ -1,3 +1,4 @@
+import { tr } from '@shared/i18n/shared/current'
 import { createReadStream } from 'fs'
 import { mkdtemp, open, readFile, readdir, rm, stat } from 'fs/promises'
 import { tmpdir } from 'os'
@@ -124,7 +125,7 @@ async function openOfficialDump(inputPath: string, isZip: boolean): Promise<Impo
     const dumpRoot = metadata.path ? join(baseDir, metadata.path) : baseDir
     const outputFiles = await listOutputFiles(dumpRoot)
     if (outputFiles.length === 0) {
-      throw new Error('ダンプではありません（output-* がありません）')
+      throw new Error(tr('dt.err_not_dump_output'))
     }
 
     let sourceProjectId = metadata.projectId
@@ -190,8 +191,8 @@ async function openJsonl(filePath: string, firstLine: string): Promise<ImportSou
         try {
           document = parseJsonlDocument(line)
         } catch (error) {
-          const reason = error instanceof Error ? error.message : '読めません'
-          await callback({ kind: 'bad', label: `${lineNumber} 行目（${reason}）` })
+          const reason = error instanceof Error ? error.message : tr('dt.unreadable')
+          await callback({ kind: 'bad', label: tr('dt.line_reason', { line: lineNumber, reason }) })
           continue
         }
         await callback({ kind: 'document', document })
@@ -209,19 +210,19 @@ async function openJsonl(filePath: string, firstLine: string): Promise<ImportSou
 export async function openImportSource(inputPath: string): Promise<ImportSource> {
   const trimmed = inputPath.trim()
   if (!trimmed) {
-    throw new Error('パスが空です')
+    throw new Error(tr('dt.err_empty_path'))
   }
 
   const info = await stat(trimmed)
   if (info.isDirectory()) {
     if ((await readdir(trimmed)).length === 0) {
-      throw new Error('フォルダが空です')
+      throw new Error(tr('dt.err_empty_folder'))
     }
     return openOfficialDump(trimmed, false)
   }
 
   if (!info.isFile()) {
-    throw new Error('ファイルまたはフォルダを指定してください')
+    throw new Error(tr('dt.err_file_or_folder'))
   }
 
   const head = await readHead(trimmed, ZIP_MAGIC.length)
@@ -235,7 +236,7 @@ export async function openImportSource(inputPath: string): Promise<ImportSource>
 
   const firstLine = await readFirstLine(trimmed)
   if (firstLine === null || firstLine.trim() === '') {
-    throw new Error('ファイルが空です')
+    throw new Error(tr('dt.err_empty_file'))
   }
   return openJsonl(trimmed, firstLine)
 }

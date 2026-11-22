@@ -1,3 +1,4 @@
+import { useI18n } from '@shared/i18n/renderer/I18nProvider'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 export type CommandPaletteItem = {
@@ -19,6 +20,7 @@ function normalize(text: string): string {
 }
 
 function CommandPalette({ open, items, onClose }: CommandPaletteProps): React.JSX.Element | null {
+  const { t } = useI18n()
   const [query, setQuery] = useState('')
   const [index, setIndex] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -93,20 +95,25 @@ function CommandPalette({ open, items, onClose }: CommandPaletteProps): React.JS
   }
 
   return (
-    <div className="command-palette" role="dialog" aria-modal="true" aria-label="Command Palette">
-      <button type="button" className="command-palette__backdrop" aria-label="閉じる" onClick={onClose} />
+    <div className="command-palette" role="dialog" aria-modal="true" aria-label={t('ui.command_palette')}>
+      <button
+        type="button"
+        className="command-palette__backdrop"
+        aria-label={t('ui.close')}
+        onClick={onClose}
+      />
       <div className="command-palette__panel">
         <input
           ref={inputRef}
           className="command-palette__input"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="コレクションや操作を検索…"
-          aria-label="コマンド検索"
+          placeholder={t('ui.palette_placeholder')}
+          aria-label={t('ui.palette_aria')}
         />
         <ul className="command-palette__list">
           {filtered.length === 0 && (
-            <li className="command-palette__empty">一致するコマンドがありません</li>
+            <li className="command-palette__empty">{t('ui.palette_empty')}</li>
           )}
           {filtered.map((item, itemIndex) => (
             <li key={item.id}>

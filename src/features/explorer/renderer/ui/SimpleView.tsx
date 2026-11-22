@@ -1,9 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useOptionalAutocompleteApi } from '@features/autocomplete/renderer/hooks'
-import {
-  isFirestoreWriteDisabled,
-  type ConnectionStatus
-} from '@features/connection/shared/types'
+import { isFirestoreWriteDisabled, type ConnectionStatus } from '@features/connection/shared/types'
 import type { ImpExpIntent } from '@features/data_transfer/shared/imp_exp'
 import type { BulkFieldMode } from '@features/bulk_operations/shared/types'
 import type { DocumentSummary } from '@features/explorer/shared/types'
@@ -140,7 +137,7 @@ function SimpleView({
       try {
         const cursors = pageStartCursorsRef.current
         if (targetPage > 0 && cursors[targetPage] === undefined) {
-          setError(`ページ ${targetPage + 1} へ進むための位置情報がありません`)
+          setError(t('explorer.err_no_page_cursor', { page: targetPage + 1 }))
           return null
         }
 
@@ -157,12 +154,7 @@ function SimpleView({
           return null
         }
 
-        const {
-          documents: pageDocs,
-          hasMore: more,
-          nextCursor,
-          pageSize: size
-        } = result.data
+        const { documents: pageDocs, hasMore: more, nextCursor, pageSize: size } = result.data
 
         const nextCursors = cursors.slice(0, targetPage + 1)
         if (more && nextCursor) {
@@ -197,7 +189,7 @@ function SimpleView({
         }
       }
     },
-    [autocomplete, projectId]
+    [autocomplete, projectId, t]
   )
 
   const resetAndLoadFirstPage = useCallback(
@@ -336,7 +328,7 @@ function SimpleView({
         await loadDocument(selectedDocumentPath)
       }
     } catch (parseError) {
-      setError(parseError instanceof Error ? parseError.message : 'JSON の形式が正しくありません')
+      setError(parseError instanceof Error ? parseError.message : t('explorer.err_invalid_json'))
     } finally {
       setLoading(false)
     }
@@ -347,7 +339,7 @@ function SimpleView({
       return
     }
 
-    if (!(await confirmAction('このドキュメントを削除しますか？'))) {
+    if (!(await confirmAction(t('explorer.delete_document_confirm')))) {
       return
     }
 
@@ -392,7 +384,7 @@ function SimpleView({
 
   const handleCreate = (): void => {
     if (!activeCollectionPath || readOnly) {
-      setError('コレクションを選択してください')
+      setError(t('explorer.select_collection'))
       return
     }
 
@@ -429,10 +421,7 @@ function SimpleView({
       return
     }
 
-    const documentsAfterDelete = await loadDocumentsPage(
-      activeCollectionPath,
-      pageIndexRef.current
-    )
+    const documentsAfterDelete = await loadDocumentsPage(activeCollectionPath, pageIndexRef.current)
     if (documentsAfterDelete && documentsAfterDelete.length === 0) {
       if (pageIndexRef.current > 0) {
         await loadDocumentsPage(activeCollectionPath, pageIndexRef.current - 1)
@@ -498,12 +487,12 @@ function SimpleView({
 
       while (true) {
         if (seekCanceledRef.current) {
-          setSeekStatus('停止しました')
+          setSeekStatus(t('explorer.stopped'))
           return
         }
 
         if (options.toLast) {
-          setSeekStatus(`最終ページへ…（${walkPage + 1}）`)
+          setSeekStatus(t('explorer.seeking_last', { page: walkPage + 1 }))
         } else if (options.targetPage !== undefined) {
           if (walkPage >= options.targetPage) {
             break
@@ -526,7 +515,7 @@ function SimpleView({
           }
 
           if (options.targetPage !== undefined && walkPage < options.targetPage) {
-            setError(`ページ ${options.label} はありません（最終は ${walkPage + 1} ページ）`)
+            setError(t('explorer.err_page_missing', { label: options.label, last: walkPage + 1 }))
           }
           setSeekStatus(null)
           return
@@ -540,12 +529,12 @@ function SimpleView({
       }
 
       if (seekCanceledRef.current) {
-        setSeekStatus('停止しました')
+        setSeekStatus(t('explorer.stopped'))
         return
       }
 
       if (options.targetPage !== undefined) {
-        setSeekStatus(`${options.label} を表示…`)
+        setSeekStatus(t('explorer.showing_page', { label: options.label }))
         await loadDocumentsPage(collectionPath, options.targetPage, { retainLoading: true })
       }
 
@@ -578,7 +567,7 @@ function SimpleView({
 
     void runSeek(activeCollectionPath, {
       targetPage,
-      label: `${pageNumber1Based} ページ`
+      label: t('explorer.page_n', { page: pageNumber1Based })
     })
   }
 
@@ -589,7 +578,7 @@ function SimpleView({
 
     void runSeek(activeCollectionPath, {
       toLast: true,
-      label: '最終ページ'
+      label: t('explorer.last_page')
     })
   }
 
@@ -598,11 +587,11 @@ function SimpleView({
   const rangeLabel =
     documents.length === 0
       ? totalCount === null
-        ? '0 件'
-        : `0 / ${totalCount} 件`
+        ? t('explorer.range_zero')
+        : t('explorer.range_zero_of', { total: totalCount })
       : totalCount === null
-        ? `${rangeFrom}–${rangeTo} 件`
-        : `${rangeFrom}–${rangeTo} / ${totalCount} 件`
+        ? t('explorer.range', { from: rangeFrom, to: rangeTo })
+        : t('explorer.range_of', { from: rangeFrom, to: rangeTo, total: totalCount })
 
   const handleDuplicateDocument = (): void => {
     if (!selectedDocumentPath || readOnly) {
@@ -624,7 +613,7 @@ function SimpleView({
 
   const duplicateOpenCollection = async (): Promise<void> => {
     if (!activeCollectionPath) {
-      setError('コレクションを選択してください')
+      setError(t('explorer.select_collection'))
       return
     }
 
@@ -643,7 +632,7 @@ function SimpleView({
     onCollectionDocumentsChanged?.()
     onSelectCollection(outcome.targetCollectionPath)
     setSuccessMessage(
-      `${outcome.copiedCount} 件を ${outcome.targetCollectionPath} に複製しました`
+      t('explorer.duplicated', { count: outcome.copiedCount, path: outcome.targetCollectionPath })
     )
   }
 
@@ -787,16 +776,24 @@ function SimpleView({
           canRenameFieldBulk: false,
           canDeleteFieldBulk: false
         },
-    [menuEnabled, readOnly, activeCollectionPath, selectedDocumentPath, jsonText, onOpenImpExp, onRequestFieldBulk, onRequestCreateDocument, onRequestDuplicateDocument]
+    [
+      menuEnabled,
+      readOnly,
+      activeCollectionPath,
+      selectedDocumentPath,
+      jsonText,
+      onOpenImpExp,
+      onRequestFieldBulk,
+      onRequestCreateDocument,
+      onRequestDuplicateDocument
+    ]
   )
 
   if (!activeCollectionPath) {
     return (
       <div className="simple-main simple-main--empty">
-        <p className="simple-main__empty-title">コレクションを選択してください</p>
-        <p className="simple-main__empty-hint">
-          左のツリーからコレクションを選ぶと、ドキュメント一覧と JSON 編集が表示されます。
-        </p>
+        <p className="simple-main__empty-title">{t('explorer.select_collection')}</p>
+        <p className="simple-main__empty-hint">{t('explorer.select_collection_hint')}</p>
       </div>
     )
   }
@@ -807,7 +804,7 @@ function SimpleView({
         <div className="simple-main__status">
           {error && <p className="simple-main__error">{error}</p>}
           {successMessage && <p className="simple-main__success">{successMessage}</p>}
-          {loading && <p className="simple-main__loading">読み込み中...</p>}
+          {loading && <p className="simple-main__loading">{t('explorer.loading')}</p>}
         </div>
       )}
 
@@ -820,52 +817,57 @@ function SimpleView({
         unit="percent"
         minFirst={120}
         minSecond={120}
-        ariaLabel="JSON パネルの高さ"
+        ariaLabel={t('explorer.json_panel_height')}
         first={
-          <div className="simple-main__workspace" data-area="settings" data-pane={pane} tabIndex={-1}>
+          <div
+            className="simple-main__workspace"
+            data-area="settings"
+            data-pane={pane}
+            tabIndex={-1}
+          >
             <TableBulkSplit
               table={
-            <DocumentTable
-              documents={documents}
-              selectedDocumentPath={selectedDocumentPath}
-              tableKey={activeCollectionPath}
-              projectId={projectId}
-              initialViewState={simpleState?.table ?? null}
-              onViewStateChange={(table) => onSimpleStateChange?.({ table })}
-              selectable={!readOnly}
-              bulkSelectedPaths={bulkSelectedPaths}
-              onBulkToggle={handleBulkToggle}
-              onBulkToggleAll={handleBulkToggleAll}
-              onSelectDocument={(path) => onSelectDocument(path)}
-              paging={{
-                rangeLabel,
-                hasPrev: pageIndex > 0,
-                hasNext: hasMore,
-                hasLast: hasMore,
-                disabled: loading,
-                pageNumber: pageIndex + 1,
-                seeking,
-                seekStatus,
-                onFirst: handleFirstPage,
-                onPrev: handlePrevPage,
-                onNext: handleNextPage,
-                onLast: handleLastPage,
-                onGoToPage: handleGoToPage,
-                onCancelSeek: handleCancelSeek
-              }}
-            />
+                <DocumentTable
+                  documents={documents}
+                  selectedDocumentPath={selectedDocumentPath}
+                  tableKey={activeCollectionPath}
+                  projectId={projectId}
+                  initialViewState={simpleState?.table ?? null}
+                  onViewStateChange={(table) => onSimpleStateChange?.({ table })}
+                  selectable={!readOnly}
+                  bulkSelectedPaths={bulkSelectedPaths}
+                  onBulkToggle={handleBulkToggle}
+                  onBulkToggleAll={handleBulkToggleAll}
+                  onSelectDocument={(path) => onSelectDocument(path)}
+                  paging={{
+                    rangeLabel,
+                    hasPrev: pageIndex > 0,
+                    hasNext: hasMore,
+                    hasLast: hasMore,
+                    disabled: loading,
+                    pageNumber: pageIndex + 1,
+                    seeking,
+                    seekStatus,
+                    onFirst: handleFirstPage,
+                    onPrev: handlePrevPage,
+                    onNext: handleNextPage,
+                    onLast: handleLastPage,
+                    onGoToPage: handleGoToPage,
+                    onCancelSeek: handleCancelSeek
+                  }}
+                />
               }
               bulk={
                 !readOnly && bulkSelectedPaths.size > 0 ? (
-              <BulkActionsPanel
-                projectId={projectId}
-                selectedPaths={Array.from(bulkSelectedPaths)}
-                loading={loading}
-                onLoadingChange={setLoading}
-                onClearSelection={() => setBulkSelectedPaths(new Set())}
-                onOperationComplete={() => void handleBulkOperationComplete()}
-                onError={setError}
-              />
+                  <BulkActionsPanel
+                    projectId={projectId}
+                    selectedPaths={Array.from(bulkSelectedPaths)}
+                    loading={loading}
+                    onLoadingChange={setLoading}
+                    onClearSelection={() => setBulkSelectedPaths(new Set())}
+                    onOperationComplete={() => void handleBulkOperationComplete()}
+                    onError={setError}
+                  />
                 ) : null
               }
             />

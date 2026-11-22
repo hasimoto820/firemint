@@ -1,3 +1,4 @@
+import { tr } from '@shared/i18n/shared/current'
 export const DEFAULT_EMULATOR_HOST = '127.0.0.1:8080'
 export const DEFAULT_EMULATOR_HUB = '127.0.0.1:4400'
 
@@ -24,7 +25,7 @@ export function parseEmulatorHost(raw: string): string {
   let value = raw.trim()
 
   if (!value) {
-    throw new Error('ホストは HOST:PORT で指定してください（例: 127.0.0.1:8080）')
+    throw new Error(tr('conn.err_host_format'))
   }
 
   value = value.replace(/^https?:\/\//i, '')
@@ -43,7 +44,7 @@ export function parseEmulatorHost(raw: string): string {
   const port = Number(value.slice(separator + 1).trim())
 
   if (!hostname || !Number.isInteger(port) || port < 1 || port > 65535) {
-    throw new Error('ホストは HOST:PORT で指定してください（例: 127.0.0.1:8080）')
+    throw new Error(tr('conn.err_host_format'))
   }
 
   return `${hostname}:${port}`

@@ -1,3 +1,4 @@
+import { useI18n } from '@shared/i18n/renderer/I18nProvider'
 import { useEffect, useMemo, useState } from 'react'
 import { collectionKindLabel } from '@features/explorer/shared/tree'
 import { invalidDocumentIdReason } from '@features/explorer/shared/document_id'
@@ -18,6 +19,7 @@ function DocumentCreateDialog({
   onClose,
   onCreated
 }: DocumentCreateDialogProps): React.JSX.Element | null {
+  const { t } = useI18n()
   const [documentId, setDocumentId] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -35,11 +37,11 @@ function DocumentCreateDialog({
   const trimmedId = documentId.trim()
   const previewPath = useMemo(() => {
     if (!trimmedId) {
-      return `${collectionPath}/（自動 ID）`
+      return `${collectionPath}/${t('explorer.auto_id')}`
     }
 
     return `${collectionPath}/${trimmedId}`
-  }, [collectionPath, trimmedId])
+  }, [collectionPath, trimmedId, t])
 
   const canSubmit = !busy
 
@@ -67,7 +69,7 @@ function DocumentCreateDialog({
         )
 
         if (existing.ok) {
-          setError('同じ ID のドキュメントが既に存在します')
+          setError(t('explorer.err_document_exists'))
           return
         }
       }
@@ -87,7 +89,11 @@ function DocumentCreateDialog({
       onCreated(collectionPath, result.data)
       onClose()
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : 'ドキュメントの作成に失敗しました')
+      setError(
+        submitError instanceof Error
+          ? submitError.message
+          : t('explorer.err_create_document_failed')
+      )
     } finally {
       setBusy(false)
     }
@@ -102,9 +108,9 @@ function DocumentCreateDialog({
       <div className="project-export-dialog__backdrop" onClick={busy ? undefined : onClose} />
       <div className="project-export-dialog__panel">
         <header className="project-export-dialog__header">
-          <h2 className="project-export-dialog__title">ドキュメントを作成</h2>
+          <h2 className="project-export-dialog__title">{t('explorer.create_document_title')}</h2>
           <p className="project-export-dialog__lead">
-            {collectionKindLabel(collectionPath)}に空のドキュメントを追加します。ID を空欄にすると自動で付きます。
+            {t('explorer.create_document_lead', { kind: collectionKindLabel(collectionPath) })}
           </p>
         </header>
 
@@ -113,13 +119,13 @@ function DocumentCreateDialog({
         </p>
 
         <label className="project-export-dialog__option">
-          ドキュメント ID（任意）
+          {t('explorer.document_id_optional')}
           <input
             className="bulk-actions__input"
             value={documentId}
             disabled={busy}
             autoFocus
-            placeholder="空欄なら自動 ID（例: Auth の uid）"
+            placeholder={t('explorer.document_id_placeholder')}
             onChange={(event) => {
               setDocumentId(event.target.value)
               setError(null)
@@ -133,17 +139,17 @@ function DocumentCreateDialog({
         </label>
 
         <p className="project-export-dialog__hint">
-          作成後: <code>{previewPath}</code>
+          {t('explorer.after_create')} <code>{previewPath}</code>
         </p>
 
         {error && <p className="project-export-dialog__error">{error}</p>}
 
         <div className="project-export-dialog__actions">
           <Button onClick={onClose} disabled={busy}>
-            キャンセル
+            {t('common.cancel')}
           </Button>
           <Button variant="primary" onClick={() => void handleSubmit()} disabled={!canSubmit}>
-            {busy ? '作成中…' : '作成'}
+            {busy ? t('explorer.creating') : t('explorer.create')}
           </Button>
         </div>
       </div>

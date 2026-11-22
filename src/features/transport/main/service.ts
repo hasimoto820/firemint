@@ -1,3 +1,4 @@
+import { tr } from '@shared/i18n/shared/current'
 import { iterateExportDocuments } from '@features/data_transfer/main/project_export_service'
 import type { ExportDocument } from '@features/data_transfer/shared/types'
 import type {
@@ -26,7 +27,7 @@ type PendingWrite = {
 
 function ensureConnected(projectId: string): void {
   if (!isFirestoreConnected(projectId)) {
-    throw new Error(`Firestore is not connected: ${projectId}`)
+    throw new Error(tr('ui.err_not_connected', { projectId: projectId }))
   }
 }
 
@@ -50,7 +51,7 @@ function toValidationError(
   logError('transport', 'validateTransport failed', error)
 
   if (canceled || isCanceledError(error)) {
-    return { ok: false, error: '検証をキャンセルしました', canceled: true }
+    return { ok: false, error: tr('dt.validate_canceled'), canceled: true }
   }
 
   return {
@@ -68,7 +69,7 @@ function toTransportError(
   logError('transport', 'transport failed', error)
 
   if (wasCanceled) {
-    return { ok: false, error: 'トランスポートをキャンセルしました', canceled: true }
+    return { ok: false, error: tr('tp.canceled'), canceled: true }
   }
 
   return {
@@ -92,7 +93,7 @@ function remapDocumentPath(
 
   const prefix = `${sourceCollectionPath}/`
   if (!documentPath.startsWith(prefix)) {
-    throw new Error(`ソース外のドキュメントです: ${documentPath}`)
+    throw new Error(tr('tp.err_outside_source', { path: documentPath }))
   }
 
   return `${destinationCollectionPath}/${documentPath.slice(prefix.length)}`
@@ -104,13 +105,12 @@ function resolveCollectionPaths(input: TransportInput): {
 } {
   const sourceCollectionPath = input.sourceCollectionPath?.trim() ?? ''
   if (!sourceCollectionPath) {
-    throw new Error('コピー元のコレクションを指定してください')
+    throw new Error(tr('tp.err_source_collection'))
   }
 
-  const destinationCollectionPath =
-    input.destinationCollectionPath?.trim() || sourceCollectionPath
+  const destinationCollectionPath = input.destinationCollectionPath?.trim() || sourceCollectionPath
   if (!destinationCollectionPath) {
-    throw new Error('コピー先のコレクションを指定してください')
+    throw new Error(tr('tp.err_dest_collection'))
   }
 
   assertCollectionPath(sourceCollectionPath)
@@ -120,12 +120,10 @@ function resolveCollectionPaths(input: TransportInput): {
 }
 
 function resolveRootIds(input: TransportInput): string[] {
-  const rootCollectionIds = (input.rootCollectionIds ?? [])
-    .map((id) => id.trim())
-    .filter(Boolean)
+  const rootCollectionIds = (input.rootCollectionIds ?? []).map((id) => id.trim()).filter(Boolean)
 
   if (rootCollectionIds.length === 0) {
-    throw new Error('コピーするルートコレクションを選んでください')
+    throw new Error(tr('tp.err_select_roots'))
   }
 
   for (const rootId of rootCollectionIds) {
@@ -140,11 +138,11 @@ function assertProjects(input: TransportInput, requireWritable: boolean): void {
   const destinationProjectId = input.destinationProjectId.trim()
 
   if (!sourceProjectId || !destinationProjectId) {
-    throw new Error('コピー元とコピー先のプロジェクトを指定してください')
+    throw new Error(tr('tp.err_projects'))
   }
 
   if (sourceProjectId === destinationProjectId) {
-    throw new Error('コピー先は別のプロジェクトを指定してください')
+    throw new Error(tr('tp.err_same_project'))
   }
 
   ensureConnected(sourceProjectId)
@@ -168,11 +166,7 @@ async function* iterateTransportDocuments(
       signal
     )) {
       yield {
-        destPath: remapDocumentPath(
-          document.path,
-          sourceCollectionPath,
-          destinationCollectionPath
-        ),
+        destPath: remapDocumentPath(document.path, sourceCollectionPath, destinationCollectionPath),
         document
       }
     }

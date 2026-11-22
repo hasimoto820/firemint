@@ -1,7 +1,13 @@
+import { tr } from '@shared/i18n/shared/current'
 import { useEffect, useState } from 'react'
 import type { DiffDraft } from '@features/diff/shared/diff'
 import { DIFF_PREVIEW_LIMIT, diffRowPreview } from '@features/diff/shared/diff'
-import type { DiffProgress, DiffRow, DiffRowStatus, DiffExportFormat } from '@features/diff/shared/types'
+import type {
+  DiffProgress,
+  DiffRow,
+  DiffRowStatus,
+  DiffExportFormat
+} from '@features/diff/shared/types'
 import type { WorkspaceAuthType } from '@features/workspace/shared/types'
 import Button from '@shared/ui/Button'
 import ColumnResizeHandle from '@shared/ui/ColumnResizeHandle'
@@ -12,9 +18,9 @@ import { useT } from '@shared/i18n/renderer/I18nProvider'
 const DIFF_COLUMNS = [
   { key: 'id', label: 'ID', className: undefined },
   { key: 'path', label: 'path', className: 'diff-table__path' },
-  { key: 'status', label: '固有', className: undefined },
-  { key: 'dump', label: 'ダンプ', className: 'diff-table__json' },
-  { key: 'project', label: 'プロジェクト', className: 'diff-table__json' }
+  { key: 'status', label: 'diff.col_unique', className: undefined },
+  { key: 'dump', label: 'diff.col_dump', className: 'diff-table__json' },
+  { key: 'project', label: 'diff.col_project', className: 'diff-table__json' }
 ] as const
 
 const DIFF_COLUMN_DEFAULTS: Record<string, number> = {
@@ -36,11 +42,11 @@ type DiffViewProps = {
 function statusLabel(status: DiffRowStatus): string {
   switch (status) {
     case 'dump_only':
-      return 'ダンプ'
+      return tr('diff.dump_only')
     case 'project_only':
-      return 'プロジェクト'
+      return tr('diff.project_only')
     case 'changed':
-      return '中身が違う'
+      return tr('diff.changed')
   }
 }
 
@@ -125,7 +131,7 @@ function DiffView({
 
   const handleCompare = async (): Promise<void> => {
     if (!draft.dumpPath) {
-      setFormError('フォルダ / ZIP を選んでください')
+      setFormError(t('diff.err_select_folder_zip'))
       return
     }
 
@@ -172,7 +178,7 @@ function DiffView({
         return
       }
 
-      setExportMessage(`保存しました: ${result.data.filePath}`)
+      setExportMessage(t('diff.saved', { path: result.data.filePath }))
     } finally {
       setExportBusy(false)
     }
@@ -185,7 +191,7 @@ function DiffView({
   const tableWidth = DIFF_COLUMNS.reduce((sum, column) => sum + widthOf(column.key), 0)
   const sourceKindLabel = sourceAuthType === 'emulator' ? t('menu.emulator') : t('menu.cloud')
   const progressLabel = progress
-    ? `${progress.processedCount} 件${progress.detail ? ` / ${progress.detail}` : ''}`
+    ? `${t('diff.count', { count: progress.processedCount })}${progress.detail ? ` / ${progress.detail}` : ''}`
     : null
   const sourceMismatch =
     draft.peek?.sourceProjectId &&
@@ -202,141 +208,146 @@ function DiffView({
         unit="percent"
         minFirst={120}
         minSecond={120}
-        ariaLabel="差分テーブルの高さ"
+        ariaLabel={t('diff.table_height')}
         first={
-      <div className="imp-exp-form">
-        <h1 className="imp-exp-form__title">{t('menu.diff')}</h1>
-        <p className="imp-exp-form__lead">
-          ダンプと、今のプロジェクトを path どおり比べます。どちらにも書きません。
-        </p>
+          <div className="imp-exp-form">
+            <h1 className="imp-exp-form__title">{t('menu.diff')}</h1>
+            <p className="imp-exp-form__lead">{t('diff.lead')}</p>
 
-        <div className="imp-exp-form__hint-block">
-          <p className="imp-exp-form__hint">
-            {sourceKindLabel} · {sourceLabel || projectId}
-          </p>
-        </div>
+            <div className="imp-exp-form__hint-block">
+              <p className="imp-exp-form__hint">
+                {sourceKindLabel} · {sourceLabel || projectId}
+              </p>
+            </div>
 
-        <div className="imp-exp-form__file">
-          <Button onClick={() => void handleSelectDump()} disabled={busy}>
-            フォルダ / ZIP を選択…
-          </Button>
-          {draft.dumpPath && <span className="imp-exp-form__path">{draft.dumpPath}</span>}
-        </div>
+            <div className="imp-exp-form__file">
+              <Button onClick={() => void handleSelectDump()} disabled={busy}>
+                {t('diff.select_folder_zip')}
+              </Button>
+              {draft.dumpPath && <span className="imp-exp-form__path">{draft.dumpPath}</span>}
+            </div>
 
-        {draft.peek && (
-          <p className="imp-exp-form__hint">
-            ダンプ {draft.peek.documentCount} 件
-            {draft.peek.sourceProjectId ? ` ／ 出所 ${draft.peek.sourceProjectId}` : ''}
-            {draft.peek.samplePaths.length > 0
-              ? ` ／ 例 ${draft.peek.samplePaths.slice(0, 3).join(', ')}`
-              : ''}
-          </p>
-        )}
-        {sourceMismatch && (
-          <p className="imp-exp-form__hint">
-            ダンプの projectId と今のプロジェクトが違います。path どおり比べます。
-          </p>
-        )}
+            {draft.peek && (
+              <p className="imp-exp-form__hint">
+                {t('diff.peek_count', { count: draft.peek.documentCount })}
+                {draft.peek.sourceProjectId
+                  ? ` ／ ${t('diff.origin', { id: draft.peek.sourceProjectId })}`
+                  : ''}
+                {draft.peek.samplePaths.length > 0
+                  ? ` ／ ${t('diff.example', { list: draft.peek.samplePaths.slice(0, 3).join(', ') })}`
+                  : ''}
+              </p>
+            )}
+            {sourceMismatch && <p className="imp-exp-form__hint">{t('diff.source_mismatch')}</p>}
 
-        {progressLabel && busy && <p className="imp-exp-form__hint">比較中 {progressLabel}</p>}
-        {formError && <p className="simple-main__error">{formError}</p>}
-        {exportMessage && <p className="simple-main__success">{exportMessage}</p>}
+            {progressLabel && busy && (
+              <p className="imp-exp-form__hint">
+                {t('diff.comparing_progress', { progress: progressLabel })}
+              </p>
+            )}
+            {formError && <p className="simple-main__error">{formError}</p>}
+            {exportMessage && <p className="simple-main__success">{exportMessage}</p>}
 
-        <div className="imp-exp-form__actions">
-          <Button variant="primary" onClick={() => void handleCompare()} disabled={!canCompare}>
-            {busy ? '比較中…' : '比較'}
-          </Button>
-        </div>
+            <div className="imp-exp-form__actions">
+              <Button variant="primary" onClick={() => void handleCompare()} disabled={!canCompare}>
+                {busy ? t('diff.comparing') : t('diff.compare')}
+              </Button>
+            </div>
 
-        {result && (
-          <p className="imp-exp-form__hint">
-            ダンプ {result.dumpCount} ／ プロジェクト {result.projectCount} ／ ダンプだけ{' '}
-            {result.dumpOnlyCount} ／ プロジェクトだけ {result.projectOnlyCount} ／ 中身が違う{' '}
-            {result.changedCount} ／ 同じ {result.sameCount}
-          </p>
-        )}
-      </div>
+            {result && (
+              <p className="imp-exp-form__hint">
+                {t('diff.summary', {
+                  dump: result.dumpCount,
+                  project: result.projectCount,
+                  dumpOnly: result.dumpOnlyCount,
+                  projectOnly: result.projectOnlyCount,
+                  changed: result.changedCount,
+                  same: result.sameCount
+                })}
+              </p>
+            )}
+          </div>
         }
         second={
-      <div className="document-table-panel diff-table-panel">
-        <div className="document-table-panel__toolbar">
-          <Button
-            onClick={() => void handleExport('json')}
-            disabled={!result || exportBusy || busy}
-          >
-            {exportBusy ? '保存中…' : 'レポート JSON'}
-          </Button>
-          <Button
-            onClick={() => void handleExport('csv')}
-            disabled={!result || exportBusy || busy}
-          >
-            {exportBusy ? '保存中…' : 'レポート CSV'}
-          </Button>
-          {result ? (
-            <span className="document-table-panel__count">
-              {result.rows.length === 0
-                ? '差分はありません'
-                : result.rows.length > DIFF_PREVIEW_LIMIT
-                  ? `先頭 ${DIFF_PREVIEW_LIMIT} 件（差分 ${result.rows.length} 件）`
-                  : `差分 ${result.rows.length} 件`}
-            </span>
-          ) : (
-            <span className="document-table-panel__count">比較すると差分がここに出ます</span>
-          )}
-        </div>
-
-        <div className="document-table__wrap">
-          <table className="document-table document-table--fixed" style={{ width: tableWidth }}>
-            <colgroup>
-              {DIFF_COLUMNS.map((column) => (
-                <col key={column.key} style={{ width: widthOf(column.key) }} />
-              ))}
-            </colgroup>
-            <thead>
-              <tr>
-                {DIFF_COLUMNS.map((column) => (
-                  <th key={column.key}>
-                    {column.label}
-                    <ColumnResizeHandle
-                      ariaLabel={`${column.label} 列の幅`}
-                      onResize={(delta) => resizeBy(column.key, delta)}
-                      onReset={() => reset(column.key)}
-                    />
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {previewRows.length === 0 ? (
-                <tr>
-                  <td className="document-table__empty" colSpan={DIFF_COLUMNS.length}>
-                    {result ? '同じものだけです' : '—'}
-                  </td>
-                </tr>
+          <div className="document-table-panel diff-table-panel">
+            <div className="document-table-panel__toolbar">
+              <Button
+                onClick={() => void handleExport('json')}
+                disabled={!result || exportBusy || busy}
+              >
+                {exportBusy ? t('diff.saving') : t('diff.report_json')}
+              </Button>
+              <Button
+                onClick={() => void handleExport('csv')}
+                disabled={!result || exportBusy || busy}
+              >
+                {exportBusy ? t('diff.saving') : t('diff.report_csv')}
+              </Button>
+              {result ? (
+                <span className="document-table-panel__count">
+                  {result.rows.length === 0
+                    ? t('diff.no_diff')
+                    : result.rows.length > DIFF_PREVIEW_LIMIT
+                      ? t('diff.head_of', { limit: DIFF_PREVIEW_LIMIT, total: result.rows.length })
+                      : t('diff.diff_count', { count: result.rows.length })}
+                </span>
               ) : (
-                previewRows.map((row) => (
-                  <tr key={row.path}>
-                    {DIFF_COLUMNS.map((column) => {
-                      const text = cellText(row, column.key)
-                      return (
-                        <td
-                          key={column.key}
-                          className={['document-table__cell', column.className]
-                            .filter(Boolean)
-                            .join(' ')}
-                          title={text}
-                        >
-                          {text}
-                        </td>
-                      )
-                    })}
-                  </tr>
-                ))
+                <span className="document-table-panel__count">{t('diff.hint')}</span>
               )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+            </div>
+
+            <div className="document-table__wrap">
+              <table className="document-table document-table--fixed" style={{ width: tableWidth }}>
+                <colgroup>
+                  {DIFF_COLUMNS.map((column) => (
+                    <col key={column.key} style={{ width: widthOf(column.key) }} />
+                  ))}
+                </colgroup>
+                <thead>
+                  <tr>
+                    {DIFF_COLUMNS.map((column) => (
+                      <th key={column.key}>
+                        {t(column.label)}
+                        <ColumnResizeHandle
+                          ariaLabel={t('ui.column_width', { column: t(column.label) })}
+                          onResize={(delta) => resizeBy(column.key, delta)}
+                          onReset={() => reset(column.key)}
+                        />
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {previewRows.length === 0 ? (
+                    <tr>
+                      <td className="document-table__empty" colSpan={DIFF_COLUMNS.length}>
+                        {result ? t('diff.all_same') : '—'}
+                      </td>
+                    </tr>
+                  ) : (
+                    previewRows.map((row) => (
+                      <tr key={row.path}>
+                        {DIFF_COLUMNS.map((column) => {
+                          const text = cellText(row, column.key)
+                          return (
+                            <td
+                              key={column.key}
+                              className={['document-table__cell', column.className]
+                                .filter(Boolean)
+                                .join(' ')}
+                              title={text}
+                            >
+                              {text}
+                            </td>
+                          )
+                        })}
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         }
       />
     </div>

@@ -1,3 +1,4 @@
+import { useI18n } from '@shared/i18n/renderer/I18nProvider'
 import { useEffect, useMemo, useState } from 'react'
 import { invalidDocumentIdReason } from '@features/explorer/shared/document_id'
 import { parentCollectionPath } from '@shared/shell/workspace_tab'
@@ -18,6 +19,7 @@ function DocumentDuplicateDialog({
   onClose,
   onDuplicated
 }: DocumentDuplicateDialogProps): React.JSX.Element | null {
+  const { t } = useI18n()
   const [documentId, setDocumentId] = useState('')
   const [includeSubcollections, setIncludeSubcollections] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -44,11 +46,11 @@ function DocumentDuplicateDialog({
     }
 
     if (!trimmedId) {
-      return `${collectionPath}/（自動 ID）`
+      return `${collectionPath}/${t('explorer.auto_id')}`
     }
 
     return `${collectionPath}/${trimmedId}`
-  }, [collectionPath, trimmedId])
+  }, [collectionPath, trimmedId, t])
 
   const canSubmit = !busy && Boolean(collectionPath)
 
@@ -84,7 +86,11 @@ function DocumentDuplicateDialog({
       onDuplicated(collectionPath, result.data)
       onClose()
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : 'ドキュメントの複製に失敗しました')
+      setError(
+        submitError instanceof Error
+          ? submitError.message
+          : t('explorer.err_duplicate_document_failed')
+      )
     } finally {
       setBusy(false)
     }
@@ -99,24 +105,22 @@ function DocumentDuplicateDialog({
       <div className="project-export-dialog__backdrop" onClick={busy ? undefined : onClose} />
       <div className="project-export-dialog__panel">
         <header className="project-export-dialog__header">
-          <h2 className="project-export-dialog__title">ドキュメントを複製</h2>
-          <p className="project-export-dialog__lead">
-            同じコレクションにコピーします。ID を空欄にすると自動で付きます。
-          </p>
+          <h2 className="project-export-dialog__title">{t('explorer.duplicate_document_title')}</h2>
+          <p className="project-export-dialog__lead">{t('explorer.duplicate_document_lead')}</p>
         </header>
 
         <p className="project-export-dialog__hint">
-          複製元: <code>{documentPath}</code>
+          {t('explorer.source')} <code>{documentPath}</code>
         </p>
 
         <label className="project-export-dialog__option">
-          ドキュメント ID（任意）
+          {t('explorer.document_id_optional')}
           <input
             className="bulk-actions__input"
             value={documentId}
             disabled={busy}
             autoFocus
-            placeholder={`空欄なら自動 ID（元: ${sourceId}）`}
+            placeholder={t('explorer.duplicate_id_placeholder', { id: sourceId })}
             onChange={(event) => {
               setDocumentId(event.target.value)
               setError(null)
@@ -130,7 +134,7 @@ function DocumentDuplicateDialog({
         </label>
 
         <p className="project-export-dialog__hint">
-          複製後: <code>{previewPath}</code>
+          {t('explorer.after_duplicate')} <code>{previewPath}</code>
         </p>
 
         <label className="project-export-dialog__option">
@@ -140,20 +144,18 @@ function DocumentDuplicateDialog({
             disabled={busy}
             onChange={(event) => setIncludeSubcollections(event.target.checked)}
           />
-          サブコレクションを含む
+          {t('explorer.include_subcollections')}
         </label>
-        <p className="project-export-dialog__hint">
-          サブコレクションを含めると、配下のドキュメントもすべてコピーします（件数・時間が増えます）。
-        </p>
+        <p className="project-export-dialog__hint">{t('explorer.include_subcollections_detail')}</p>
 
         {error && <p className="project-export-dialog__error">{error}</p>}
 
         <div className="project-export-dialog__actions">
           <Button onClick={onClose} disabled={busy}>
-            キャンセル
+            {t('common.cancel')}
           </Button>
           <Button variant="primary" onClick={() => void handleSubmit()} disabled={!canSubmit}>
-            {busy ? '複製中…' : '複製'}
+            {busy ? t('explorer.duplicating') : t('explorer.duplicate')}
           </Button>
         </div>
       </div>

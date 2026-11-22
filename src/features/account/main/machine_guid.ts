@@ -16,7 +16,7 @@ export async function readMachineGuid(): Promise<string> {
   const guid = stdout.match(/MachineGuid\s+REG_SZ\s+(\S+)/)?.[1]
 
   if (!guid) {
-    throw new Error('MachineGuid を読み取れませんでした')
+    throw new Error('Could not read MachineGuid')
   }
 
   return guid

@@ -1,3 +1,4 @@
+import { useI18n } from '@shared/i18n/renderer/I18nProvider'
 import {
   buildOpenStreetMapEmbedUrl,
   buildOpenStreetMapLink,
@@ -9,6 +10,7 @@ type GeopointPreviewProps = {
 }
 
 function GeopointPreview({ points }: GeopointPreviewProps): React.JSX.Element | null {
+  const { t } = useI18n()
   if (points.length === 0) {
     return null
   }
@@ -26,7 +28,7 @@ function GeopointPreview({ points }: GeopointPreviewProps): React.JSX.Element | 
               target="_blank"
               rel="noreferrer"
             >
-              地図を開く
+              {t('ui.open_map')}
             </a>
           </p>
           <iframe

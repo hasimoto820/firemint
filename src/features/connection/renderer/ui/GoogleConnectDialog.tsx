@@ -1,3 +1,4 @@
+import { useI18n } from '@shared/i18n/renderer/I18nProvider'
 import { useEffect, useRef, useState } from 'react'
 import type { GoogleSavedAccount } from '@features/connection/shared/types'
 import Button from '@shared/ui/Button'
@@ -21,6 +22,7 @@ function GoogleConnectDialog({
   onClose,
   onConnected
 }: GoogleConnectDialogProps): React.JSX.Element | null {
+  const { t } = useI18n()
   const [projectId, setProjectId] = useState('')
   const [accounts, setAccounts] = useState<GoogleSavedAccount[]>([])
   const [accountChoice, setAccountChoice] = useState(NEW_ACCOUNT)
@@ -79,7 +81,7 @@ function GoogleConnectDialog({
         }
 
         if (!signedIn.ok) {
-          if (signedIn.error.includes('キャンセル')) {
+          if (signedIn.canceled) {
             return
           }
 
@@ -92,7 +94,7 @@ function GoogleConnectDialog({
         const saved = accounts.find((item) => item.accountKey === accountChoice)
 
         if (!saved) {
-          setError('Google アカウントを選び直してください')
+          setError(t('conn.reselect_account'))
           return
         }
 
@@ -130,31 +132,40 @@ function GoogleConnectDialog({
 
   const usesSavedAccount = accountChoice !== NEW_ACCOUNT
   const connectLabel = signingIn
-    ? 'ブラウザで認証中…'
+    ? t('conn.authenticating')
     : busy
-      ? '接続中…'
+      ? t('conn.connecting')
       : usesSavedAccount
-        ? '接続'
-        : 'Google でサインインして接続'
+        ? t('conn.connect')
+        : t('conn.sign_in_connect')
 
   return (
     <div className="project-export-dialog" role="dialog" aria-modal="true">
       <div className="project-export-dialog__backdrop" onClick={handleCancel} />
       <div className="project-export-dialog__panel">
         <header className="project-export-dialog__header">
-          <h2 className="project-export-dialog__title">Google アカウントでプロジェクトを追加</h2>
-          <p className="project-export-dialog__lead">
-            Firestore のプロジェクト ID を入力して、Google アカウントで接続します。
-            以前の表示名・色・read-only 設定があれば復元します。
-          </p>
+          <h2 className="project-export-dialog__title">{t('conn.add_google_title')}</h2>
+          <p className="project-export-dialog__lead">{t('conn.add_google_lead')}</p>
         </header>
 
         <label className="project-export-dialog__hint">
-          プロジェクト ID
+          {t('conn.project_id')}
           <input
             type="text"
             value={projectId}
             onChange={(event) => setProjectId(event.target.value)}
+            onKeyDown={(event) => {
+              // Enter で「接続」と同じ。日本語入力の変換を確定する Enter は除く
+              if (
+                event.key === 'Enter' &&
+                !event.nativeEvent.isComposing &&
+                !busy &&
+                projectId.trim().length > 0
+              ) {
+                event.preventDefault()
+                void handleConnect()
+              }
+            }}
             placeholder="my-project-id"
             disabled={busy}
             autoFocus
@@ -165,7 +176,7 @@ function GoogleConnectDialog({
 
         {accounts.length > 0 ? (
           <label className="project-export-dialog__hint">
-            Google アカウント
+            {t('conn.google_account')}
             <select
               value={accountChoice}
               onChange={(event) => setAccountChoice(event.target.value)}
@@ -177,19 +188,17 @@ function GoogleConnectDialog({
                   {account.email}
                 </option>
               ))}
-              <option value={NEW_ACCOUNT}>別のアカウントでサインイン…</option>
+              <option value={NEW_ACCOUNT}>{t('conn.other_account')}</option>
             </select>
           </label>
         ) : (
-          <p className="project-export-dialog__hint">
-            ブラウザが開くので、Google アカウントでサインインしてください。
-          </p>
+          <p className="project-export-dialog__hint">{t('conn.browser_will_open')}</p>
         )}
 
         {error && <p className="project-export-dialog__error">{error}</p>}
 
         <div className="project-export-dialog__actions">
-          <Button onClick={handleCancel}>キャンセル</Button>
+          <Button onClick={handleCancel}>{t('common.cancel')}</Button>
           <Button
             variant="primary"
             onClick={() => void handleConnect()}

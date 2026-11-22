@@ -1,3 +1,4 @@
+import { useI18n } from '@shared/i18n/renderer/I18nProvider'
 import { useEffect, useMemo, useState } from 'react'
 import { collectionKindLabel } from '@features/explorer/shared/tree'
 import Button from '@shared/ui/Button'
@@ -17,6 +18,7 @@ function CollectionRenameDialog({
   onClose,
   onRenamed
 }: CollectionRenameDialogProps): React.JSX.Element | null {
+  const { t } = useI18n()
   const segments = useMemo(() => collectionPath.split('/').filter(Boolean), [collectionPath])
   const currentName = segments[segments.length - 1] ?? ''
 
@@ -87,18 +89,20 @@ function CollectionRenameDialog({
       <div className="project-export-dialog__backdrop" onClick={busy ? undefined : onClose} />
       <div className="project-export-dialog__panel">
         <header className="project-export-dialog__header">
-          <h2 className="project-export-dialog__title">{kindLabel}をリネーム</h2>
+          <h2 className="project-export-dialog__title">
+            {t('explorer.rename_title', { kind: kindLabel })}
+          </h2>
           <p className="project-export-dialog__lead">
-            {kindLabel}自体の名前を変更します。配下ドキュメントとサブコレも移動し、元は削除されます。
+            {t('explorer.rename_lead', { kind: kindLabel })}
           </p>
         </header>
 
         <p className="project-export-dialog__hint">
-          現在: <code>{collectionPath}</code>
+          {t('explorer.current')} <code>{collectionPath}</code>
         </p>
 
         <label className="project-export-dialog__option">
-          新しい名前
+          {t('explorer.new_name')}
           <input
             className="bulk-actions__input"
             value={newName}
@@ -118,7 +122,7 @@ function CollectionRenameDialog({
 
         {targetCollectionPath && targetCollectionPath !== collectionPath && (
           <p className="project-export-dialog__hint">
-            変更後: <code>{targetCollectionPath}</code>
+            {t('explorer.after_change')} <code>{targetCollectionPath}</code>
           </p>
         )}
 
@@ -126,10 +130,10 @@ function CollectionRenameDialog({
 
         <div className="project-export-dialog__actions">
           <Button onClick={onClose} disabled={busy}>
-            キャンセル
+            {t('common.cancel')}
           </Button>
           <Button variant="primary" onClick={() => void handleSubmit()} disabled={!canSubmit}>
-            {busy ? '実行中…' : 'リネーム'}
+            {busy ? t('explorer.running') : t('explorer.rename')}
           </Button>
         </div>
       </div>

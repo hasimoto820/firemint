@@ -1,3 +1,4 @@
+import { useI18n } from '@shared/i18n/renderer/I18nProvider'
 import { useEffect, useMemo, useState } from 'react'
 import { collectionKindLabel } from '@features/explorer/shared/tree'
 import Button from '@shared/ui/Button'
@@ -17,6 +18,7 @@ function SubcollectionDeleteDialog({
   onClose,
   onDeleted
 }: SubcollectionDeleteDialogProps): React.JSX.Element | null {
+  const { t } = useI18n()
   const collectionName = useMemo(() => {
     const segments = collectionPath.split('/').filter(Boolean)
     return segments[segments.length - 1] ?? collectionPath
@@ -61,7 +63,11 @@ function SubcollectionDeleteDialog({
       onDeleted(result.data.deletedDocumentCount)
       onClose()
     } catch (error) {
-      setError(error instanceof Error ? error.message : `${kindLabel}の削除に失敗しました`)
+      setError(
+        error instanceof Error
+          ? error.message
+          : t('explorer.err_delete_kind_failed', { kind: kindLabel })
+      )
     } finally {
       setBusy(false)
     }
@@ -76,16 +82,18 @@ function SubcollectionDeleteDialog({
       <div className="project-export-dialog__backdrop" onClick={busy ? undefined : onClose} />
       <div className="project-export-dialog__panel">
         <header className="project-export-dialog__header">
-          <h2 className="project-export-dialog__title">{kindLabel}を削除</h2>
+          <h2 className="project-export-dialog__title">
+            {t('explorer.delete_kind_title', { kind: kindLabel })}
+          </h2>
           <p className="project-export-dialog__lead">
-            {kindLabel} <code>{collectionPath}</code> と、配下のドキュメント・サブコレクションをすべて削除します。
+            {t('explorer.delete_kind_lead', { kind: kindLabel, path: collectionPath })}
           </p>
         </header>
 
-        <p className="project-export-dialog__hint">この操作は取り消せません。</p>
+        <p className="project-export-dialog__hint">{t('explorer.cannot_undo')}</p>
 
         <label className="project-export-dialog__option">
-          確認のため、{kindLabel}名 <code>{collectionName}</code> を入力してください
+          {t('explorer.type_name_to_confirm', { kind: kindLabel })}: <code>{collectionName}</code>
           <input
             className="bulk-actions__input"
             value={confirmName}
@@ -110,10 +118,10 @@ function SubcollectionDeleteDialog({
 
         <div className="project-export-dialog__actions">
           <Button onClick={onClose} disabled={busy}>
-            キャンセル
+            {t('common.cancel')}
           </Button>
           <Button variant="danger" onClick={() => void handleSubmit()} disabled={!canSubmit}>
-            {busy ? '削除中…' : '削除'}
+            {busy ? t('explorer.deleting') : t('common.delete')}
           </Button>
         </div>
       </div>

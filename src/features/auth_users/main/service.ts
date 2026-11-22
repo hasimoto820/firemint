@@ -1,3 +1,4 @@
+import { tr } from '@shared/i18n/shared/current'
 import { writeFile } from 'fs/promises'
 import { BrowserWindow, dialog } from 'electron'
 import type { UpdateRequest, UserRecord } from 'firebase-admin/auth'
@@ -39,13 +40,13 @@ function toError<T>(error: unknown): AuthUsersResult<T> {
   logError('auth_users', 'operation failed', error)
   return {
     ok: false,
-    error: error instanceof Error ? error.message : 'Auth users operation failed'
+    error: error instanceof Error ? error.message : tr('ui.err_operation_failed')
   }
 }
 
 function ensureConnected(projectId: string): void {
   if (!isFirestoreConnected(projectId)) {
-    throw new Error(`プロジェクトに接続されていません: ${projectId}`)
+    throw new Error(tr('auth.err_not_connected', { projectId }))
   }
 }
 
@@ -82,10 +83,7 @@ export async function listUsers(
   }
 }
 
-export async function getUser(
-  projectId: string,
-  uid: string
-): Promise<AuthUsersResult<AuthUser>> {
+export async function getUser(projectId: string, uid: string): Promise<AuthUsersResult<AuthUser>> {
   try {
     ensureConnected(projectId)
     const record = await getAuth(projectId).getUser(uid)
@@ -95,9 +93,7 @@ export async function getUser(
   }
 }
 
-export async function updateUser(
-  input: UpdateAuthUserInput
-): Promise<AuthUsersResult<AuthUser>> {
+export async function updateUser(input: UpdateAuthUserInput): Promise<AuthUsersResult<AuthUser>> {
   try {
     ensureConnected(input.projectId)
     ensureWritable(input.projectId)
@@ -228,10 +224,7 @@ export async function deleteUsers(
   }
 }
 
-async function collectUsersForExport(
-  projectId: string,
-  uids?: string[]
-): Promise<AuthUser[]> {
+async function collectUsersForExport(projectId: string, uids?: string[]): Promise<AuthUser[]> {
   const auth = getAuth(projectId)
 
   if (uids && uids.length > 0) {
@@ -305,7 +298,7 @@ export async function exportUsers(
     const users = await collectUsersForExport(input.projectId, input.uids)
 
     if (users.length === 0) {
-      throw new Error('エクスポート対象のユーザーがありません')
+      throw new Error(tr('auth.err_no_users_to_export'))
     }
 
     const content =
@@ -318,12 +311,12 @@ export async function exportUsers(
 
     const result = window
       ? await dialog.showSaveDialog(window, {
-          title: 'Auth ユーザーのエクスポート先',
+          title: tr('auth.export_title'),
           defaultPath,
           filters
         })
       : await dialog.showSaveDialog({
-          title: 'Auth ユーザーのエクスポート先',
+          title: tr('auth.export_title'),
           defaultPath,
           filters
         })

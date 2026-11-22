@@ -1,11 +1,9 @@
+import { tr } from '@shared/i18n/shared/current'
 import { readdir, readFile } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { connectWithEmulator } from '@features/connection/main/service'
-import {
-  DEFAULT_EMULATOR_HUB,
-  parseEmulatorHost
-} from '@features/connection/shared/emulator'
+import { DEFAULT_EMULATOR_HUB, parseEmulatorHost } from '@features/connection/shared/emulator'
 import { importOfficialDump } from '@features/data_transfer/main/official/write_dump'
 import { readOfficialDump } from '@features/data_transfer/main/official/read_dump'
 import { getWorkspaceEntry, removeEntry } from '@features/workspace/main/service'
@@ -202,7 +200,7 @@ export async function discoverEmulators(): Promise<DiscoverEmulatorsResult> {
     return { ok: true, data: results }
   } catch (error) {
     logError('emulator', 'discover failed', error)
-    const message = error instanceof Error ? error.message : 'Discover failed'
+    const message = error instanceof Error ? error.message : tr('ui.err_operation_failed')
     return { ok: false, error: message }
   }
 }
@@ -220,7 +218,7 @@ export async function importEmulatorProjectZip(
 
   const sourceProjectId = loaded.data.sourceProjectId
   if (!sourceProjectId) {
-    return { ok: false, error: 'ダンプから projectId が取れません。Emulator にプロジェクトとして入れられません。' }
+    return { ok: false, error: tr('emu.err_no_project_in_dump') }
   }
 
   const connected = await connectWithEmulator({
@@ -265,15 +263,15 @@ export async function deleteEmulatorProject(
     const entry = getWorkspaceEntry(input.projectId)
 
     if (!entry || entry.authType !== 'emulator') {
-      return { ok: false, error: 'エミュレーターのプロジェクトではありません' }
+      return { ok: false, error: tr('emu.err_not_emulator') }
     }
 
     if (entry.readOnly) {
-      return { ok: false, error: 'read-only プロジェクトのため書き込みできません' }
+      return { ok: false, error: tr('workspace.err_read_only') }
     }
 
     if (!entry.emulatorHost || !entry.emulatorProjectId) {
-      return { ok: false, error: 'エミュレーターの接続情報が不足しています' }
+      return { ok: false, error: tr('emu.err_info_missing') }
     }
 
     const host = parseEmulatorHost(entry.emulatorHost)
@@ -290,7 +288,7 @@ export async function deleteEmulatorProject(
       )
       return {
         ok: false,
-        error: `Emulator 上の削除に失敗しました（${response.status}）。プロセスが起動しているか確認してください`
+        error: tr('emu.err_delete', { status: response.status })
       }
     }
 
@@ -300,16 +298,19 @@ export async function deleteEmulatorProject(
       return { ok: false, error: removed.error }
     }
 
-    logInfo('emulator', `deleteProject success in ${Date.now() - startedAt}ms pool_id=${input.projectId}`)
+    logInfo(
+      'emulator',
+      `deleteProject success in ${Date.now() - startedAt}ms pool_id=${input.projectId}`
+    )
     return { ok: true }
   } catch (error) {
     logError('emulator', `deleteProject failed in ${Date.now() - startedAt}ms`, error)
-    const message = error instanceof Error ? error.message : 'Delete emulator project failed'
+    const message = error instanceof Error ? error.message : tr('ui.err_operation_failed')
 
     if (message.includes('ECONNREFUSED') || message.includes('fetch failed')) {
       return {
         ok: false,
-        error: 'Emulator に接続できません。プロセスが起動しているか確認してください'
+        error: tr('emu.err_unreachable')
       }
     }
 

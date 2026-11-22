@@ -50,7 +50,7 @@ async function runWriteDumpCli(): Promise<number> {
 
   const entry = resolveWorkspaceEntry(projectArg)
   if (!entry) {
-    console.error(`プロジェクトが見つかりません: ${projectArg}`)
+    console.error(`Project not found: ${projectArg}`)
     return 1
   }
 

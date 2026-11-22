@@ -1,3 +1,4 @@
+import { tr } from '@shared/i18n/shared/current'
 import { getWriteBlockedReason } from '@shared/firestore/client'
 import { getFocusedProjectId } from '@shared/firestore/focused'
 import { getWorkspaceEntry } from './service'
@@ -6,13 +7,13 @@ export function ensureWritable(projectId?: string): void {
   const resolvedProjectId = projectId ?? getFocusedProjectId()
 
   if (!resolvedProjectId) {
-    throw new Error('プロジェクトが選択されていません')
+    throw new Error(tr('ui.err_no_project_selected'))
   }
 
   const entry = getWorkspaceEntry(resolvedProjectId)
 
   if (entry?.readOnly) {
-    throw new Error('read-only プロジェクトのため書き込みできません')
+    throw new Error(tr('workspace.err_read_only'))
   }
 }
 

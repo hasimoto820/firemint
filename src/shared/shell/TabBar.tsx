@@ -1,3 +1,5 @@
+import { tr } from '@shared/i18n/shared/current'
+import { useI18n } from '@shared/i18n/renderer/I18nProvider'
 import { useEffect, useMemo, useState } from 'react'
 import { useT } from '@shared/i18n/renderer/I18nProvider'
 import {
@@ -114,6 +116,7 @@ function TabItem({
   onDrop: (event: React.DragEvent, dest: TabDropDest) => void
   onDragEnd: () => void
 }): React.JSX.Element {
+  const { t } = useI18n()
   const className = [
     'tab-bar__tab',
     active ? 'tab-bar__tab--active' : '',
@@ -161,7 +164,7 @@ function TabItem({
       <button
         type="button"
         className="tab-bar__close"
-        aria-label={`${label} を閉じる`}
+        aria-label={t('ui.close_tab_named', { label })}
         draggable={false}
         onClick={(event) => {
           event.stopPropagation()
@@ -178,7 +181,7 @@ function TabBar({
   tabs,
   groups,
   activeTabId,
-  ariaLabel = 'コレクションタブ',
+  ariaLabel = tr('ui.collection_tabs'),
   impExpBusy = false,
   projectLabelFor,
   showProjectLabel = false,
@@ -317,7 +320,8 @@ function TabBar({
     setEditingGroupId(null)
   }
 
-  const contextTab = contextMenu?.kind === 'tab' ? tabs.find((tab) => tab.id === contextMenu.tabId) : null
+  const contextTab =
+    contextMenu?.kind === 'tab' ? tabs.find((tab) => tab.id === contextMenu.tabId) : null
   const contextGroup =
     contextMenu?.kind === 'group'
       ? paneGroups.find((group) => group.id === contextMenu.groupId)

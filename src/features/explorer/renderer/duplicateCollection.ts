@@ -1,8 +1,6 @@
+import { tr } from '@shared/i18n/shared/current'
 import { collectionKindLabel, nextDuplicateCollectionPath } from '@features/explorer/shared/tree'
 import { confirmActionWithCheckbox } from '@shared/ui/confirmAction'
-
-const INCLUDE_SUBCOLLECTIONS_DETAIL =
-  'サブコレクションを含めると、配下のドキュメントもすべてコピーします（件数・時間が増えます）。'
 
 export type DuplicateCollectionOutcome =
   | { status: 'canceled' }
@@ -26,10 +24,14 @@ export async function runDuplicateCollection(
   const targetCollectionPath = nextDuplicateCollectionPath(collectionPath, siblingResult.data)
   const kindLabel = collectionKindLabel(collectionPath)
   const prompt = await confirmActionWithCheckbox(
-    `${kindLabel}「${collectionPath}」を「${targetCollectionPath}」に複製しますか？`,
+    tr('explorer.duplicate_confirm', {
+      kind: kindLabel,
+      path: collectionPath,
+      target: targetCollectionPath
+    }),
     {
-      detail: INCLUDE_SUBCOLLECTIONS_DETAIL,
-      checkboxLabel: 'サブコレクションを含む',
+      detail: tr('explorer.include_subcollections_detail'),
+      checkboxLabel: tr('explorer.include_subcollections'),
       checkboxChecked: false
     }
   )

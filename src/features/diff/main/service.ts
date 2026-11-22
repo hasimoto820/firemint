@@ -1,9 +1,13 @@
+import { tr } from '@shared/i18n/shared/current'
 import { writeFile } from 'fs/promises'
 import type { BrowserWindow } from 'electron'
 import { dialog } from 'electron'
 import { listRootCollections } from '@features/explorer/main/service'
 import { readOfficialDump } from '@features/data_transfer/main/official/read_dump'
-import { iterateExportDocuments, iterateGroupDocuments } from '@features/data_transfer/main/project_export_service'
+import {
+  iterateExportDocuments,
+  iterateGroupDocuments
+} from '@features/data_transfer/main/project_export_service'
 import type { OfficialDumpSummary } from '@features/data_transfer/shared/official'
 import type { ExportDocument } from '@features/data_transfer/shared/types'
 import { isFirestoreConnected } from '@shared/firestore/client'
@@ -24,7 +28,7 @@ type ProgressReporter = (progress: DiffProgress) => void
 
 function ensureConnected(projectId: string): void {
   if (!isFirestoreConnected(projectId)) {
-    throw new Error(`Firestore is not connected: ${projectId}`)
+    throw new Error(tr('ui.err_not_connected', { projectId: projectId }))
   }
 }
 
@@ -49,16 +53,23 @@ function escapeCsvCell(value: unknown): string {
 function statusLabel(status: DiffRow['status']): string {
   switch (status) {
     case 'dump_only':
-      return 'ダンプ'
+      return tr('diff.dump_only')
     case 'project_only':
-      return 'プロジェクト'
+      return tr('diff.project_only')
     case 'changed':
-      return '中身が違う'
+      return tr('diff.changed')
   }
 }
 
 function summaryToCsv(summary: DiffSummary): string {
-  const header = ['id', 'path', 'collectionPath', '固有', 'ダンプ', 'プロジェクト']
+  const header = [
+    'id',
+    'path',
+    'collectionPath',
+    tr('diff.col_unique'),
+    tr('diff.col_dump'),
+    tr('diff.col_project')
+  ]
     .map(escapeCsvCell)
     .join(',')
   const rows = summary.rows.map((row) =>
@@ -75,12 +86,12 @@ function toDiffError(error: unknown, canceled = false): DumpDiffResult {
   logError('diff', 'compareOfficialDump failed', error)
 
   if (wasCanceled) {
-    return { ok: false, error: '比較をキャンセルしました', canceled: true }
+    return { ok: false, error: tr('diff.canceled'), canceled: true }
   }
 
   return {
     ok: false,
-    error: error instanceof Error ? error.message : 'Compare dump failed'
+    error: error instanceof Error ? error.message : tr('ui.err_operation_failed')
   }
 }
 
@@ -142,7 +153,9 @@ function collectionTreeRoot(parents: string[]): string | null {
     return null
   }
 
-  const sorted = [...parents].sort((left, right) => left.length - right.length || left.localeCompare(right))
+  const sorted = [...parents].sort(
+    (left, right) => left.length - right.length || left.localeCompare(right)
+  )
   const root = sorted[0]
   if (sorted.every((parent) => parent === root || parent.startsWith(`${root}/`))) {
     return root
@@ -247,7 +260,7 @@ export async function peekDiffDump(dumpPath: string): Promise<PeekDiffDumpResult
     logError('diff', 'peekDiffDump failed', error)
     return {
       ok: false,
-      error: error instanceof Error ? error.message : 'ダンプを読み取れませんでした'
+      error: error instanceof Error ? error.message : tr('diff.err_read_dump')
     }
   }
 }
@@ -260,7 +273,7 @@ export async function compareOfficialDump(
     ensureConnected(input.projectId)
 
     if (!input.dumpPath) {
-      throw new Error('ダンプを選んでください')
+      throw new Error(tr('diff.err_select_dump'))
     }
 
     logInfo('diff', `compareOfficialDump projectId=${input.projectId} dump=${input.dumpPath}`)
@@ -279,7 +292,7 @@ export async function compareOfficialDump(
     }
 
     if (dump.data.documents.length === 0) {
-      throw new Error('ダンプにドキュメントがありません')
+      throw new Error(tr('diff.err_dump_empty'))
     }
 
     const dumpByPath = new Map<string, Record<string, unknown>>()
@@ -296,9 +309,7 @@ export async function compareOfficialDump(
     })
 
     const liveDocuments = await collectLiveDocuments(input.projectId, dump.data, onProgress)
-    const projectByPath = new Map(
-      liveDocuments.map((document) => [document.path, document.data])
-    )
+    const projectByPath = new Map(liveDocuments.map((document) => [document.path, document.data]))
 
     onProgress?.({
       phase: 'comparing',
@@ -408,18 +419,18 @@ export async function exportDumpDiffReport(
         : [{ name: 'JSON', extensions: ['json'] }]
     const result = window
       ? await dialog.showSaveDialog(window, {
-          title: '差分レポートの保存先',
+          title: tr('diff.report_save_title'),
           defaultPath,
           filters
         })
       : await dialog.showSaveDialog({
-          title: '差分レポートの保存先',
+          title: tr('diff.report_save_title'),
           defaultPath,
           filters
         })
 
     if (result.canceled || !result.filePath) {
-      return { ok: false, error: '保存をキャンセルしました', canceled: true }
+      return { ok: false, error: tr('diff.save_canceled'), canceled: true }
     }
 
     const content =
@@ -458,7 +469,7 @@ export async function exportDumpDiffReport(
     logError('diff', 'exportDumpDiffReport failed', error)
     return {
       ok: false,
-      error: error instanceof Error ? error.message : 'Export diff report failed'
+      error: error instanceof Error ? error.message : tr('ui.err_operation_failed')
     }
   }
 }
