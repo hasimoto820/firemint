@@ -3,194 +3,82 @@ account
 
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
-
-
-
+デスクトップ版のアカウント・課金の決定事項と、Stripe の設定。
+流れ（解約・データ削除を含む）は 002_005_flow.txt、Stripe の通知の書き方は 002_006_webhook.txt。
 
 
 
 
 ================================================================================
-未策定
+決定事項
 ================================================================================
-
-
-
-デスクトップで新しく決めること
-
-
-
 
 
 1. FireMint へのログイン（Firebase Auth）
-モバイルは、初回起動のときに匿名で始めて、あとで Google に昇格するか、既存の uid に合流します。デスクトップも同じ流れにするかを決めます。
-
-Electron には Android の Google ログインの仕組みが無いので、Google ログインのやり方も決める必要があります。今の Firestore 用のログインと同じく、ブラウザでログインして戻ってくる形が考えられます。
-
-→　モバイルと同じ。初めて起動した時に匿名ユーザーを作り、あとで Google に昇格するか、既存の uid に合流する。
-　　基本ルール 0〜6（003_001_plan）をそのまま使う。
-　　Google ログインは、ブラウザでログインしてアプリに戻る形。
-
-
+　モバイルと同じ。初めて起動した時に匿名ユーザーを作り、あとで Google に昇格するか、既存の uid に合流する。
+　基本ルール 0〜6（003_001_plan）をそのまま使う。
+　Google ログインは、ブラウザでログインしてアプリに戻る形。
+　Firebase Auth は裏側（main）で動かす。画面側（renderer）にログイン情報を渡さない。
+　Firebase Auth の Web API を直接呼ぶ。refresh token は safeStorage で暗号化して保存する。
+　関数の呼び出しと、契約の読み取りも裏側で行う。
 
 
 2. deviceId（トライアルの起点）
-Android ID の代わりになる値を何にするかを決めます。
-
-→　Windows の MachineGuid を使う（関数に渡す時の名前は deviceId）。
-
-
+　Windows の MachineGuid を使う（関数に渡す時の名前は deviceId）。
+　トライアルは端末ごと。再インストールしても同じ値なので、トライアルは続く。
+　サーバーには、ハッシュ（SHA-256）にして devices のドキュメントID として持つ。生の値は保存しない。
 
 
-自分で作った番号をファイルに保存する場合：そのファイルを消せば、トライアルをやり直せます。
-PC の固有の番号（Windows の MachineGuid など）を使う場合：再インストールしても同じ値です。
-
-モバイルの「再インストールしてもトライアルは続く」に合わせるかどうかが分かれ目です。
-
-→　モバイルと同じ。トライアルは端末ごと。
-　　サーバーには、ハッシュ（SHA-256）にして devices のドキュメントID として持つ。生の値は保存しない。
+3. トライアルの起点（firstUseDate）
+　モバイルと同じ。devices/{MachineGuid のハッシュ}.firstUseDate
+　Google ログインすると、課金の状態（account）を引き継ぐ。課金が切れたら、その PC の firstUseDate で判定する。
+　データ削除では、devices に期限（expireAt）を入れるだけで消さない。トライアルはリセットされない。
 
 
+4. 割り切り
+　MachineGuid の書き換え・Windows の入れ直し・別の PC では、トライアルを使い直せる。対策しない。
+　（モバイルの「端末の初期化」と同じ扱い）
+　PC の中身を丸ごと複製して配った場合などに、別の PC で MachineGuid が同じになり、トライアルを共有することがある。対策しない。
 
 
-3. 端末に置くキャッシュ
-モバイルの SQLite（uid / accountId / この端末の firstUseDate）に当たるものを、どこに置くかを決めます。
+5. users/{uid}.platform
+　"windows"
 
-→
+
+6. Cloud Functions
+　サーバー側（Functions・Firestore ルール・Hosting）は、すべて firemint_m で変更し、デプロイする。
+　デスクトップ用の関数は firemint_m/functions/ にあり、名前の頭に windows_ を付ける（codebase は default）。
+　モバイルの関数（discardAnonymous / joinAccount / createAccount など）は、デスクトップからもそのまま呼ぶ。
+　このリポジトリの hosting/ と functions/ は使わない。
+
+
+7. subscriptions/{ID} の ID
+　Stripe の subscription の ID（sub_…）。
+
+
+8. 解約とデータ削除
+　どちらもアプリの中で行う。流れは 002_005_flow.txt「解約」「データ削除」。
+
+
+9. 再ログインしても、つないでいるプロジェクトの認証が古いまま
+　再ログインで繋ぎ直す。
+
+
+10. OAuth クライアント
+　firemint-m のデスクトップ用クライアント（Firebase のセーフリストに登録）。
+　FireMint へのログインと Firestore 用のログインで共用する。
+　権限は datastore / identitytoolkit（と openid / email）。
+　プロジェクトの一覧は取得しない。モバイルと同じく、projectId を入力して繋ぐ。
+
+
+
+
+================================================================================
+端末に置くファイル
+================================================================================
+
+
 C:\Users\<ユーザー名>\AppData\Roaming\FireMint\
-プロジェクトの一覧（workspaces.json）や Google の OAuth の設定　これらも移動。
-
-
-
-
-4. Stripe の購入の流れと、Webhook をどこで受けるか
-Webhook を受ける関数は、モバイルと同じ Firebase プロジェクト（firemint-e801f）の Cloud Functions に置くことになります。
-注意点として、デスクトップのリポジトリから関数をデプロイすると、モバイルのリポジトリの関数が消されるおそれがあります。
-それを避ける方法（Firebase の「codebase」の分け方）を決める必要があります。
-
-→　
-codebase を windows にして、モバイル（android）と分ける。モバイル側は変えない。
-関数の名前の頭に windows_ を付ける。
-モバイル側の変更が必要になるなら、変更はモバイル側で行う。
-デスクトップ側の作業で作成、変更が許されるのは、　windows_ のみ。
-
-
-
-5. subscriptions/{ID} の ID
-Stripe の subscription の ID（sub_…）を使うのが自然です。
-
-→　賛成
-
-
-
-
-6. 解約と、データ削除のときの Stripe 解約
-解約の窓口（Stripe の Customer Portal にするか）と、誰が操作できるかを決めます。
-データ削除の処理（deleteAccount）はモバイルのリポジトリにあるので、そこから Stripe の解約をどう呼ぶかも決めます。
-
-→　公式webページに、解約、データ削除の項目を設置。
-デスクトップアプリ内には、公式ページへのリンクを設置。
-
-→　2026-11-20 変更（002_005_flow.txt「解約」「データ削除」）
-　　解約: アプリから windows_createPortalSession で Customer Portal を開く。公式サイトにはログインリンクを載せる。
-　　データ削除: アプリの中で、モバイル版と同じ deleteAccount / deleteMyData を呼ぶ。Stripe の課金が続いていれば断る。
-
-
-
-
-
-
-
-7. 再ログインしても、つないでいるプロジェクトの認証が古いまま
-
-→　再ログインで繋ぎ直す
-
-
-
-
-
-
-
-
-
-
-
-8. トライアルの起点（firstUseDate）をどこに置くか
-
-→　モバイルと同じ。firestore:devices/{MachineGuid のハッシュ}.firstUseDate
-　　Google ログインすると、課金の状態（account）を引き継ぐ。課金が切れたら、その PC の firstUseDate で判定する。
-　　データ削除では、devices に期限（expireAt）を入れるだけで消さない。トライアルはリセットされない。
-
-
-
-
-
-9. 割り切り
-
-→　MachineGuid の書き換え・Windows の入れ直し・別の PC では、トライアルを使い直せる。対策しない。
-　　（モバイルの「端末の初期化」と同じ扱い）
-　　PC の中身を丸ごと複製して配った場合などに、別の PC で MachineGuid が同じになり、トライアルを共有することがある。対策しない。
-
-
-
-10. FireMint へのログインに使う OAuth クライアント：Firestore 用のログインとは別に、どのクライアントで Firebase Auth にログインするかです。
-モバイルでは、firemint-m の Web クライアントを使っています。
-
-→　firemint-m にデスクトップ用のクライアントを1つ作り、Firebase のセーフリストに登録する。
-　　FireMint へのログインと Firestore 用のログイン（11）は、このクライアントを共用する。
-
-
-
-
-11. Google の認証の期限が1週間
-デスクトップが使っている OAuth クライアントは、firemint-m でも firemint-e801f でもない、別のプロジェクト（番号 415032174806）のものです。
-そのプロジェクトがまだ「テスト中」の状態だと、Google の決まりで、ログインの有効期限が7日になります。おそらくこれが原因です。
-
-直すには、審査を通した firemint-m にデスクトップ用のクライアントを作り、そちらに移ります。
-その場合、権限の範囲（デスクトップは cloud-platform、モバイルの審査は datastore）の整理も要ります。
-
-→　Firestore 用のログインも、10 で作るクライアントを使う。
-　　権限は datastore / identitytoolkit（と openid / email）。cloud-platform は使わない。
-　　service.management はデスクトップでは使わないので求めない。
-　　プロジェクトの一覧は取得しない。モバイルと同じく、projectId を入力して繋ぐ。
-
-
-
-
-
-
-
-12. firebase functions 
-registerDevice これを、windows版で再作成。
-windows_registerDevice
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-================================================================================
-未策定 詳細
-================================================================================
-
-
-＊　設定ファイル類は開発中は、config/ 以下に置いているが、本番に向け、全てC:\users\.... へ移動
-
-
-C:\users\.... へ設置
 ファイル	                         中身
 workspaces.json	                    プロジェクトの一覧
 settings.json	                    設定
@@ -198,92 +86,11 @@ saved_queries.json	                保存したクエリ
 google_profiles.json	            Google アカウントの表示名など
 google_oauth_tokens.json	        Google のログイン情報（トークン）（暗号化）
 extra_ca.pem	                    追加の証明書（置いた人だけ）
-これから足すアカウントのキャッシュ	   uid・accountId など
+account_cache.json	                uid・accountId など
 
-アプリと同時に配布。C:\users\.... へ設置しない。
+アプリと同時に配布する（AppData には置かない）
 ファイル	                        中身
-google_oauth.json	                OAuth クライアントの ID と秘密の値。
-
-
-
-
-
-
-
-
-
-
-================================================================================
-Stripe
-================================================================================
-
-支払いの失敗などで起きることは、Google Play・Stripe それぞれの仕様に従う。FireMint は今の状態を記録するだけ。
-lastNotificationType の値は、モバイル版と同じ。詳細は 002_005_flow.txt の C。
-
-Stripe の通知	                いつ来るか	                                                subscriptions への書き方
-checkout.session.completed	    初めての購入が終わった	                                     ドキュメントを作る。expiryTime ＝ 今の請求期間の終わり。PURCHASED
-invoice.paid	                毎月の更新の支払いが成功した	                              expiryTime を次の期間の終わりに延ばす。PURCHASED
-invoice.payment_failed	        更新の支払いが失敗した（カードの期限切れなど）	               記録だけ（IN_GRACE_PERIOD）。Stripe は 7 日かけて引き落としをやり直す。その間は使える
-customer.subscription.updated	解約の予約など、状態が変わった	                              解約の予約なら記録だけ（CANCELED）。期限までは使える
-customer.subscription.deleted	契約が本当に終わった（期限が来た、やり直しも全部失敗した）	     expiryTime ＝ 終わった時刻。CANCELED
-charge.refunded	                返金した	                                                expiryTime ＝ 今。VOIDED_FULL_REFUND / VOIDED_PARTIAL_REFUND。Stripe の契約もすぐ終わらせる
-charge.dispute.created	        チャージバック（カード会社経由の取り消し）	                    expiryTime ＝ 今。VOIDED_FULL_REFUND。Stripe の契約もすぐ終わらせる
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-================================================================================
-実装　順序
-================================================================================
-
-1. firemint-m にデスクトップ用の OAuth クライアントを作る（手作業。手順は私が案内します）
-Google ログインに必要なので、これが最初です。
-
-
-
-2. 起動〜ログイン〜トライアルを実装する
-windows_registerDevice
-匿名ユーザーの作成と Google ログイン
-キャッシュ
-AppData への移動
-
-Stripe が無くても作れます。
-
-
-
-
-3. Stripe のコンソールで設定する（テストモード）
-商品と価格
-支払いのやり直し：1週間。最後まで失敗したらキャンセル
-Customer Portal
-Webhook の受け口
-
-
-
-4. 課金・Webhook・解約・データ削除を実装する
-
-
-
-5. モバイル側を直す（002_100）
-
-
-
-
-
-
+google_oauth.json	                OAuth クライアントの ID と秘密の値
 
 
 
@@ -293,13 +100,17 @@ Stripe の設定
 ================================================================================
 
 サンドボックス（FireMint サンドボックス、acct_1U5lxsLx1ft5ni7R）で組み上げる。
-実装が終わったら、本番環境に同じ設定を作り直す（サンドボックスの設定は引き継がれない）。
-本番に切り替える時に差し替えるのは、API キー・価格の ID・Webhook の署名の値。コードは変えない。
+本番に出す時は、本番環境に同じ設定を作り直す（サンドボックスの設定は引き継がれない）。
+差し替えるのは、API キー（STRIPE_SECRET_KEY）・Webhook の署名の値（STRIPE_WEBHOOK_SECRET）・
+価格の ID（firemint_m/functions/.env.firemint-e801f の STRIPE_PRICE_ID）。コードは変えない。
+
+テスト用の Google アカウント: pandaas886@gmail.com
+API キー: https://dashboard.stripe.com/acct_1U5lxsLx1ft5ni7R/test/apikeys
 
 ＊　商品と価格
 　商品: FireMint Pro（prod_VWrNagbzyvYP3I）。画像は FireMint のロゴ。
-　価格: ¥500 / 月（JPY、デフォルト）、$5.00 / 月（USD）。継続・1 カ月ごと。トライアルなし。
-　価格の ID（サンドボックス）: price_1UVneTLx1ft5ni7RZJtsC7U9
+　価格: $3.00 / 月（USD）。継続・1 カ月ごと。トライアルなし。
+　価格の ID（サンドボックス）: price_1UdOrcLx1ft5ni7Ruz4oLpGp
 
 ＊　支払いの失敗（設定 → Billing → サブスクリプションとメール通知）
 　送信メール: 「カード決済が失敗した場合にメールを送信」をオン。
@@ -313,183 +124,12 @@ Stripe の設定
 
 ＊　カスタマーポータル（設定 → Billing → カスタマーポータル）
 　次世代のポータル体験: オフ。
-　ポータルリンク: 有効にする（公式サイトに載せる。アプリが使えない人の入口。2026-11-20 変更）。
+　ポータルリンク: 有効にする（公式サイトに載せる。アプリが使えない人の入口）。
 　　アプリからは、owner か確かめてから、windows_createPortalSession がポータルを開く。
 　請求書: オン（請求履歴）。顧客情報: 既定のまま。決済手段: オン。
 　キャンセル: オン。請求期間の終了時にキャンセル。
 　サブスク（プラン・数量の変更）: オフ。
 　ビジネス情報: ヘッダー・リダイレクトリンクは空。カスタムドメインなし。
 　本番環境では「公開事業情報」で、事業名を FireMint にし、
-　プライバシーポリシー（https://firemint-e801f.web.app/privacy.html）を入れる。
-
-================================================================================
-審査中
-================================================================================
-
-＊　状態
-　firemint-m の OAuth 審査（ブランディング・権限）を、2026-10-29 に申請した。今は Google の審査中。
-　・審査は最大 4〜6 週間。最初の連絡は 3〜5 日で carepanda886@gmail.com に来る。
-　・確認先: https://console.cloud.google.com/auth/verification?project=firemint-m
-　・審査が済むまで、datastore などの権限でログインできるのは 100 人まで。
-
-＊　審査中にしないこと
-　・firemint-m に OAuth クライアントを足さない（審査の動画に、すべてのクライアントを映す必要があるため）。
-　　2026-10-28 に作った「FireMint Windows」は削除した。
-　　Firebase（firemint-e801f）のセーフリストには、その ID（750211540930-cpba2ri903e4t6lifbhkofutpisfgdp7）が残っているが、害は無い。
-　　セーフリストの ID は 1 件だけ消せない。Google の設定パネルの「Delete provider」は Google ログインごと消すので、押さない。
-
-　・firemint-e801f.web.app をデプロイしない（審査の対象）。hosting/ のデプロイ先も同じサイトで、丸ごと置き換わる。
-　・解約とデータ削除の Web ページは、審査が通ってから作る（公式サイトに置く）。
-
-＊　審査中でも進められること
-　・開発中のログインは、今のクライアント（プロジェクト番号 415032174806）を使う。
-　　その ID を Firebase のセーフリストに足す。権限はモバイルと同じ（11）にして作る。
-　・windows_registerDevice
-　・匿名ユーザーの作成と Google ログイン（昇格・合流）
-　・キャッシュと、設定ファイル類の AppData への移動
-　・Stripe（テストモード）の設定、購入、Webhook、解約
-　・データ削除（Web ページと windows_ の関数）
-　・トライアルが切れた時の画面（未策定 E）
-　・モバイル側の修正（002_100_mobile.txt）
-
-＊　審査が通ったらやること（Web ページ）
-　・解約（windows_createPortalSession と Customer Portal）とデータ削除（windows_ の関数）の Web ページを作る
-　　→　2026-11-20 変更: Web ページは作らない。002_005_flow.txt「解約」「データ削除」
-　・支払い完了のページを作り、windows_createCheckoutSession の戻り先を変える（今は公式サイトのトップ）
-　・顧客を消した後に返金できるかを、サンドボックスで試す（002_006「決めること」2）
-
-＊　審査が通ったらやること
-　1. firemint-m に Windows 用の OAuth クライアント（種類: デスクトップ アプリ）を作る
-　2. その ID を、Firebase（firemint-e801f）のセーフリストに足す
-　3. google_oauth.json を、そのクライアントの ID とシークレットに差し替える
-　4. 開発用のクライアント（415032174806）の ID を、セーフリストから外す（外せなければ残してよい）
-
-＊　審査に含まれていないもの
-　・（解決済み 2026-11-14）service.management は、モバイルからも外した。両方とも datastore と identitytoolkit だけ。
-
-
-
-
-
-
-
-
-
-
-================================================================================
-Stripe
-================================================================================
-
-
-google認証  pandaas886@gmail.com
-
-商品 ID：prod_VWrNagbzyvYP3I
-価格 ID：price_1UVneTLx1ft5ni7RZJtsC7U9
-
-
-API Key
-https://dashboard.stripe.com/acct_1U5lxsLx1ft5ni7R/test/apikeys
-上記URLを参照
-
-
-
-
-
-
-
-
-================================================================================
-審査中　作業
-================================================================================
-
-
-
-
-
-
-
-
-
-================================================================================
-1. 開発用クライアントをセーフリストに足す（手作業、1分）
-今のデスクトップのクライアント（415032174806）の ID を、Firebase のセーフリストに足します。FireMint へのログインを試すのに必要です。
-
-→　OK
-
-
-
-
-
-
-
-================================================================================
-2. 設定ファイルを AppData に移す（実装）
-config/ の JSON を C:\Users\<ユーザー名>\AppData\Roaming\FireMint\ に移します。ほかと関係なく進められて、小さく済みます。
-
-→　
-C:\Users\hashi\AppData\Roaming\FireMint\
-workspaces.json
-settings.json
-saved_queries.json
-google_profiles.json
-google_oauth_tokens.json
-保存済
-
-
-
-
-
-
-================================================================================
-3. 関数の土台と windows_registerDevice（実装）
-デスクトップのリポジトリに functions/ を作り、codebase を windows にします。最初の関数として、windows_registerDevice を作ります。
-
-→　OK（デプロイ済み）
-デプロイの手順（PowerShell。F:\FireMint\sys\firemint で実行）:
-　$env:NODE_OPTIONS="--use-system-ca"　　　　　… この PC は通信の証明書が差し替えられるため、Windows の証明書を使う
-　$env:FUNCTIONS_DISCOVERY_TIMEOUT="60"　　　 … コードの初回読み込みが 10 秒を超えることがあるため
-　firebase deploy --only functions:windows
-
-
-
-
-
-
-
-
-================================================================================
-4. ログインと利用状態（実装）
-・匿名ユーザーの作成と、Google ログイン（昇格・合流）
-・キャッシュ
-・トライアルの判定
-・期限切れのときの画面（E）
-
-→　Firebase Auth は裏側（main）で動かす。画面側（renderer）にログイン情報を渡さない。
-　　Firebase Auth の Web API を直接呼ぶ。refresh token は safeStorage で暗号化して保存する。
-　　関数の呼び出しと、契約の読み取りも裏側で行う。
-　　開発中のテスト: 環境変数 FIREMINT_ACCOUNT_CACHE_ONLY=1 で起動すると、キャッシュだけで判定する（配布版では効かない）。
-　　作る順番: 4-1 MachineGuid とキャッシュ / 4-2 匿名ユーザーと windows_registerDevice / 4-3 Google ログイン（昇格・合流）/ 4-4 トライアルの判定と画面（E）
-
-
-================================================================================
-5. 課金の前に、Webhook の不変条件と状態遷移表をドキュメントに書く
-データ削除のあとに届く通知のような抜けを、表で先に潰します。
-
-
-================================================================================
-6. 課金・Webhook・解約・データ削除（実装）
-
-================================================================================
-7. Firestore 用ログインの権限と、projectId の入力（実装。4 の後に行う）
-11 の決定どおり、cloud-platform をやめて、モバイルと同じ権限にする。プロジェクトの一覧の取得をやめて、projectId を入力して繋ぐ。
-
-
-
-
-
-
-
-
-
-
+　プライバシーポリシー（https://hydrangy.com/firemint/privacy.html）を入れる。
 

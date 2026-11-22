@@ -3,6 +3,9 @@
 
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
+※ モバイル版を作る前の、最初の設計。今の課金・解約・データ削除の仕様は
+　 doc/003_reoper/002_005_flow.txt と 002_006_webhook.txt。
+
 関連:
   002_001_plan.txt          … 値段・Stripe・販売の置き場
   001_003_ディレクトリ構成  … features/auth（アプリ側認証・課金の箱）
@@ -49,9 +52,9 @@
 
   4. Stripe
        Customer / Subscription / Checkout / Customer Portal
-       Price: 日本 ¥500、海外 $5
+       Price: $3 / 月（USD）
 
-  5. hosting/
+  5. firemint_m/hosting/（公式サイト https://hydrangy.com/firemint/）
        紹介・DL。購入ボタンはアプリ内 or LP から Functions の Checkout へ
 
 

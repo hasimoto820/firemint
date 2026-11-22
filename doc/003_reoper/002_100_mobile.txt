@@ -20,7 +20,7 @@ mobileに向けて
 
 
 
-＊　データ削除（2026-11-18 済み。firemint_m の deleteAccountCore.ts と AccountScreen.tsx）
+＊　データ削除（済み。firemint_m の deleteAccountCore.ts と AccountScreen.tsx）
 　デスクトップ版でストライプ課金が継続してるなら、データ削除を断る。
 "???のアカウントで、google play以外の支払いが継続しています。
 データを削除する為には、先に支払いを停止させて下さい。"
@@ -28,8 +28,6 @@ mobileに向けて
 
 
 
-＊　codebaseの名前変更（不要になった 2026-11-17）
-　関数はすべて firemint_m/functions/ の1つにまとめた（Windows 用の windows_* も含む）。codebase は default のまま。
 
 
 

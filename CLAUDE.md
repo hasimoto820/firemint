@@ -31,16 +31,10 @@ C:\Users\<ユーザー名>\AppData\Roaming\firemint\account_cache.json
 | 期限切れ（過去の日付: 2023-11-15） | `1700000000000` |
 | トライアル中（2026-11-02 11:00） | `1793584800000` |
 
-## Hosting
+## サーバー側（Functions・Firestore ルール・Hosting）
 
-Google の OAuth 審査中は、`hosting/` をデプロイしない。デプロイ先は審査の対象の `firemint-e801f.web.app` で、モバイル版のサイトが丸ごと置き換わる。
+すべて `firemint_m` で変更し、デプロイする。Windows 用の関数（`windows_*`）も `firemint_m/functions/` にある。
 
-## Cloud Functions のデプロイ
+このリポジトリの `hosting/` と `functions/` は使わない。ここからデプロイしない。
 
-```powershell
-$env:NODE_OPTIONS="--use-system-ca"
-$env:FUNCTIONS_DISCOVERY_TIMEOUT="60"
-firebase deploy --only functions:windows
-```
-
-デプロイの後、同じ画面で `npm run dev` を実行する時は、先に `Remove-Item Env:NODE_OPTIONS` を実行する。
+公式サイト: https://hydrangy.com/firemint/

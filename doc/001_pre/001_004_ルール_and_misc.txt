@@ -99,13 +99,10 @@ https://www.reddit.com/r/Firebase/comments/1nd21eo/is_there_a_better_alternative
 
 
 
-hostingのデプロイ
+サーバー側（Functions・Firestore ルール・Hosting）のデプロイ
 
-cd hosting
-FireMint\sys\firemint\hosting\
-
-npm run build
-npx firebase-tools deploy --only hosting --project firemint-e801f
+firemint_m で行う。このリポジトリの hosting/ と functions/ は使わない。
+公式サイト: https://hydrangy.com/firemint/
 
 
 

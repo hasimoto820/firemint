@@ -31,14 +31,8 @@
 ================================================================================
 
 
-＊　料金は検討中
-    日本  ¥500 / 月
-    海外  $5 / month
-
-    or
-
-    日本  ¥300 / 月
-    海外  $3 / month
+＊　料金
+    $3 / month（USD）。Google Play・Stripe とも同じ。
 
 ＊　アカウントの種類
     firemint アカウント   firemint を操作する権限。Google アカウントを使用。課金を管理。2 アカウントまで使用可。
@@ -59,7 +53,7 @@
     ドキュメントの形はモバイル版と同じにする。provider で決済元を区別する
     （"Google Play" / "Stripe"）。
     関連コレクション  accounts / devices / users
-    詳細は doc/firemint_mobile/doc/003_account/003_001_plan.txt。
+    詳細は firemint_m/doc/003_account/003_001_plan.txt。
 
 
 ================================================================================
@@ -82,6 +76,13 @@
 
 ＊　doc/003_reoper/
     これからの仕様・実装はここに書く。
+
+＊　解約・データ削除・公式サイト（Windows 版）
+    仕様          doc/003_reoper/002_005_flow.txt「解約」「データ削除」
+    Stripe の通知  doc/003_reoper/002_006_webhook.txt
+    やること      doc/003_reoper/002_002_todo.txt「これからやること」
+    firemint_m で行う作業（Functions・公式サイト・Stripe の設定）
+                  firemint_m/doc/005_web/005_001_plan.txt
 
 ＊　doc/001_pre/、doc/002_operate/
     モバイル版を作る前のドキュメント。

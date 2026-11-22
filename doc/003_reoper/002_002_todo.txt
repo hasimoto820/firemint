@@ -18,11 +18,11 @@ todo
 
 
 ＊　仕様の置き場所
-　002_004_account.txt　決定事項、Stripe の設定、「審査中」「審査中　作業」
+　002_004_account.txt　決定事項、Stripe の設定
 　002_005_flow.txt　　 流れ
 　002_006_webhook.txt　Webhook の不変条件と状態遷移表
 　002_100_mobile.txt　 モバイル側の修正
-　CLAUDE.md（リポジトリ直下）　テストのモード切り替え、デプロイの手順
+　CLAUDE.md（リポジトリ直下）　テストのモード切り替え
 
 
 ＊　完了したもの
@@ -37,14 +37,13 @@ todo
 　　サンドボックスのテスト用カードで購入し、「契約中」になることまで確認した
 
 
-＊　しないこと（2026-11-18 更新。OAuth の審査は 2026-11-17 に通った）
-　・このリポジトリの hosting/ と functions/ は、デプロイしない（審査後も、ずっと）。
-　　サーバー側（Functions・Firestore ルール・Hosting）の本流は firemint_m。変更とデプロイは firemint_m で行う。
-　　hosting/ … ここからデプロイすると、公開中のサイト（hydrangy.com/firemint/）が丸ごと置き換わる
-　　functions/ … Windows 用の関数（windows_*）も、firemint_m/functions/ に移した（codebase default）
+＊　サーバー側
+　Functions・Firestore ルール・Hosting は、firemint_m で変更し、デプロイする。
+　Windows 用の関数（windows_*）も firemint_m/functions/ にある。
+　このリポジトリの hosting/ と functions/ は使わない。
 
 
-＊　審査中でも試せること（まだ確認していない）
+＊　まだ試していないこと
 　Stripe のダッシュボードから、テスト契約（pandaas886）を操作して、Webhook の動きを確かめる。
 　・解約の予約 → CANCELED。期限までは使える
 　・解約の取り消し → PURCHASED に戻る
@@ -52,23 +51,21 @@ todo
 　・支払いの失敗 → IN_GRACE_PERIOD。全部失敗したら使えなくなる
 
 
-＊　審査が通ったら、この順番で
-　1. firemint-m に Windows 用の OAuth クライアント（種類: デスクトップ アプリ）を作る
-　　 追加の審査（Windows の動画）が要るかは、未確認。ここで確かめる
-
-        → OK
-
-
-　2. その ID を Firebase のセーフリストに足す。config/google_oauth.json を差し替える
-
-        → OK
-
-
-　3. 公式サイトの改修（下の「Stripe リダイレクト先の変更」）。Windows 版の内容を足す
-　4. 支払い完了のページを作り、windows_createCheckoutSession の戻り先を変える
-　5. 解約の Web ページと windows_createPortalSession を作る
-　6. データ削除の Web ページと windows_ の関数を作る（002_005「データ削除」の順番）
-　7. 顧客を消した後に返金できるかを、サンドボックスで試す。できなければ、顧客を消す決定を見直す
+＊　これからやること（解約・データ削除・公式サイト）
+　仕様は 002_005_flow.txt「解約」「データ削除」。firemint_m 側の作業の詳細は firemint_m/doc/005_web/005_001_plan.txt。
+　0. 課金の判定を 1 か所にまとめ、deleteAccount を「呼んだアプリの決済元は止める、別の決済元なら断る」に直す（firemint_m）
+　　 仕様は firemint_m/doc/003_account/003_015_billing_core.txt
+　1. windows_createPortalSession を作る（firemint_m）
+　2. アプリに「支払いの管理・解約」を足す（このリポジトリ。002_005「解約」）
+　　 出すのは、Stripe で買った本人（owner で stripeCustomerId がある時）だけ
+　3. アプリの「アカウント削除」から deleteAccount / deleteMyData を呼ぶ（このリポジトリ。002_005「データ削除」）
+　　 成功したら、続けて PC の中のデータ（AppData の JSON）を消し、アプリを閉じる
+　4. 支払い完了のページを作り、windows_createCheckoutSession の戻り先を変える（firemint_m）
+　　 今の戻り先は https://firemint-e801f.web.app/。https://hydrangy.com/firemint/ の支払い完了ページにする
+　5. 公式サイト（firemint_m/hosting/firemint の index・privacy・delete_account）に Windows 版と Stripe を足す。
+　　 delete_account.html には、Windows 版の削除の手順と、Customer Portal のログインリンクを載せる
+　6. Stripe のカスタマーポータルのログインリンクを有効にする（サンドボックスと本番）
+　7. 002_005 の未策定 K を決める
 　8. 招待の「参加しますか？」を試す（Android から招待を送る）
 
 
@@ -199,13 +196,13 @@ todo
         Android 版の deviceId（Android ID）に相当する値を、デスクトップ版で独自に作る。
         端末を見分けるための値で、本人確認には使わない。（003_001）
     ・users/{uid}.platform は "windows"。（003_001）
-    ・課金は Stripe。Stripe 関連のコードは、デスクトップ側のリポジトリに置く。（003_004）
+    ・課金は Stripe。Stripe 関連の関数は firemint_m/functions/ に置く（windows_*）。
     ・購入の流れ（003_002「デスクトップで課金」）
         購入できるのは、Google ログイン済みの owner だけ。
         購入が終わったら subscriptions/{ID} を作る（provider = "Stripe"）。
         ID の決め方は、デスクトップ側で決める。
         subscriptions のドキュメントの形は、Android と同じ（003_001）。
-    ・データ削除の時は、Stripe 側の解約も同じ流れで行う。（003_002）
+    ・解約・データ削除は 002_005_flow.txt「解約」「データ削除」。
 
     ・googleの認証方法（現在は、期限が一週間）
 
@@ -225,40 +222,15 @@ Google Play で売るときは、Google が売り手として代わりにやっ�
 
 特定商取引法の表記（公式 Web ページに置く）
 消費税・海外の税（Stripe Tax を使うか）
-価格と通貨。Play と同じ ¥500 / $5 にするか
 
 
 
 
 
 
-＊　Stripe リダイレクト先の変更
-
-google審査に絡む為、審査終了後に、以下を修正
-
-
-現在は、モバイル版のランディングページになっている。
-・デスクトップ共用にランディングページ自体の改修
-・stripeの成功ページの設置
-
-
-
-
-
-＊　解約の Web ページと windows_createPortalSession
-
-
-＊　データ削除（Web ページと windows_ の関数）
-
-
-＊　支払い完了のページ
-    windows_createCheckoutSession の戻り先が、まだ https://firemint-e801f.web.app/ のまま
-
-＊　公式サイトに Windows 版を足す
-    hosting/firemint の3ページ（index、privacy、delete_account）に、Windows と Stripe の記述がありません
-
-
-＊　顧客を消した後に返金できるか	サンドボックスで試していません
+＊　公式サイト
+　https://hydrangy.com/firemint/ は、今はモバイル版だけのランディングページ。
+　デスクトップ版と共用にする（上の「これからやること」の 4・5）。
 
 
 
