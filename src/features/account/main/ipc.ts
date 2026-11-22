@@ -3,8 +3,10 @@ import { IPC_CHANNELS } from '@shared/ipc/channels'
 import {
   addAccountMember,
   getAccountStatus,
+  deleteAccountData,
   leaveAccount,
   listAccountMembers,
+  manageBilling,
   purchaseSubscription,
   removeAccountMember,
   refreshAccount,
@@ -27,6 +29,8 @@ export function registerAccountHandlers(): void {
     removeAccountMember(memberId)
   )
   ipcMain.handle(IPC_CHANNELS.ACCOUNT_LEAVE, () => leaveAccount())
+  ipcMain.handle(IPC_CHANNELS.ACCOUNT_MANAGE_BILLING, () => manageBilling())
+  ipcMain.handle(IPC_CHANNELS.ACCOUNT_DELETE_DATA, () => deleteAccountData())
   ipcMain.handle(IPC_CHANNELS.ACCOUNT_GOOGLE_CANCEL_SIGN_IN, () => {
     cancelGoogleIdTokenRequest()
   })

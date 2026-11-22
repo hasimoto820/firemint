@@ -110,6 +110,8 @@ import type {
   UpdateAuthUserInput
 } from '@features/auth_users/shared/types'
 import type {
+  AccountDeleteDataResult,
+  AccountManageBillingResult,
   AccountMember,
   AccountMemberResult,
   AccountPurchaseResult,
@@ -318,6 +320,8 @@ export type AccountIpcApi = {
   addMember: (email: string) => Promise<AccountMemberResult>
   removeMember: (memberId: string) => Promise<AccountMemberResult>
   leave: () => Promise<AccountMemberResult>
+  manageBilling: () => Promise<AccountManageBillingResult>
+  deleteData: () => Promise<AccountDeleteDataResult>
   onChanged: (listener: (status: AccountStatus) => void) => () => void
 }
 

@@ -43,11 +43,18 @@ export type AccountStatus = {
   trialDaysLeft: number | null
   /** 購入できるのは owner だけ */
   isOwner: boolean
+  /** Stripe で買ったことがある（accounts/{accountId}.stripeCustomerId がある）。「支払いの管理・解約」を出す条件 */
+  hasStripeCustomer: boolean
 }
 
 export type AccountSignInResult = { ok: true; status: AccountStatus } | { ok: false; error: string }
 
 export type AccountPurchaseResult = { ok: true } | { ok: false; error: string }
+
+export type AccountManageBillingResult = { ok: true } | { ok: false; error: string }
+
+/** 成功した時は、アプリが閉じるので返らない */
+export type AccountDeleteDataResult = { ok: false; error: string }
 
 /**
  * accounts/{accountId}/members の 1 件（モバイル版の MemberEntry と同じ）。

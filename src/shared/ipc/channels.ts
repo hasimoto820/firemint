@@ -90,6 +90,8 @@ export const IPC_CHANNELS = {
   ACCOUNT_ADD_MEMBER: 'account:add_member',
   ACCOUNT_REMOVE_MEMBER: 'account:remove_member',
   ACCOUNT_LEAVE: 'account:leave',
+  ACCOUNT_MANAGE_BILLING: 'account:manage_billing',
+  ACCOUNT_DELETE_DATA: 'account:delete_data',
   SETTINGS_GET: 'settings:get',
   SETTINGS_SET_LOCALE: 'settings:set_locale',
   SETTINGS_SET_THEME: 'settings:set_theme',

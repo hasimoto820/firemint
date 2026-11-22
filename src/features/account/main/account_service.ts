@@ -1,3 +1,5 @@
+import { rm } from 'node:fs/promises'
+import { join } from 'node:path'
 import { app, BrowserWindow, dialog, net, shell } from 'electron'
 import { translate } from '@shared/i18n/shared/translate'
 import { logInfo, logWarn } from '@shared/logging/logger'
@@ -6,6 +8,8 @@ import { IPC_CHANNELS } from '@shared/ipc/channels'
 import {
   computeEntitlement,
   computeTrialDaysLeft,
+  type AccountDeleteDataResult,
+  type AccountManageBillingResult,
   type AccountMember,
   type AccountMemberResult,
   type AccountPurchaseResult,
@@ -40,6 +44,7 @@ const TOKEN_REFRESH_MARGIN_MS = 60 * 1000
 // ウィンドウに戻るたびに読みに行かない
 const REFRESH_INTERVAL_MS = 15 * 1000
 const CHECKOUT_URL_PREFIX = 'https://checkout.stripe.com/'
+const PORTAL_URL_PREFIX = 'https://billing.stripe.com/'
 
 type IdTokenClaims = { email?: string; name?: string }
 
@@ -48,6 +53,9 @@ let currentEmail: string | null = null
 let currentCache: AccountCache | null = null
 let inviteCheckInflight: Promise<void> | null = null
 let currentIsOwner = false
+let currentHasStripeCustomer = false
+// 「課金中なので招待を受けられない」の案内は、起動している間に 1 回だけ出す
+let inviteBlockedNoticeShown = false
 let lastRefreshAt = 0
 
 function readClaims(idToken: string): IdTokenClaims {
@@ -184,25 +192,32 @@ async function refreshLatestSubscription(): Promise<void> {
       : null
     currentCache = { ...currentCache, latestSubscription }
     await saveAccountCache(currentCache)
-    currentIsOwner = currentCache.accountId
-      ? (await fetchAccountOwnerUid(currentCache.accountId)) === currentTokens?.uid
-      : false
+    const account = currentCache.accountId ? await fetchAccountInfo(currentCache.accountId) : null
+    currentIsOwner = account !== null && account.ownerUid === currentTokens?.uid
+    currentHasStripeCustomer = account !== null && account.stripeCustomerId !== null
   } catch (error) {
     logWarn('account', 'subscription refresh failed; using cache', error)
   }
 }
 
-/** accounts/{accountId}.ownerUid を読む（モバイル版の fetchAccountOwnerUid と同じ）。 */
-async function fetchAccountOwnerUid(accountId: string): Promise<string | null> {
+/** accounts/{accountId} の ownerUid と stripeCustomerId を読む（モバイル版の fetchAccountOwnerUid と同じ読み方）。 */
+async function fetchAccountInfo(
+  accountId: string
+): Promise<{ ownerUid: string | null; stripeCustomerId: string | null }> {
   const response = await net.fetch(
     `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/accounts/${accountId}`,
     { headers: { Authorization: `Bearer ${await getIdToken()}` } }
   )
   if (!response.ok) {
-    throw new Error(`fetchAccountOwnerUid failed: HTTP ${response.status}`)
+    throw new Error(`fetchAccountInfo failed: HTTP ${response.status}`)
   }
-  const body = (await response.json()) as { fields?: { ownerUid?: { stringValue?: string } } }
-  return body.fields?.ownerUid?.stringValue ?? null
+  const body = (await response.json()) as {
+    fields?: { ownerUid?: { stringValue?: string }; stripeCustomerId?: { stringValue?: string } }
+  }
+  return {
+    ownerUid: body.fields?.ownerUid?.stringValue ?? null,
+    stripeCustomerId: body.fields?.stripeCustomerId?.stringValue ?? null
+  }
 }
 
 /** 契約を読み直す。購入した後にブラウザからアプリへ戻った時など。 */
@@ -227,6 +242,28 @@ export async function purchaseSubscription(): Promise<AccountPurchaseResult> {
   } catch (error) {
     logWarn('account', 'purchase failed', error)
     return { ok: false, error: error instanceof Error ? error.message : '購入できませんでした' }
+  }
+}
+
+/**
+ * 002_005_flow.txt「解約」。Stripe の Customer Portal をブラウザで開く。
+ * 開けるのは Stripe で買った本人（owner）だけ（サーバー側でも確かめる）。
+ */
+export async function manageBilling(): Promise<AccountManageBillingResult> {
+  try {
+    const { url } = await callFunction<{ url: string }>('windows_createPortalSession')
+    if (!url.startsWith(PORTAL_URL_PREFIX)) {
+      throw new Error('支払いの管理画面の URL が正しくありません')
+    }
+    await shell.openExternal(url)
+    return { ok: true }
+  } catch (error) {
+    logWarn('account', 'manage billing failed', error)
+    const { locale } = await getSettings()
+    return {
+      ok: false,
+      error: functionErrorMessage(error, translate(locale, 'account.manage_billing_failed'))
+    }
   }
 }
 
@@ -363,6 +400,38 @@ async function updateUserProfile(uid: string): Promise<void> {
   }
 }
 
+async function showNotice(message: string, detail: string): Promise<void> {
+  const options = {
+    type: 'info' as const,
+    buttons: ['OK'],
+    defaultId: 0,
+    noLink: true,
+    message,
+    detail
+  }
+  const window = BrowserWindow.getFocusedWindow()
+  if (window) {
+    await dialog.showMessageBox(window, options)
+  } else {
+    await dialog.showMessageBox(options)
+  }
+}
+
+/** 003_015_billing_core.txt「招待を受けて、別の account に入る」。請求が続いている間は招待を受けられない */
+async function showInviteBlocked(providers: string[]): Promise<void> {
+  if (inviteBlockedNoticeShown) {
+    return
+  }
+  inviteBlockedNoticeShown = true
+  const { locale } = await getSettings()
+  await showNotice(
+    translate(locale, 'account.invite_blocked_title'),
+    translate(locale, 'account.invite_blocked_message', {
+      providers: providers.length > 0 ? providers.join(' / ') : '?'
+    })
+  )
+}
+
 async function confirmInvite(ownerEmail: string | null): Promise<boolean> {
   const { locale } = await getSettings()
   const options = {
@@ -397,7 +466,14 @@ async function doCheckForInvite(): Promise<void> {
     joined: boolean
     accountId?: string
     pendingInvite?: { accountId: string; ownerEmail: string | null }
+    blockedByBilling?: { providers: string[] }
   }>('joinAccount')
+
+  if (joined.blockedByBilling) {
+    logInfo('account', 'invite is blocked while billing is active')
+    await showInviteBlocked(joined.blockedByBilling.providers)
+    return
+  }
 
   if (joined.joined && joined.accountId) {
     await updateCachedAccountId(joined.accountId)
@@ -406,10 +482,21 @@ async function doCheckForInvite(): Promise<void> {
 
   if (joined.pendingInvite) {
     const accept = await confirmInvite(joined.pendingInvite.ownerEmail)
-    const responded = await callFunction<{ joined: boolean; accountId?: string }>(
-      'respondToInvite',
-      { accept }
-    )
+    let responded: { joined: boolean; accountId?: string }
+    try {
+      responded = await callFunction<{ joined: boolean; accountId?: string }>('respondToInvite', {
+        accept
+      })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : ''
+      if (message.includes('BILLING_ACTIVE')) {
+        // 確認を出した後に、課金が始まった時など。サーバーのメッセージの（）の中が決済元
+        const providers = /\(([^)]+)\)/.exec(message)?.[1]?.split(', ') ?? []
+        await showInviteBlocked(providers)
+        return
+      }
+      throw error
+    }
     if (responded.joined && responded.accountId) {
       await updateCachedAccountId(responded.accountId)
       return
@@ -513,6 +600,7 @@ export async function signOutOfAccount(): Promise<AccountStatus> {
   currentEmail = null
   currentCache = null
   currentIsOwner = false
+  currentHasStripeCustomer = false
   logInfo('account', 'signed out')
 
   try {
@@ -536,7 +624,8 @@ export function getAccountStatus(): AccountStatus {
     firstUseDate,
     entitlement: computeEntitlement(firstUseDate, currentCache?.latestSubscription ?? null, now),
     trialDaysLeft: firstUseDate === null ? null : computeTrialDaysLeft(firstUseDate, now),
-    isOwner: currentIsOwner
+    isOwner: currentIsOwner,
+    hasStripeCustomer: currentIsOwner && currentHasStripeCustomer
   }
 }
 
@@ -585,4 +674,72 @@ export async function signInWithGoogle(): Promise<AccountSignInResult> {
       error: error instanceof Error ? error.message : 'Google ログインに失敗しました'
     }
   }
+}
+
+/**
+ * データ削除の後に消す、この PC のファイル（002_005_flow.txt「データ削除」）。
+ * extra_ca.pem（ユーザーが自分で置いた証明書）と、ユーザーが選んだ場所に保存したファイルは消さない。
+ */
+const LOCAL_DATA_FILES = [
+  'account_session.json',
+  'account_cache.json',
+  'google_oauth_tokens.json',
+  'google_profiles.json',
+  'workspaces.json',
+  'saved_queries.json',
+  'settings.json'
+]
+
+/** この PC のデータを消す。1 つでも消せなければ false */
+async function wipeLocalData(): Promise<boolean> {
+  let ok = true
+  for (const name of LOCAL_DATA_FILES) {
+    try {
+      await rm(join(app.getPath('userData'), name), { force: true })
+    } catch (error) {
+      ok = false
+      logWarn('account', `could not delete ${name}`, error)
+    }
+  }
+  return ok
+}
+
+/**
+ * 002_005_flow.txt「データ削除」。確認は画面側で済ませてから呼ぶ。
+ * owner は deleteAccount、それ以外は deleteMyData。どちらも app = windows を渡す
+ * （003_015_billing_core.txt。Stripe はすぐ解約し、Google Play の請求が続いていれば断られる）。
+ * 成功したら、この PC のデータも消して、案内を出してからアプリを閉じる（返らない）。
+ * 失敗した時（断られた時を含む）は、この PC の中は何も消さない。
+ */
+export async function deleteAccountData(): Promise<AccountDeleteDataResult> {
+  // settings.json を消す前に、案内の言語を読んでおく
+  const { locale } = await getSettings()
+  try {
+    await callFunction(currentIsOwner ? 'deleteAccount' : 'deleteMyData', { app: 'windows' })
+    logInfo('account', 'account data deleted on the server')
+  } catch (error) {
+    logWarn('account', 'delete account data failed', error)
+    const message = error instanceof Error ? error.message : ''
+    return {
+      ok: false,
+      error: message.includes('OTHER_BILLING_ACTIVE')
+        ? translate(locale, 'account.delete_other_billing')
+        : functionErrorMessage(error, translate(locale, 'account.delete_failed'))
+    }
+  }
+
+  // ここから先は、サーバーの削除は済んでいる。失敗しても「削除できませんでした」とは出さない
+  currentTokens = null
+  currentEmail = null
+  currentCache = null
+  currentIsOwner = false
+  currentHasStripeCustomer = false
+  const wiped = await wipeLocalData()
+  await showNotice(
+    translate(locale, 'account.delete_done_title'),
+    translate(locale, wiped ? 'account.delete_done' : 'account.delete_done_local_failed')
+  )
+  // before-quit などで設定を書き戻さないよう、終了の処理を飛ばして閉じる
+  app.exit(0)
+  return { ok: false, error: '' }
 }

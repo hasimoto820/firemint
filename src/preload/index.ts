@@ -201,6 +201,8 @@ const api: IpcApi = {
     removeMember: (memberId: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.ACCOUNT_REMOVE_MEMBER, memberId),
     leave: () => ipcRenderer.invoke(IPC_CHANNELS.ACCOUNT_LEAVE),
+    manageBilling: () => ipcRenderer.invoke(IPC_CHANNELS.ACCOUNT_MANAGE_BILLING),
+    deleteData: () => ipcRenderer.invoke(IPC_CHANNELS.ACCOUNT_DELETE_DATA),
     onChanged: (listener) => {
       const handler = (_event: IpcRendererEvent, status: AccountStatus): void => {
         listener(status)

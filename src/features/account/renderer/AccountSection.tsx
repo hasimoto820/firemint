@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useI18n } from '@shared/i18n/renderer/I18nProvider'
 import Button from '@shared/ui/Button'
+import AccountDelete from './AccountDelete'
 import AccountMembers from './AccountMembers'
 import { useAccountStatus } from './useAccountStatus'
 
@@ -34,6 +35,15 @@ function AccountSection(): React.JSX.Element {
     })
   }
 
+  const handleManageBilling = (): void => {
+    setError(null)
+    void window.api.account.manageBilling().then((result) => {
+      if (!result.ok) {
+        setError(result.error)
+      }
+    })
+  }
+
   const handleSignOut = (): void => {
     setError(null)
     setSigningOut(true)
@@ -56,6 +66,10 @@ function AccountSection(): React.JSX.Element {
           {status.isOwner && status.entitlement !== 'subscribed' && (
             <Button onClick={handlePurchase}>{t('account.purchase')}</Button>
           )}
+          {/* 出すのは、Stripe で買った本人だけ（002_005_flow.txt の L） */}
+          {status.hasStripeCustomer && (
+            <Button onClick={handleManageBilling}>{t('account.manage_billing')}</Button>
+          )}
           <Button onClick={handleSignOut} disabled={signingOut}>
             {t('account.sign_out')}
           </Button>
@@ -66,6 +80,7 @@ function AccountSection(): React.JSX.Element {
               firstUseDate={status.firstUseDate}
             />
           )}
+          <AccountDelete status={status} />
         </>
       ) : (
         <>
@@ -79,6 +94,7 @@ function AccountSection(): React.JSX.Element {
           ) : (
             <Button onClick={handleSignIn}>{t('account.google_sign_in')}</Button>
           )}
+          {status && !signingIn && <AccountDelete status={status} />}
         </>
       )}
       {error && <p className="settings-window__path">{error}</p>}
