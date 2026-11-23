@@ -903,6 +903,8 @@ code {
   background: var(--ev-c-gray-3);
   border-color: var(--ev-c-gray-1);
   color: inherit;
+  /* アクティブなタブは下線で示す（グループの中でも分かるように） */
+  box-shadow: inset 0 -2px 0 var(--ev-c-tab-active-line);
 }
 
 .tab-bar__label {
@@ -1384,7 +1386,8 @@ code {
   border: none;
   border-radius: 4px;
   background: color-mix(in srgb, var(--tab-group-color) 28%, transparent);
-  color: inherit;
+  /* 普段は控えめに。アクティブなタブを含むグループだけ明るくする */
+  color: var(--ev-c-text-2);
   font-family: inherit;
   font-size: 11px;
   font-weight: 600;
@@ -1403,8 +1406,17 @@ code {
   cursor: text;
 }
 
+.tab-bar__group--active .tab-bar__group-label,
+.tab-bar__group-input {
+  color: var(--ev-c-text-1);
+}
+
 .tab-bar__group .tab-bar__tab {
   background: transparent;
+}
+
+.tab-bar__group .tab-bar__tab--active {
+  background: color-mix(in srgb, var(--tab-group-color) 30%, transparent);
 }
 
 .tab-bar__color-row {
@@ -1510,11 +1522,7 @@ code {
   outline-offset: -2px;
 }
 
-/* 分割表示で、今触っている側（機能を選ぶと入れ替わる側）を分かりやすくする */
-.firestore-split__pane--focused .tab-bar__tab--active {
-  box-shadow: inset 0 2px 0 var(--ev-c-project-focus-border);
-}
-
+/* 分割表示で、今触っている側（機能を選ぶと入れ替わる側）を分かりやすくする。反対側のアクティブなタブは薄くする */
 .firestore-split__pane:not(.firestore-split__pane--focused) .tab-bar__tab--active {
   opacity: 0.65;
 }

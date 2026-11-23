@@ -18,6 +18,7 @@
   --ev-c-text-success: #4ade80;
   --ev-c-project-focus: rgba(45, 212, 191, 0.16);
   --ev-c-project-focus-border: rgba(45, 212, 191, 0.48);
+  --ev-c-tab-active-line: rgba(45, 212, 191, 0.9);
 
   --ev-button-alt-border: transparent;
   --ev-button-alt-text: var(--ev-c-text-1);
@@ -54,6 +55,7 @@
   --ev-c-text-success: #047857;
   --ev-c-project-focus: rgba(45, 212, 191, 0.18);
   --ev-c-project-focus-border: rgba(20, 184, 166, 0.42);
+  --ev-c-tab-active-line: rgba(13, 148, 136, 0.9);
 
   --ev-button-alt-border: transparent;
   --ev-button-alt-text: var(--ev-c-text-1);
