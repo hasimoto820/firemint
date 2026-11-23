@@ -13,8 +13,10 @@ import {
   addGoogleEntryAndLoad,
   getFocusedConnectionInfo,
   getWorkspaceEntry,
+  reconnectGoogleAccountConnections,
   unloadProject
 } from '@features/workspace/main/service'
+import { getScriptJobSnapshot } from '@features/script_runner/main/job_runner'
 import { getFocusedProjectId } from '@shared/firestore/focused'
 import type {
   ConnectResult,
@@ -189,6 +191,25 @@ export async function connectWithServiceAccountFile(filePath: string): Promise<C
   }
 }
 
+/**
+ * 再ログインで保存し直した token を、同じアカウントで開いているプロジェクトに使わせる。
+ * Import / Export / 転送の最中は、接続を作り直すとジョブが壊れるので、つなぎ直さない
+ * （その時は、ジョブが終わってから再ログインするか、アプリを再起動すると直る）。
+ * ここで失敗しても、ログイン自体は成功として返す。
+ */
+async function reconnectOpenProjects(accountKey: string): Promise<void> {
+  if (getScriptJobSnapshot()?.status === 'running') {
+    logWarn('connection', 'google reconnect skipped: a job is running')
+    return
+  }
+
+  try {
+    await reconnectGoogleAccountConnections(accountKey)
+  } catch (error) {
+    logError('connection', 'google reconnect failed', error)
+  }
+}
+
 export function cancelGoogleSignIn(): void {
   cancelGoogleOAuthLogin()
 }
@@ -198,6 +219,7 @@ export async function signInWithGoogle(): Promise<GoogleSignInResult> {
     const config = await loadGoogleOAuthConfig()
     const tokens = await runGoogleOAuthLogin(config)
     const accountKey = await saveGoogleRefreshToken(tokens.email, tokens.refreshToken)
+    await reconnectOpenProjects(accountKey)
 
     return {
       ok: true,

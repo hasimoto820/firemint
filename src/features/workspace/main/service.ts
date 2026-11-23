@@ -387,6 +387,43 @@ export async function unloadProject(projectId: string): Promise<WorkspaceResult<
 }
 
 /**
+ * 同じ Google アカウントで開いているプロジェクトを、保存し直した token でつなぎ直す。
+ * 接続は、作った時の token を持ち続ける。再ログインしただけでは古い token のままで、
+ * アプリを再起動するまで直らなかった。再ログインの後にこれを呼ぶ。
+ * 開いていないプロジェクトは、次に開く時に新しい token を読むので触らない。
+ */
+export async function reconnectGoogleAccountConnections(
+  accountKey: string
+): Promise<{ reconnectedProjectIds: string[]; failedProjectIds: string[] }> {
+  const key = accountKey.trim().toLowerCase()
+  const targets = store.entries.filter(
+    (entry) =>
+      entry.authType === 'google' &&
+      entry.googleAccountKey?.trim().toLowerCase() === key &&
+      isFirestoreConnected(entry.id)
+  )
+  const reconnectedProjectIds: string[] = []
+  const failedProjectIds: string[] = []
+
+  for (const entry of targets) {
+    const result = await ensureConnected(entry)
+
+    if (result.ok) {
+      reconnectedProjectIds.push(entry.id)
+    } else {
+      failedProjectIds.push(entry.id)
+      logError('workspace', `google reconnect failed project_id=${entry.id}`, result.error)
+    }
+  }
+
+  logInfo(
+    'workspace',
+    `google reconnect done reconnected=${reconnectedProjectIds.length} failed=${failedProjectIds.length}`
+  )
+  return { reconnectedProjectIds, failedProjectIds }
+}
+
+/**
  * Google アカウントの接続だけ切る（クラウド削除ではない）。
  * 名簿・token・プロファイルは残し、リストから再接続できる状態にする。
  */
