@@ -277,6 +277,13 @@ J. オフラインの時は、モバイル版と同じく、キャッシュを�
 L. 「支払いの管理・解約」を出すのは、Stripe で買った本人だけ
    （owner で、accounts/{accountId}.stripeCustomerId がある時）。
 
+K. Stripe の顧客を消さないことを、プライバシーポリシーと delete_account.html に書く（2026-11-23）。
+   ・Windows で払った人は、Stripe の顧客（メールアドレスと支払いの履歴・請求書）が、支払いの記録として残る
+   ・会計と税の記録のためだけに使う
+   ・消してほしい時は連絡をもらい、法律で残す必要がある分を除いて消す
+   privacy.html「Data we keep after deletion」→「Payment records at Stripe」と、
+   delete_account.html「Data we keep after deletion」に書いた。
+
 
 
 
@@ -284,4 +291,4 @@ L. 「支払いの管理・解約」を出すのは、Stripe で買った本人�
 未策定
 ================================================================================
 
-K. Stripe の顧客を消さないことを、プライバシーポリシーと delete_account.html に書くか。
+（なし）
