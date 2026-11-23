@@ -1,4 +1,8 @@
+import type { ImpExpDraft } from '@features/data_transfer/shared/imp_exp'
+import type { DiffDraft } from '@features/diff/shared/diff'
+import type { EmulatorPageMode } from '@features/emulator/shared/types'
 import type { DocumentSummary } from '@features/explorer/shared/types'
+import type { TransportDraft } from '@features/transport/shared/transport'
 import type { AppView } from '@shared/shell/AppNav'
 import type { DocumentTableViewState } from '@shared/ui/document_table_utils'
 
@@ -6,8 +10,8 @@ export type WorkspacePaneId = 'primary' | 'secondary'
 
 /**
  * 上段タブの種別。Imp/Exp と Emulator はコレクションに紐づかない。
- * empty は＋で開く空タブ。コレクションを選ぶと collection に置き換わる。
- * auth は projectId の Auth ユーザー一覧。コレクションと同じく中身を切り替えられる。
+ * empty は＋で開く空タブ。
+ * どの種別のタブも、機能を選ぶと中身が入れ替わる（001_006_UI.txt「タブの決まり」）。
  */
 export type WorkspaceTabKind =
   | 'collection'
@@ -66,7 +70,26 @@ export type WorkspaceTab = {
    * 今開いているコレクションと合わせて PAGE_HISTORY_LIMIT 件まで覚える。
    */
   pageCache: Record<string, WorkspaceTabPageState>
+  /**
+   * ツールの入力。タブごとに持ち、そのツールを開いている時だけ値がある。
+   * 別の画面に入れ替えると null に戻す（入力の途中は捨てる）。
+   */
+  toolDraft: WorkspaceToolDraft | null
+  /**
+   * ツールを開くたびに変わる ID。画面の key に使い、開き直したら画面の状態（検証の結果など）も作り直す。
+   * ツール以外は null。
+   */
+  toolOpenId: string | null
 }
+
+/** ツールのタブが持つ入力。kind はタブの kind と同じ。 */
+export type WorkspaceToolDraft =
+  | { kind: 'imp_exp'; draft: ImpExpDraft }
+  | { kind: 'emulator_imp_exp'; mode: EmulatorPageMode }
+  | { kind: 'transport'; draft: TransportDraft }
+  | { kind: 'diff'; draft: DiffDraft }
+
+export type WorkspaceToolKind = WorkspaceToolDraft['kind']
 
 /** Simple モードのページ位置と、表の列・並び替え・フィルタ。 */
 export type WorkspaceTabSimpleState = {
@@ -127,7 +150,9 @@ export function createWorkspaceTab(input: {
     groupId: null,
     ...emptyPageState(),
     selectedDocumentPath: input.selectedDocumentPath ?? null,
-    pageCache: {}
+    pageCache: {},
+    toolDraft: null,
+    toolOpenId: null
   }
 }
 
@@ -232,7 +257,9 @@ export function retargetAuthTab(tab: WorkspaceTab, projectId: string): Workspace
     kind: 'auth',
     projectId,
     collectionPath: '',
-    pageCache: cache
+    pageCache: cache,
+    toolDraft: null,
+    toolOpenId: null
   }
 }
 
@@ -281,14 +308,41 @@ export function retargetCollectionTab(
     collectionPath: input.collectionPath,
     view: input.view ?? tab.view,
     selectedDocumentPath: input.selectedDocumentPath ?? restored.selectedDocumentPath,
-    pageCache: cache
+    pageCache: cache,
+    toolDraft: null,
+    toolOpenId: null
   }
 }
 
-/** ウィンドウに 1 つだけの Imp/Exp タブ。コレクションには紐づけない。 */
-export function createImpExpTab(input: {
+/**
+ * タブの中身をツール（Imp/Exp・Emulator・Transport・Diff）に切り替える。
+ * 入力は渡されたもの（まっさら、または開く時に渡された対象を入れたもの）にする。
+ * 開いていたコレクションの状態は pageCache に残す（コレクションに戻った時に戻す）。
+ */
+export function retargetToolTab(
+  tab: WorkspaceTab,
+  input: { projectId: string; toolDraft: WorkspaceToolDraft }
+): WorkspaceTab {
+  const cache = stashCurrentPage(tab)
+  trimPageCache(cache)
+
+  return {
+    ...tab,
+    ...emptyPageState(),
+    kind: input.toolDraft.kind,
+    projectId: input.projectId,
+    collectionPath: '',
+    pageCache: cache,
+    toolDraft: input.toolDraft,
+    toolOpenId: createWorkspaceTabId()
+  }
+}
+
+/** ツールのタブを新しく作る（今のタブが無い時）。 */
+export function createToolTab(input: {
   projectId: string
   pane?: WorkspacePaneId
+  toolDraft: WorkspaceToolDraft
 }): WorkspaceTab {
   return {
     ...createWorkspaceTab({
@@ -296,7 +350,9 @@ export function createImpExpTab(input: {
       collectionPath: '',
       pane: input.pane ?? 'primary'
     }),
-    kind: 'imp_exp'
+    kind: input.toolDraft.kind,
+    toolDraft: input.toolDraft,
+    toolOpenId: createWorkspaceTabId()
   }
 }
 
@@ -310,11 +366,6 @@ export function isEmptyTab(tab: WorkspaceTab): boolean {
 
 export function isAuthTab(tab: WorkspaceTab): boolean {
   return tab.kind === 'auth'
-}
-
-/** クリックで中身を切り替えてよいタブ（コレクション / 空タブ / Auth）。ツール系は入力途中なので除く。 */
-export function isReplaceableTab(tab: WorkspaceTab): boolean {
-  return tab.kind === 'collection' || tab.kind === 'empty' || tab.kind === 'auth'
 }
 
 export function isImpExpTab(tab: WorkspaceTab): boolean {
@@ -341,51 +392,6 @@ export function isWorkspaceToolTab(tab: WorkspaceTab): boolean {
     tab.kind === 'transport' ||
     tab.kind === 'diff'
   )
-}
-
-/** ウィンドウに 1 つだけの Emulator Imp/Exp タブ。 */
-export function createEmulatorImpExpTab(input: {
-  projectId: string
-  pane?: WorkspacePaneId
-}): WorkspaceTab {
-  return {
-    ...createWorkspaceTab({
-      projectId: input.projectId,
-      collectionPath: '',
-      pane: input.pane ?? 'primary'
-    }),
-    kind: 'emulator_imp_exp'
-  }
-}
-
-/** ウィンドウに 1 つだけの Transport タブ。 */
-export function createTransportTab(input: {
-  projectId: string
-  pane?: WorkspacePaneId
-}): WorkspaceTab {
-  return {
-    ...createWorkspaceTab({
-      projectId: input.projectId,
-      collectionPath: '',
-      pane: input.pane ?? 'primary'
-    }),
-    kind: 'transport'
-  }
-}
-
-/** ウィンドウに 1 つだけの Diff タブ。 */
-export function createDiffTab(input: {
-  projectId: string
-  pane?: WorkspacePaneId
-}): WorkspaceTab {
-  return {
-    ...createWorkspaceTab({
-      projectId: input.projectId,
-      collectionPath: '',
-      pane: input.pane ?? 'primary'
-    }),
-    kind: 'diff'
-  }
 }
 
 /** タブ見出し。コレクションはパス末尾、Imp/Exp・Emulator は固定名。混在時は projectLabel を付ける。 */

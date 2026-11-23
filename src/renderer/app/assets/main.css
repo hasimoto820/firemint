@@ -1506,8 +1506,17 @@ code {
 }
 
 .firestore-split__pane--focused {
-  outline: 1px solid rgba(105, 136, 230, 0.35);
-  outline-offset: -1px;
+  outline: 2px solid var(--ev-c-project-focus-border);
+  outline-offset: -2px;
+}
+
+/* 分割表示で、今触っている側（機能を選ぶと入れ替わる側）を分かりやすくする */
+.firestore-split__pane--focused .tab-bar__tab--active {
+  box-shadow: inset 0 2px 0 var(--ev-c-project-focus-border);
+}
+
+.firestore-split__pane:not(.firestore-split__pane--focused) .tab-bar__tab--active {
+  opacity: 0.65;
 }
 
 .firestore-split__pane-empty {

@@ -25,19 +25,16 @@ import type { ScriptJobSnapshot } from '@features/script_runner/shared/types'
 import {
   applyImpExpIntent,
   createImpExpDraft,
-  type ImpExpDraft,
   type ImpExpIntent
 } from '@features/data_transfer/shared/imp_exp'
 import {
   applyDiffIntent,
   createDiffDraft,
-  type DiffDraft,
   type DiffIntent
 } from '@features/diff/shared/diff'
 import {
   applyTransportIntent,
   createTransportDraft,
-  type TransportDraft,
   type TransportIntent
 } from '@features/transport/shared/transport'
 import AppHeader from '@shared/shell/AppHeader'
@@ -49,11 +46,8 @@ import TabBar from '@shared/shell/TabBar'
 import WorkspacePane from '@shared/shell/WorkspacePane'
 import {
   createAuthTab,
-  createDiffTab,
-  createEmulatorImpExpTab,
-  createImpExpTab,
   createEmptyTab,
-  createTransportTab,
+  createToolTab,
   createWorkspaceTab,
   DIFF_TAB_LABEL,
   EMULATOR_IMP_EXP_TAB_LABEL,
@@ -65,18 +59,19 @@ import {
   isAuthTab,
   isImpExpTab,
   isEmptyTab,
-  isReplaceableTab,
   isTransportTab,
   isWorkspaceToolTab,
   parentCollectionPath,
   retargetAuthTab,
   retargetCollectionTab,
+  retargetToolTab,
   remapFirestorePath,
   tabsInPane,
   workspaceTabLabel,
   type WorkspacePaneId,
   type WorkspaceTab,
-  type WorkspaceTabSimpleState
+  type WorkspaceTabSimpleState,
+  type WorkspaceToolDraft
 } from '@shared/shell/workspace_tab'
 import {
   applyTabBarDrop,
@@ -190,11 +185,7 @@ function FirestorePageInner({
   const [deleteSubcollectionPath, setDeleteSubcollectionPath] = useState<string | null>(null)
   const [dialogProjectId, setDialogProjectId] = useState(projectId)
   const [impExpJob, setImpExpJob] = useState<ScriptJobSnapshot | null>(null)
-  const [impExpDraft, setImpExpDraft] = useState<ImpExpDraft>(() => createImpExpDraft(projectId))
-  const [transportDraft, setTransportDraft] = useState<TransportDraft>(() => createTransportDraft())
-  const [diffDraft, setDiffDraft] = useState<DiffDraft>(() => createDiffDraft())
   const [lastCollectionPath, setLastCollectionPath] = useState('')
-  const [emulatorImpExpMode, setEmulatorImpExpMode] = useState<EmulatorPageMode>('import-project')
   const lastCollectionPathRef = useRef<string | null>(null)
   const impExpJobRef = useRef<ScriptJobSnapshot | null>(null)
   impExpJobRef.current = impExpJob
@@ -262,12 +253,20 @@ function FirestorePageInner({
 
   useEffect(() => {
     setTabs((current) =>
-      current.map((tab) => (isWorkspaceToolTab(tab) ? { ...tab, projectId } : tab))
-    )
-    setImpExpDraft((current) =>
-      current.destinationProjectId === projectId
-        ? current
-        : { ...current, destinationProjectId: projectId }
+      current.map((tab) => {
+        if (!isWorkspaceToolTab(tab)) {
+          return tab
+        }
+        const toolDraft: WorkspaceToolDraft | null =
+          tab.toolDraft?.kind === 'imp_exp' &&
+          tab.toolDraft.draft.destinationProjectId !== projectId
+            ? {
+                kind: 'imp_exp',
+                draft: { ...tab.toolDraft.draft, destinationProjectId: projectId }
+              }
+            : tab.toolDraft
+        return { ...tab, projectId, toolDraft }
+      })
     )
   }, [projectId])
 
@@ -430,8 +429,8 @@ function FirestorePageInner({
       const activeId = targetPane === 'primary' ? primaryActiveId : secondaryActiveId
       const activeTab = tabs.find((tab) => tab.id === activeId) ?? null
 
-      // コレクション / 空タブ / Auth は中身を切り替える。ツール系タブは入力途中なので残す。
-      if (!options?.newTab && activeTab && isReplaceableTab(activeTab)) {
+      // どのタブでも中身を入れ替える。ツールの入力途中は捨てる（001_006_UI.txt「タブの決まり」）。
+      if (!options?.newTab && activeTab) {
         const resolvedView = nextView ?? (isCollectionTab(activeTab) ? activeTab.view : view)
         setFocusedPane(targetPane)
         setTabs((current) =>
@@ -486,7 +485,7 @@ function FirestorePageInner({
       const activeTab = tabs.find((tab) => tab.id === activeId) ?? null
       setFocusedPane(targetPane)
 
-      if (!newTab && activeTab && isReplaceableTab(activeTab)) {
+      if (!newTab && activeTab) {
         setTabs((current) =>
           current.map((tab) => (tab.id === activeTab.id ? retargetAuthTab(tab, projectId) : tab))
         )
@@ -519,139 +518,94 @@ function FirestorePageInner({
     [projectId]
   )
 
-  const openImpExp = useCallback(
-    (intent?: ImpExpIntent): void => {
-      if (intent) {
-        setImpExpDraft((current) =>
-          applyImpExpIntent(current, intent, lastCollectionPathRef.current, rootCollections)
+  /**
+   * ツールを今のタブに開く（分割表示なら、今触っている側）。タブが無ければ作る。
+   * 別のタブに同じツールがあっても、そこへは移らない。入力は渡された toolDraft にする。
+   */
+  const openTool = useCallback(
+    (toolDraft: WorkspaceToolDraft): void => {
+      const targetPane = splitEnabled ? focusedPane : 'primary'
+      const activeId = targetPane === 'primary' ? primaryActiveId : secondaryActiveId
+      const activeTab = tabs.find((tab) => tab.id === activeId) ?? null
+      setFocusedPane(targetPane)
+
+      if (activeTab) {
+        setTabs((current) =>
+          current.map((tab) =>
+            tab.id === activeTab.id ? retargetToolTab(tab, { projectId, toolDraft }) : tab
+          )
         )
-      } else {
-        setImpExpDraft((current) => ({
-          ...current,
-          collectionPath: current.collectionPath || lastCollectionPathRef.current || ''
-        }))
+        return
       }
 
-      setTabs((current) => {
-        const existing = current.find(isImpExpTab)
-        if (existing) {
-          if (existing.pane === 'primary') {
-            setPrimaryActiveId(existing.id)
-          } else {
-            setSecondaryActiveId(existing.id)
-          }
-          setFocusedPane(existing.pane)
-          return current
-        }
-
-        const created = createImpExpTab({ projectId, pane: 'primary' })
+      const created = createToolTab({ projectId, pane: targetPane, toolDraft })
+      if (targetPane === 'primary') {
         setPrimaryActiveId(created.id)
-        setFocusedPane('primary')
-        return [...current, created]
-      })
+      } else {
+        setSecondaryActiveId(created.id)
+      }
+      setTabs((current) => [...current, created])
     },
-    [projectId, rootCollections]
+    [focusedPane, primaryActiveId, projectId, secondaryActiveId, splitEnabled, tabs]
+  )
+
+  const openImpExp = useCallback(
+    (intent?: ImpExpIntent): void => {
+      const blank = createImpExpDraft(projectId)
+      const draft = intent
+        ? applyImpExpIntent(blank, intent, lastCollectionPathRef.current, rootCollections)
+        : { ...blank, collectionPath: lastCollectionPathRef.current || '' }
+      openTool({ kind: 'imp_exp', draft })
+    },
+    [openTool, projectId, rootCollections]
   )
 
   const openEmulatorImpExp = useCallback(
     (mode?: EmulatorPageMode): void => {
-      if (mode) {
-        setEmulatorImpExpMode(mode)
-      }
-
-      setTabs((current) => {
-        const existing = current.find(isEmulatorImpExpTab)
-        if (existing) {
-          if (existing.pane === 'primary') {
-            setPrimaryActiveId(existing.id)
-          } else {
-            setSecondaryActiveId(existing.id)
-          }
-          setFocusedPane(existing.pane)
-          return current
-        }
-
-        const created = createEmulatorImpExpTab({ projectId, pane: 'primary' })
-        setPrimaryActiveId(created.id)
-        setFocusedPane('primary')
-        return [...current, created]
-      })
+      openTool({ kind: 'emulator_imp_exp', mode: mode ?? 'import-project' })
     },
-    [projectId]
+    [openTool]
   )
 
   const openTransport = useCallback(
     (intent?: TransportIntent): void => {
-      if (intent) {
-        setTransportDraft((current) =>
-          applyTransportIntent(
-            current,
+      const blank = createTransportDraft()
+      const draft = intent
+        ? applyTransportIntent(
+            blank,
             intent,
             lastCollectionPathRef.current || lastCollectionPath,
             rootCollections
           )
-        )
-      }
-
-      setTabs((current) => {
-        const existing = current.find(isTransportTab)
-        if (existing) {
-          if (existing.pane === 'primary') {
-            setPrimaryActiveId(existing.id)
-          } else {
-            setSecondaryActiveId(existing.id)
-          }
-          setFocusedPane(existing.pane)
-          return current
-        }
-
-        const created = createTransportTab({ projectId, pane: 'primary' })
-        setPrimaryActiveId(created.id)
-        setFocusedPane('primary')
-        return [...current, created]
-      })
+        : blank
+      openTool({ kind: 'transport', draft })
     },
-    [lastCollectionPath, projectId, rootCollections]
+    [lastCollectionPath, openTool, rootCollections]
   )
 
   const openDiff = useCallback(
     (intent?: DiffIntent): void => {
-      if (intent) {
-        setDiffDraft((current) => applyDiffIntent(current, intent))
-      }
-
-      setTabs((current) => {
-        const existing = current.find(isDiffTab)
-        if (existing) {
-          if (existing.pane === 'primary') {
-            setPrimaryActiveId(existing.id)
-          } else {
-            setSecondaryActiveId(existing.id)
-          }
-          setFocusedPane(existing.pane)
-          return current
-        }
-
-        const created = createDiffTab({ projectId, pane: 'primary' })
-        setPrimaryActiveId(created.id)
-        setFocusedPane('primary')
-        return [...current, created]
-      })
+      const blank = createDiffDraft()
+      openTool({ kind: 'diff', draft: intent ? applyDiffIntent(blank, intent) : blank })
     },
-    [projectId]
+    [openTool]
   )
 
-  const handleImpExpDraftChange = useCallback((patch: Partial<ImpExpDraft>): void => {
-    setImpExpDraft((current) => ({ ...current, ...patch }))
-  }, [])
-
-  const handleTransportDraftChange = useCallback((patch: Partial<TransportDraft>): void => {
-    setTransportDraft((current) => ({ ...current, ...patch }))
-  }, [])
-
-  const handleDiffDraftChange = useCallback((patch: Partial<DiffDraft>): void => {
-    setDiffDraft((current) => ({ ...current, ...patch }))
-  }, [])
+  /** ツールの入力を、そのタブの toolDraft に書く。今の種類と違えば何もしない。 */
+  const updateToolDraft = useCallback(
+    (tabId: string, update: (current: WorkspaceToolDraft) => WorkspaceToolDraft | null): void => {
+      setTabs((current) =>
+        current.map((tab) => {
+          if (tab.id !== tabId || !tab.toolDraft) {
+            return tab
+          }
+          const next = update(tab.toolDraft)
+          return next ? { ...tab, toolDraft: next } : tab
+        })
+      )
+    },
+    []
+  )
 
   const handleSelectCollection = useCallback(
     (collectionPath: string, newTab = false): void => {
@@ -1005,15 +959,29 @@ function FirestorePageInner({
       autocomplete.addCollectionPaths(dialogProjectId, [targetCollectionPath])
 
       if (dialogProjectId === projectId) {
-        setImpExpDraft((current) => ({
-          ...current,
-          collectionPath:
-            remapFirestorePath(
-              current.collectionPath,
-              sourceCollectionPath,
-              targetCollectionPath
-            ) ?? current.collectionPath
-        }))
+        setTabs((current) =>
+          current.map((tab) => {
+            if (tab.toolDraft?.kind !== 'imp_exp') {
+              return tab
+            }
+            const draft = tab.toolDraft.draft
+            return {
+              ...tab,
+              toolDraft: {
+                kind: 'imp_exp',
+                draft: {
+                  ...draft,
+                  collectionPath:
+                    remapFirestorePath(
+                      draft.collectionPath,
+                      sourceCollectionPath,
+                      targetCollectionPath
+                    ) ?? draft.collectionPath
+                }
+              }
+            }
+          })
+        )
       }
 
       setTabs((current) => {
@@ -1223,11 +1191,14 @@ function FirestorePageInner({
   }, [loadRootCollections, onWorkspaceChanged])
 
   const handleCloseEmulatorImpExp = useCallback((): void => {
-    const tab = tabs.find(isEmulatorImpExpTab)
+    // Emulator のタブは複数ありうるので、今触っているタブを優先する
+    const tab =
+      tabs.find((item) => item.id === focusedActiveId && isEmulatorImpExpTab(item)) ??
+      tabs.find(isEmulatorImpExpTab)
     if (tab) {
       void handleCloseTab(tab.id)
     }
-  }, [handleCloseTab, tabs])
+  }, [focusedActiveId, handleCloseTab, tabs])
 
   const handleCloseOtherTabs = useCallback(async (): Promise<void> => {
     if (!focusedActiveId || !focusedTab) {
@@ -1620,8 +1591,9 @@ function FirestorePageInner({
         </div>
       ) : active ? (
         <WorkspacePane
-          // タブごとに作り直す。中身の状態はタブ（simpleState / query*）から戻す
-          key={active.id}
+          // タブごとに作り直す。中身の状態はタブ（simpleState / query*）から戻す。
+          // ツールは開くたびに作り直す（入力の途中は捨てる）
+          key={active.toolOpenId ? `${active.id}:${active.toolOpenId}` : active.id}
           status={
             isWorkspaceToolTab(active)
               ? status
@@ -1631,19 +1603,55 @@ function FirestorePageInner({
           pane={pane}
           menuEnabled={focusedPane === pane && isCollectionTab(active) && active.view === 'simple'}
           impExpJob={impExpJob}
-          impExpDraft={impExpDraft}
+          impExpDraft={
+            active.toolDraft?.kind === 'imp_exp'
+              ? active.toolDraft.draft
+              : createImpExpDraft(active.projectId)
+          }
           rootCollections={rootCollections}
-          onImpExpDraftChange={handleImpExpDraftChange}
+          onImpExpDraftChange={(patch) =>
+            updateToolDraft(active.id, (current) =>
+              current.kind === 'imp_exp'
+                ? { kind: 'imp_exp', draft: { ...current.draft, ...patch } }
+                : null
+            )
+          }
           onCancelImpExp={handleCancelImpExp}
           onOpenImpExp={openImpExp}
-          transportDraft={transportDraft}
-          onTransportDraftChange={handleTransportDraftChange}
-          diffDraft={diffDraft}
-          onDiffDraftChange={handleDiffDraftChange}
+          transportDraft={
+            active.toolDraft?.kind === 'transport'
+              ? active.toolDraft.draft
+              : createTransportDraft()
+          }
+          onTransportDraftChange={(patch) =>
+            updateToolDraft(active.id, (current) =>
+              current.kind === 'transport'
+                ? { kind: 'transport', draft: { ...current.draft, ...patch } }
+                : null
+            )
+          }
+          diffDraft={
+            active.toolDraft?.kind === 'diff' ? active.toolDraft.draft : createDiffDraft()
+          }
+          onDiffDraftChange={(patch) =>
+            updateToolDraft(active.id, (current) =>
+              current.kind === 'diff'
+                ? { kind: 'diff', draft: { ...current.draft, ...patch } }
+                : null
+            )
+          }
           sourceLabel={focusedEntry?.label ?? status.projectId}
           sourceCollectionPath={lastCollectionPath}
-          emulatorPageMode={emulatorImpExpMode}
-          onEmulatorModeChange={setEmulatorImpExpMode}
+          emulatorPageMode={
+            active.toolDraft?.kind === 'emulator_imp_exp'
+              ? active.toolDraft.mode
+              : 'import-project'
+          }
+          onEmulatorModeChange={(mode) =>
+            updateToolDraft(active.id, (current) =>
+              current.kind === 'emulator_imp_exp' ? { kind: 'emulator_imp_exp', mode } : null
+            )
+          }
           emulatorHost={emulatorHost}
           emulatorDestinationPoolId={status.authType === 'emulator' ? status.projectId : null}
           emulatorDestinationLabel={
