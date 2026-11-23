@@ -46,8 +46,8 @@ todo
 ＊　まだ試していないこと
 　Stripe のダッシュボードから、テスト契約（pandaas886）を操作して、Webhook の動きを確かめる。
 　・解約の予約 → CANCELED。期限までは使える
+　　→　OK（2026-11-23。Webhook が cancel_at を見ていなかったのを直してから確かめた）
 　・解約の取り消し → PURCHASED に戻る
-　・返金 → VOIDED_。すぐ使えなくなり、Stripe の契約も終わる
 　・支払いの失敗 → IN_GRACE_PERIOD。全部失敗したら使えなくなる
 
 
@@ -259,8 +259,10 @@ Stripe と課金
 解約の取り消し
 返金
 支払いの失敗
+ →　OK
 
 4 実際に払って、thanks.html に戻るかを試す（今日の変更の確認です）
+ →　OK
 
 
 
@@ -295,8 +297,12 @@ Stripe と課金
 本番に出す前に
 
 1 モバイル側の修正（002_100_mobile.txt）
+→　OK
 
-2 Stripe の本番環境に、同じ設定を作り直す: STRIPE_SECRET_KEY、STRIPE_WEBHOOK_SECRET、価格の ID を差し替えます。
+
+
+
+
 
 3 法律とお金まわり: 特定商取引法の表記を公式サイトに置く。消費税・海外の税（Stripe Tax を使うか）を決める。
 
@@ -307,6 +313,73 @@ Stripe と課金
 
 
 
+
+
+
+================================================================================
+本番開始直前作業
+================================================================================
+
+1 Stripe の本番環境に、同じ設定を作り直す: STRIPE_SECRET_KEY、STRIPE_WEBHOOK_SECRET、価格の ID を差し替えます。
+
+　設定の中身は 003_reoper/002_004_account.txt「Stripe の設定」と同じ。サンドボックスの設定は本番に引き継がれない。
+　コードは変えない。差し替えるのは次の 3 つ。
+
+　　値                              置く場所
+　　API キー（sk_live_…）           Firebase のシークレット STRIPE_SECRET_KEY
+　　Webhook の署名の値（whsec_…）   Firebase のシークレット STRIPE_WEBHOOK_SECRET
+　　価格の ID（price_…）            firemint_m/functions/.env.firemint-e801f の STRIPE_PRICE_ID
+
+　＊　いつやるか
+　　A（Stripe のダッシュボード）は、いつやってもテストに影響しない。早めに済ませて、値を控えておく。
+　　B（Firebase）でデプロイした時点で本番に切り替わり、テスト用のカード（4242…）は使えなくなる。
+　　　→ B はリリースの直前にやる。
+　　「アカウントの有効化」は Stripe の審査に日数がかかることがあるので、いちばん先にやる。
+
+　＊　A. Stripe のダッシュボード（https://dashboard.stripe.com/ 。画面上部の切り替えを「本番環境」にしてから）
+　　1. アカウントの有効化: 事業の情報と、入金先の銀行口座を登録する
+　　2. 商品と価格（商品カタログ）
+　　　　商品: FireMint Pro。画像は FireMint のロゴ
+　　　　価格: $3.00 / 月（USD）。継続・1 カ月ごと。トライアルなし
+　　　　→ 価格の ID（price_…）を控える
+　　2-2. Managed Payments（Stripe が売り手になる。各国の税を任せる）
+　　　　https://dashboard.stripe.com/settings/managed-payments →「使ってみる」
+　　　　商品カテゴリー: FireMint Pro に「Downloadable Software - business use」を付ける（利用資格が「利用対象」になること）
+　　　　決済: 「構築済みの決済フォームをそのまま利用」（コードは windows_createCheckoutSession の managed_payments: { enabled: true }）
+　　　　本番で有効になっていないと、購入画面を作る時にエラーになる。Stripe の審査があるので早めに
+　　　　返金リクエスト: 「メール通知なしで返金」（Stripe の返金ポリシーに沿って自動で返金。tokushoho.html もこの前提）
+　　　　Tax の設定 → 価格に税を含める: 「はい」（どの国でも $3 ちょうど）
+　　3. 支払いの失敗（設定 → Billing → サブスクリプションとメール通知）
+　　　　カード決済が失敗した場合にメールを送信: オン
+　　　　Smart Retries、1 週間で最大 8 回
+　　　　支払いのリトライがすべて失敗した場合: サブスクリプションをキャンセル
+　　　　ほかはサンドボックスと同じ（002_004「支払いの失敗」）
+　　4. カスタマーポータル（設定 → Billing → カスタマーポータル）
+　　　　キャンセル: オン。請求期間の終了時にキャンセル
+　　　　サブスク（プラン・数量の変更）: オフ
+　　　　ログインリンク: 有効にする → URL を delete_account.html の「Cancel a card payment without the app」に入れて、Hosting をデプロイする
+　　5. 公開事業情報: 事業名 FireMint、プライバシーポリシー https://hydrangy.com/firemint/privacy.html
+　　6. Webhook（開発者 → Webhook → エンドポイントを追加）
+　　　　URL: https://asia-northeast1-firemint-e801f.cloudfunctions.net/windows_stripeWebhook
+　　　　イベント: checkout.session.completed / invoice.paid / invoice.payment_failed /
+　　　　　　　　　customer.subscription.updated / customer.subscription.deleted / charge.refunded /
+　　　　　　　　　charge.dispute.created
+　　　　→ 署名シークレット（whsec_…）を控える
+　　　　（先に登録しておいても、本番で誰も買わない限り通知は届かないので、テストの邪魔にならない）
+　　7. API キー（開発者 → API キー）→ シークレットキー（sk_live_…）を控える
+
+　＊　B. Firebase（firemint_m のフォルダで。リリースの直前）
+　　1. テストの契約を片付ける
+　　　　サンドボックスで買った契約（carepanda886・pandaas886 など）は、本番に切り替えると Webhook が届かなくなり、
+　　　　Firestore の subscriptions に期限まで「契約中」として残る。ドキュメントを消すか、テスト用のアカウントを削除する
+　　2. シークレットを入れる（実行すると値を聞かれるので、控えた値を貼る）
+　　　　firebase functions:secrets:set STRIPE_SECRET_KEY
+　　　　firebase functions:secrets:set STRIPE_WEBHOOK_SECRET
+　　3. functions/.env.firemint-e801f の STRIPE_PRICE_ID= を、本番の price_… に書き換える
+　　4. Functions を全部デプロイする（Stripe を使う関数は windows_ 以外にもある。respondToInvite など）
+　　　　firebase deploy --only functions
+　　5. 本物のカードで 1 回買って、「契約中」になることを確かめる
+　　　　確かめたら Stripe のダッシュボードから返金する（charge.refunded の確認にもなる）
 
 
 

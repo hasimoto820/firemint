@@ -125,5 +125,15 @@ Emulator使用アドレス
 
 
 デスクトップのインストールファイル
+作成
+firemint/
+npm run build:win
+
+
 dist\firemint-1.0.0-setup.exe
+
+
+
+
+
 

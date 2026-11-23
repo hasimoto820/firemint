@@ -63,6 +63,11 @@ past_due（支払いのやり直し中）        変えない                IN_
 canceled（契約が終わった）            終わった時刻            CANCELED
 上記以外                              変えない                変えない（ログに残す）
 
+「解約の予約あり」は、cancel_at_period_end が true か、cancel_at に日時が入っている時。
+Customer Portal の「請求期間の終了時にキャンセル」は、今の API では cancel_at に日時が入り、
+cancel_at_period_end は false のままになることがある
+（2026-11-23 サンドボックス。Portal で解約を予約したら通知は届いたが、cancel_at_period_end だけを見ていたので PURCHASED のままだった）。
+
 past_due の時は、Stripe の請求期間はもう次の月に進んでいる。その値を expiryTime に書かない。
 
 
