@@ -47,6 +47,12 @@ todo
 　Stripe のダッシュボードから、テスト契約（pandaas886）を操作して、Webhook の動きを確かめる。
 　・解約の予約 → CANCELED。期限までは使える
 　　→　OK（2026-11-23。Webhook が cancel_at を見ていなかったのを直してから確かめた）
+　・Managed Payments で購入 → PURCHASED（購入画面に Link。thanks.html に戻る。アプリは契約中）
+　　→　OK（2026-11-23。sub_1UeoUELx1ft5ni7RgyfUEwas）
+　・Managed Payments で解約の予約 → CANCELED（customer.subscription.updated が届く）
+　　→　OK（2026-11-23）
+　・Managed Payments で毎月の更新 → invoice.paid が届いて expiryTime が延びる
+　　（未確認。テストクロックで時間を進めると試せる）
 　・解約の取り消し → PURCHASED に戻る
 　・支払いの失敗 → IN_GRACE_PERIOD。全部失敗したら使えなくなる
 
